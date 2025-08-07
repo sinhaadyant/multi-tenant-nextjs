@@ -1,0 +1,100 @@
+Development Stack & Best Practices
+	•	TanStack Query (React Query) with Axios for every API call.
+	•	Use Axios interceptors for token handling, global error catching.
+	•	Proper React Context or Redux Toolkit setup if global state is required.
+	•	Follow environment-based logging:
+	•	console.log for dev only using process.env.NODE_ENV.
+	•	Remove all logs in production.
+
+⸻
+
+✅ Form Management & Validation
+	•	Use React Hook Form for all forms.
+	•	Add Yup / Zod schema-based validation for forms.
+	•	Display proper inline error messages for each field.
+	•	Disable submit button during loading.
+	•	Prevent multiple submissions.
+
+⸻
+
+✅ Code Cleanliness
+	•	Remove all unused code, imports, and console logs.
+	•	Ensure component structure is modular and reusable.
+	•	Folder structure follows feature-based separation.
+
+⸻
+
+✅ UI/UX Consistency
+	•	All loading states have Skeleton Loaders.
+	•	All async calls wrapped in Error Boundary or try-catch.
+	•	Use Toast / Snackbar for user feedback (success, error, warning).
+	•	Display empty state with fallback messages when no data is available.
+
+⸻
+
+✅ Table Functionalities
+	•	All tables must support:
+	•	Pagination
+	•	Sorting
+	•	Filtering
+	•	Search (debounced if needed)
+	•	Row-level actions (edit, active/inactive, view)
+	•	Export
+
+⸻
+
+✅ Security Checks
+	•	All API calls must have JWT / Token Authorization.
+	•	Protect all routes with Auth Guards (PrivateRoute or middleware).
+	•	Role-based access checks for modules/submenus.
+	•	Sanitize all user inputs before submission.
+	•	Escape HTML where needed to avoid XSS.
+
+⸻
+
+✅ Export  Functionality
+	•	Ensure Export to CSV/Excel works with applied filters.
+	•	Import supports file type validation, duplicate detection, and error summary.
+	•	Show proper success/failure report on import.
+
+⸻
+
+✅ Notifications / Alerts
+	•	Notification alerts shown via in-app toast + notification dropdown.
+	•	Unread count shown in header.
+ 	•	Notification persists even if user reloads.
+
+⸻
+
+✅ Accessibility & Responsiveness
+ 	•	Proper focus handling and aria-labels for screen readers.
+	•	Responsive layout for all screen sizes.
+
+⸻
+
+✅ Testing & Edge Cases
+	•	Handle edge cases: no data, invalid inputs, slow network.
+	•	Test all modules with both valid and invalid API data.
+	•	Check all conditional UI states (loading, error, empty, success).
+	•	Mobile responsiveness tested.
+
+
+Remove all dummy code 
+
+remove all test code and files 
+
+remove all unused packages and files 
+check and verify all filters all forms and all sorts all search 
+
+
+for validtion for common this create a seperate util for that
+
+
+Check in all pages list is loading 
+Check in all forms is working 
+check in all filters is working 
+check all sort is working 
+check all search is workingc
+check all table pagination is working 
+ErrorBoundary
+SkeletonLoader
