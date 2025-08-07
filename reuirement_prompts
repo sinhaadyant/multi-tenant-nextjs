@@ -1,0 +1,834 @@
+Create a new backend using Express or Next.js API routes.
+Use MySQL + Prisma.
+Implement middleware for:
+
+	•	JWT validation
+	•	Role = superadmin
+	•	Global error handler
+
+	Dashboard
+
+Prompt:
+
+Create GET API /superadmin/dashboard to return:
+
+	•	Total tenants
+	•	Total users (grouped by tenant)
+	•	Active vs inactive tenants
+	•	Last 5 audit logs (tenant name, user email, action, date)
+	•	Last 5 created tenants
+
+⸻
+
+2️⃣ Tenant Management
+
+➤ a. All Tenants
+
+Prompt:
+
+GET /superadmin/tenants
+Supports pagination, search by name, filter by status
+
+➤ b. Create Tenant
+
+Prompt:
+
+POST /superadmin/tenants with fields:
+
+	•	name, slug, admin_email
+→ Automatically create admin user under this tenant
+→ Return admin credentials (optional: send email)
+/tenants/new
+
+have to create tenant with all fields in db also create Admin user for that particular tenant 
+so give required fields with all validation in it 
+
+➤ c. Get / Edit / Delete Tenant
+
+Prompt:
+
+GET /superadmin/tenants/:id
+PUT /superadmin/tenants/:id
+DELETE /superadmin/tenants/:id (soft delete with is_active = false)
+
+⸻
+
+3️⃣ User Management
+
+Prompt:
+
+GET /superadmin/users
+→ List all users across all tenants
+→ Optional filters: tenant_id, role
+GET /superadmin/users/:id
+PUT /superadmin/users/:id — update role, status, tenant
+DELETE /superadmin/users/:id — soft delete
+
+⸻
+
+4️⃣ Roles & Permissions
+
+➤ Roles
+
+Prompt:
+
+GET /superadmin/roles
+POST /superadmin/roles — name, description, global flag
+PUT /superadmin/roles/:id — edit role
+DELETE /superadmin/roles/:id — delete role
+
+➤ Permissions
+
+Prompt:
+
+GET /superadmin/permissions — return static list
+POST /superadmin/roles/:id/permissions — assign multiple permissions to role
+
+➤ Assign Role to User
+
+Prompt:
+
+PUT /superadmin/users/:id/role — assign role_id to user
+
+⸻
+
+5️⃣ Audit Logs
+
+Prompt:
+
+GET /superadmin/audit-logs
+→ Filter by: tenant name, user email, action type, date range
+→ Include pagination & export support (CSV/PDF)
+
+⸻
+
+6️⃣ Reports
+
+Prompt:
+
+GET /superadmin/reports/summary
+→ Summary of tenant usage, active users, features used
+GET /superadmin/reports/tenant/:tenantId
+→ Activity report per tenant (logins, users added, etc.)
+
+⸻
+
+7️⃣ Notifications
+
+➤ Notification List
+
+Prompt:
+
+GET /superadmin/notifications — return notification history
+POST /superadmin/notifications — create a new notification
+→ Accept target: superadmin / all tenants / specific tenant(s)
+PUT /superadmin/notifications/:id — edit content/status
+DELETE /superadmin/notifications/:id
+
+➤ Send Notification API
+
+Prompt:
+
+Trigger in-app notification (optional: email) using target_audience
+
+⸻
+
+8️⃣ Settings
+
+Prompt:
+
+GET /superadmin/settings — fetch system-level settings
+PUT /superadmin/settings — update settings like site title, default theme, language, etc.
+
+⸻
+
+9️⃣ Support / Logs
+
+➤ Support Tickets
+
+Prompt:
+
+GET /superadmin/support — view support tickets raised by tenants
+PUT /superadmin/support/:id — update status, reply
+
+➤ System Logs
+
+Prompt:
+
+GET /superadmin/system-logs — logs of background jobs, cron, errors
+
+⸻
+
+🔟 Superadmin Profile
+
+Prompt:
+
+GET /superadmin/profile — get current superadmin info from token
+PUT /superadmin/profile — update name, email, password (validate current password)
+
+⸻
+
+🔐 Common Middleware Prompts
+
+JWT Auth Middleware
+
+Validate token, extract userId, role, and ensure role === superadmin
+
+Permission Middleware
+
+Create checkPermission(permissionName) to protect specific APIs
+
+
+=======
+API Response Format
+
+Use this format across all APIs for consistency, including for Superadmin, Tenant, and User modules.
+
+{
+  "success": true,
+  "status": 200,
+  "message": "Operation completed successfully",
+  "data": {
+    // Your actual payload here (can be object, array, string, etc.)
+  },
+  "meta": {
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "totalPages": 5,
+      "totalRecords": 50
+    },
+    "timestamp": "2025-08-07T12:34:56.789Z"
+  }
+}
+
+	•	success: Boolean flag for operation status.
+	•	status: HTTP status code.
+	•	message: Descriptive success message.
+	•	data: Main result payload.
+	•	meta: Additional information like pagination or timestamps.
+
+
+    🔻 Failure/Error Response Format
+
+    {
+  "success": false,
+  "status": 400,
+  "message": "Validation failed",
+  "errors": [
+    {
+      "field": "email",
+      "message": "Email is required"
+    },
+    {
+      "field": "password",
+      "message": "Password must be at least 8 characters"
+    }
+  ],
+  "meta": {
+    "timestamp": "2025-08-07T12:35:01.123Z",
+    "requestId": "abc123-def456"
+  }
+}
+
+	•	success: Always false for failure.
+	•	status: HTTP error status (400, 401, 403, 404, 500, etc.).
+	•	message: High-level error description.
+	•	errors: Detailed field-level issues (optional for server errors).
+	•	meta: Optional metadata like request ID, timestamp, environment info.
+
+⸻
+
+For API Testing & ALL - (pending), 
+
+Postman Collection,
+Swagger Documentation,
+
+============
+
+Superadmin Signup and Login Module Prompt
+
+ Implement Secure Superadmin Signup and Login (/signin and /login)
+
+Tech Stack Used:
+	•	Next.js 15 (App Router)
+	•	Redux Toolkit (for auth state)
+	•	TanStack Query (for API calls)
+	•	Axios (with interceptors)
+	•	Lucide React (icons)
+	•	ShadCN (UI components)
+	•	Zod + React Hook Form (for form validation)
+	•	Error Boundary
+	•	Skeleton Loader (for UX)
+	•	Secure LocalStorage (token + user data)
+
+⸻
+
+✅ Superadmin Signup Flow (/signin)
+	1.	Access Control:
+	•	Only accessible via an invite link with token (e.g., /signin?token=xyz)
+	•	If token is invalid/expired → redirect to error page.
+	2.	Fields Required:
+	•	Full Name
+	•	Email (prefilled from invite, not editable)
+	•	Password (min 8 chars, upper/lowercase, number, special char)
+	•	Confirm Password
+	•	Contact Number (with validation)
+	3.	Validations:
+	•	All required fields must be validated using Zod.
+	•	Password and confirm password must match.
+	•	Contact number should follow E.164 format or local rules.
+	4.	Edge Cases:
+	•	Token expired
+	•	Already registered user
+	•	Weak password
+	•	Missing invite token
+	5.	After Signup:
+	•	Auto-login and redirect to dashboard
+	•	Store token in secure localStorage
+	•	Redux auth state must be updated
+
+⸻
+
+🔑 Superadmin Login Flow (/login)
+	1.	Fields Required:
+	•	Email
+	•	Password
+	2.	Validation:
+	•	Validate email format
+	•	Password length > 6
+	•	Show error messages for invalid credentials
+	3.	Login Flow:
+	•	Call login API using TanStack Query + Axios
+	•	On success: store token + user in localStorage
+	•	On failure: show toast or form error
+	•	Use error boundary for unexpected errors
+	•	Show skeleton loader or loading spinner on submit
+	4.	Edge Cases:
+	•	Incorrect credentials
+	•	Inactive account
+	•	Blocked user
+	•	Network failure
+	•	Already logged-in user accessing /login → redirect to dashboard
+
+⸻
+
+🔁 Session Handling
+	•	On every route change:
+	•	If token exists in localStorage, verify it with API
+	•	If not logged in and accessing protected route → redirect to /login
+	•	On successful login/signup:
+	•	Set auth state in Redux (isAuthenticated = true, user = userData)
+	•	Set Axios Authorization headers
+	•	Prefetch dashboard data using TanStack Query
+
+⸻
+
+📦 Modules to Import and Setup
+	1.	Redux Toolkit
+	•	authSlice.ts → stores token, user, and auth status
+	•	setUser, logout, setToken
+	2.	Axios
+	•	Setup with interceptors for:
+	•	Injecting token
+	•	Handling 401 responses
+	•	Global error toast for API issues
+	3.	TanStack Query
+	•	Use mutation for login/signup
+	•	Invalidate queries on logout
+	•	Prefetch dashboard stats after login
+	4.	UI and Icons
+	•	ShadCN input, button, form field
+	•	Lucide icons for input adornments
+	5.	Error Boundary
+	•	Wrap layout or page in error boundary
+	•	Show fallback UI on failure
+	6.	Skeleton Loader
+	•	Use while fetching user or authenticating
+
+⸻
+
+🔐 Security Considerations
+	•	Store token securely (avoid cookies unless HttpOnly used)
+	•	Prevent XSS using sanitized input
+	•	Rate limit login attempts (on backend)
+	•	Enable captcha (if required) for brute-force protection
+	•	Logout on token expiry or 401
+
+==============
+Superadmin Dashboard Module Prompt
+
+Build a secure, responsive, modular Superadmin Dashboard that shows analytical metrics with filters and ApexCharts, includes skeleton loaders for a smooth UX, and follows best practices with clean architecture.
+
+⸻
+
+📦 Libraries to Use:
+	•	Next.js 15 (App Router)
+	•	TanStack Query (Client-side data fetching with caching)
+	•	Axios (for API requests)
+	•	ApexCharts (for charts and graphs)
+	•	Lucide React (for icons)
+	•	Shadcn/UI (for dropdowns, cards, skeletons, and buttons)
+	•	Redux Toolkit + Redux Persist (Optional) for global state (if needed for login state, theme, etc.)
+
+⸻
+
+🧱 Page Structure:
+
+Route: /superadmin/dashboard
+
+Split the dashboard into modular components:
+	1.	DashboardOverviewCards – Total Users, Tenants, Roles, etc.
+	2.	DashboardAnalyticsChart – ApexCharts (Line, Bar, Pie)
+	3.	DateFilterDropdown – “Last 7 Days”, “1 Month”, “60 Days”, “90 Days”, “All”
+	4.	SkeletonLoader – Shown for each section while loading
+	5.	ErrorComponent – Handle and show API/network errors
+	6.	NoDataComponent – Graceful fallback when API returns no data
+
+⸻
+
+📊 Data to Display:
+	•	Total Tenants
+	•	Total Users
+	•	Total Superadmins
+	•	Active Tenants
+	•	Chart 1: Daily/Monthly User Signups
+	•	Chart 2: Tenants Activity over time
+	•	Chart 3: Role Distribution (Pie)
+	•	Recent activity logs (optional)
+
+⸻
+
+🔃 Filtering:
+	•	Add a dropdown (<Select> from Shadcn UI)
+	•	Options: Last 7 Days, 1 Month, 60 Days, 90 Days, All
+	•	On change → re-fetch all counts and chart data
+	•	Add debounce/throttle if rapid switching
+
+⸻
+
+🛡️ Security & Checks:
+	•	Use protected route middleware:
+	•	Redirect to /superadmin/signin if not authenticated
+	•	Redirect to /superadmin/dashboard if already logged in
+	•	Use secure cookies (HttpOnly, Secure, SameSite=Strict)
+	•	Use SSR or middleware to validate tokens
+	•	Validate and sanitize all query params (if any)
+
+⸻
+
+✅ Edge Cases to Handle:
+	•	Token expired → show login screen
+	•	API returns empty → show fallback message
+	•	API errors → retry logic or error state
+	•	Rapid dropdown switching → debounce + cancel previous requests
+	•	No internet → show offline fallback (optional)
+	•	Unauthorized role → redirect to proper access page
+
+⸻
+
+🔌 API Integration:
+
+Use TanStack Query with axios:
+	•	GET /api/superadmin/dashboard/overview?range=7d|30d|60d|90d|all
+	•	GET /api/superadmin/dashboard/analytics?range=...
+
+Use skeleton loader for every element in the dashboard.
+oading UX:
+
+Use Shadcn’s <Skeleton> component for:
+	•	Overview cards
+	•	Chart containers
+	•	Dropdown loading
+
+==========
+Superadmin Tenant Management
+
+Implement the Tenant Management section in the Superadmin dashboard using Next.js (App Router), React (Client Components), TypeScript, TanStack Query, Axios, ApexCharts, and Skeleton Loaders. Use modular components with clear separation of concerns.
+with dyanmic data in dashboard
+⸻
+
+🔹 Main Features to Implement
+
+🧩 1. All Tenants Listing Page
+	•	Fetch all tenants using secure API with useQuery.
+	•	Implement filters:
+	•	Status: Active, Inactive, Suspended
+	•	Created Date Range
+	•	Search by: Name / Subdomain
+	•	Use TanStack Table with:
+	•	Server-side pagination, sorting, and filtering.
+	•	Columns: Tenant Name, Subdomain, Status, Created Date, Actions
+	•	Actions per row:
+	•	View Details
+	•	Edit
+	•	Suspend/Activate Toggle
+	•	Use Skeleton loaders while loading.
+	•	Error boundary for fetch failures.
+
+⸻
+
+📄 2. View Tenant Details Page
+	•	Tenant Information block: Name, Subdomain, Status, Created Date.
+	•	Tenant Admin Info block.
+	•	Users List under tenant (table view):
+	•	User Name, Email, Role, Status, Actions
+	•	Use Tabs or Accordion for separation.
+	•	Add loader and error fallback on each data block.
+	•	Enable status toggle for users.
+	•	Action: Reset Password, Suspend User.
+
+⸻
+
+➕ 3. Create Tenant & Admin
+	•	Form Fields:
+	•	Tenant Name
+	•	Subdomain (with real-time availability check)
+	•	Admin Name
+	•	Admin Email
+	•	Admin Password (strong password validation)
+	•	Subdomain Availability Check:
+	•	On blur or debounce on input.
+	•	Call API to check if subdomain exists in DB.
+	•	Show available/unavailable status inline.
+	•	Validation:
+	•	All fields required.
+	•	Password: Min 8 chars, 1 uppercase, 1 number, 1 special.
+	•	Email format check.
+	•	Show success toast on creation.
+	•	On success → redirect to Tenant Detail page.
+
+⸻
+
+🧰 Technical Modules and Libraries to Use
+	•	✅ react-hook-form – for robust form handling.
+	•	✅ zod – for schema-based validation.
+	•	✅ axios – for API requests with auth token header.
+	•	✅ @tanstack/react-query – for fetching/mutation with caching.
+	•	✅ @tanstack/react-table – for listing data.
+	•	✅ apexcharts – if you plan to show tenant-wise stats.
+	•	✅ @radix-ui/react-toggle or custom toggle component.
+	•	✅ swr-toast or react-hot-toast – for feedback messages.
+	•	✅ react-loading-skeleton – for skeleton UIs.
+	•	✅ next-auth or JWT-based middleware for route protection.
+
+⸻
+
+🔐 Security & UX Considerations
+	•	✅ Protect all tenant routes for Superadmin only.
+	•	✅ All APIs must be authorized with Superadmin token.
+	•	✅ Use optimistic updates for toggle actions.
+	•	✅ Confirm dialogs for Suspend/Activate/Delete actions.
+	•	✅ Error boundaries for each API block.
+	•	✅ Modular component breakdown:
+	•	TenantList.tsx
+	•	TenantFilters.tsx
+	•	TenantTable.tsx
+	•	TenantDetails.tsx
+	•	CreateTenantForm.tsx
+	•	SubdomainChecker.tsx
+	•	UserList.tsx
+
+Superadmin - User Management
+
+⸻
+
+🔧 Tech Stack
+	•	Frontend: Next.js 14+, React, TypeScript
+	•	Table: @tanstack/react-table
+	•	Data Fetching: @tanstack/react-query
+	•	HTTP: Axios (with token-based auth + interceptors)
+	•	Backend: Node.js/Express or Next.js API routes
+	•	DB: MySQL
+	•	Validation: Zod or Yup
+	•	UX: Skeleton loaders, Error boundaries, Toast notifications
+
+⸻
+
+🧩 Features
+	1.	Paginated User Table View
+	•	Use @tanstack/react-table with pagination (manualPagination: true)
+	•	Page size selection (10, 25, 50, 100)
+	•	Maintain URL params for current page, size, and sort state
+	2.	Search & Filters
+	•	Filter by:
+	•	Role
+	•	Status (Active, Inactive)
+	•	Email (search)
+	•	Tenant (dropdown)
+	•	Debounced input for search
+	•	Use controlled form via Zod or React Hook Form
+	3.	Sorting
+	•	Enable sorting on:
+	•	Name
+	•	Email
+	•	Created Date
+	•	Status
+	•	Server-side sort with API query
+	4.	Data Fetching with TanStack Query
+	•	useQuery to fetch user list with:
+	•	page
+	•	limit
+	•	filters
+	•	sorting
+	•	Include cache key with dependencies
+	5.	API Integration (Backend Spec)
+	•	GET /api/superadmin/users?page=1&limit=10&sort=email&order=asc&status=active&search=example&tenant=xyz
+	•	Authenticated (JWT or session-based)
+	•	Secure with role check (superadmin only)
+	6.	Security & Error Handling
+	•	Axios interceptor with JWT token from cookies or secure storage
+	•	Handle:
+	•	401 Unauthorized (redirect to login)
+	•	403 Forbidden (toast or error message)
+	•	500 Server error (boundary fallback)
+	•	Add error boundary to catch API/UI failures
+	7.	Skeleton Loaders
+	•	Table skeleton while loading (show rows and columns)
+	•	Show loading for dropdowns/filters
+	8.	No “Create User” here
+	•	This is only View + Filter module
+	•	Full read-only user list with powerful filter/sort capabilities
+	9.	Component Separation
+	•	UserTable.tsx → for table logic
+	•	UserFilterBar.tsx → for filters
+	•	UserPage.tsx → container with data hooks
+	•	UserRowSkeleton.tsx → table loader
+	•	useUsers.ts → React Query + Axios logic
+	•	UserErrorBoundary.tsx → boundary
+
+⸻
+
+🧪 Edge Cases to Handle
+	•	Long user list with debounce to avoid rate limits
+	•	Empty states with friendly messaging
+	•	Sorting reset on filter change
+	•	Preserve filter state in URL
+	•	Unauthorized/Forbidden redirection
+	•	Tenant filter must handle no selection
+	•	Email with special characters in search input
+	•	Status toggle/filter not working across pages
+	•	No results found UX
+
+Features: pagination, search, filters (email, status, tenant, role), sorting, skeleton loaders, error boundaries.
+Backend: Secure MySQL + Express/Next.js API.
+No create user — just full-featured filtered view with pagination & sorting.
+Break into components: UserTable, UserFilters, UserPage, UserSkeleton, UserErrorBoundary.
+Use react-query for fetching. Handle edge cases and security. Return full working component examples.
+
+==========
+
+Roles & Permissions Management
+Purpose: To allow the Superadmin to manage different roles and assign/revoke permissions for system access.
+
+⸻
+
+Functional Requirements:
+	1.	Roles Listing Page (/roles):
+	•	Display all roles in a paginated table.
+	•	Include search and sorting by Role Name and Created Date.
+	•	Each row should show: Role Name, Total Users with that Role, Created Date, Actions (Edit/Delete/View).
+	•	Include a skeleton loader during data fetching.
+	•	Error boundary to catch any fetch or render errors.
+	2.	Create New Role (/roles/new):
+	•	Form with validation for:
+	•	Role Name (unique, required, min 3 characters).
+	•	Description (optional, max 200 characters).
+	•	Permission selection: Group permissions by module (e.g., Dashboard, Users, Tenants).
+	•	Use toggle or checkbox UI for granting module-wise Create, Read, Update, Delete (CRUD) permissions.
+	•	Submit button should remain disabled until all required fields are valid.
+	•	On submit: Save role and its permissions to the DB.
+	3.	Edit Role (/roles/:id/edit):
+	•	Pre-fill form with existing role details.
+	•	Allow modifying name, description, and permissions.
+	•	Validation must ensure no duplicate role names.
+	•	Update existing role and permissions in the DB.
+	4.	Role Detail Page (/roles/:id):
+	•	Show role name, description, created date, and list of all permissions granted.
+	•	Show list of users assigned this role with pagination.
+	•	Actions: Edit Role, Delete Role (with confirmation popup).
+	5.	Delete Role:
+	•	Allow role deletion only if not assigned to any user.
+	•	Confirm modal before deletion.
+	•	Show warning if deletion not allowed due to dependencies.
+	6.	Permission Management:
+	•	Define a structured permission model in the backend (per module and action: e.g., users.create, tenants.view).
+	•	When role is assigned to a user, permissions are inherited.
+	•	Ensure API authorization logic respects assigned permissions.
+	7.	Error Handling:
+	•	Proper toast messages or alerts for success/failure.
+	•	Display validation errors inline for each field.
+	•	Error boundary wrapping pages and form components.
+	8.	UI Enhancements:
+	•	All pages should have responsive layout.
+	•	Use skeleton loaders for form load and table data.
+	•	Show spinner on save/update actions.
+	•	Filter and search components should be built as reusable components.
+
+⸻
+========
+
+Audit Logs Module (Superadmin Panel):
+
+Implement a fully functional Audit Logs module that captures and displays every critical action taken across the Superadmin platform. The module should include:
+
+Core Features:
+	1.	Log List View:
+	•	Display a paginated, searchable, and sortable table of logs.
+	•	Include filters for:
+	•	Date range (with calendar picker)
+	•	Action Type (CREATE, UPDATE, DELETE, LOGIN, LOGOUT, etc.)
+	•	Actor (User/Superadmin who performed the action)
+	•	Target Entity (e.g., Tenant, User, Role, etc.)
+	•	Status (Success / Failed)
+	2.	Log Details View:
+	•	Clicking a log entry should open a modal or side panel with:
+	•	Timestamp
+	•	Performed By (user ID, name, role)
+	•	IP address & User-Agent
+	•	Entity affected
+	•	Action performed
+	•	Before and after JSON diff if applicable (for updates)
+	•	Any error messages if failed
+	3.	Real-time Update Option:
+	•	Optionally implement websocket or polling-based real-time updates to reflect recent logs without refresh.
+	4.	Security:
+	•	Ensure only authorized users (Superadmin) can view audit logs.
+	•	Log all permission-sensitive actions for traceability.
+	5.	Error Handling:
+	•	Wrap all fetch and detail components in proper Error Boundaries with fallback UI.
+	•	Show retry option on failure.
+	6.	UX Enhancements:
+	•	Use skeleton loaders for logs table and detail view while data is loading.
+	•	Add clear empty-state message when no logs are found.
+	•	Optimize for performance when dealing with large datasets.
+	7.	Backend Integration:
+	•	Ensure backend APIs support filters, pagination, and sorting.
+	•	Log format should be consistent and must include all relevant metadata (timestamp, action type, user, etc.)
+	8.	Download Option (Optional):
+	•	Allow Superadmins to download filtered logs as CSV or JSON for further analysis.
+
+==========
+
+Superadmin Notification Module (Basic Implementation)
+
+Implement a notification module in the Superadmin panel with the following functionality and structure:
+
+✅ Scope of Notifications
+	1.	Send Notification to All Superadmins
+	2.	Send Notification to All Tenants
+	3.	Send Notification to a Specific Tenant
+
+⸻
+
+✅ Notification Features
+	•	Title (Required)
+	•	Message/Description (Required)
+	•	Recipient Type:
+	•	All Superadmins
+	•	All Tenants
+	•	Single Tenant (Dropdown with Tenant list)
+	•	Notification Priority (Optional):
+	•	Low, Medium, High (Used for future styling purposes)
+	•	Created At timestamp
+	•	Created By (Auto-filled from current logged-in Superadmin)
+
+⸻
+
+✅ UI Functionality
+	1.	Notification Send Form
+	•	Form to create/send notification with validation on required fields.
+	•	Disable “Submit” button until all required fields are filled.
+	•	Skeleton loader while fetching tenant list or submitting form.
+	•	Use ErrorBoundary to catch and show any runtime errors gracefully.
+	2.	Notification Listing (optional now, future ready)
+	•	Table/List to show recent notifications sent by the superadmin with filters (optional).
+	•	Sort by latest.
+
+⸻
+
+✅ Notification Display in Header (for All Users)
+	•	Notifications sent by Superadmin should be shown in the user notification dropdown in the header bar.
+	•	Display only relevant notifications to each user:
+	•	Superadmin → sees all Superadmin notifications.
+	•	Tenant Admin → sees all Tenant-specific and global Tenant notifications.
+	•	Show Unread/Read status (basic implementation – mark as read on click).
+	•	Limit shown count to latest 10 notifications in dropdown.
+	•	Full Notification List (future scope).
+
+⸻
+
+✅ Backend Requirements
+	1.	API to Create Notification
+	•	Accepts notification payload.
+	•	Stores in DB with recipient_type, recipient_id (nullable for all), title, message, created_by, created_at.
+	2.	API to Fetch Notifications
+	•	Based on logged-in user role and tenant.
+	•	Filters notifications dynamically based on recipient_type.
+	3.	DB Schema: Notifications
+	•	id, title, message, recipient_type, recipient_id, created_by, created_at, is_read (default: false).
+
+⸻
+
+✅ Validation and Error Handling
+	•	Required: title, message, recipient type.
+	•	If recipient type is “Single Tenant”, tenant selection is required.
+	•	Handle all errors with appropriate messages.
+	•	Show success toast after notification is sent.
+	•	Wrap critical parts with ErrorBoundary.
+	•	Use Skeleton Loader while form or data is loading.
+
+⸻
+
+🔒 Security
+	•	Only Superadmin can send notifications.
+	•	API should validate the role of the sender.
+	•	Tenant Admins or users cannot send notifications.
+========
+
+Search Bar
+Implement a Global Search bar in the header that supports real-time, fast API-based search across the platform. The design is already done. Now, make it fully dynamic with backend API integration.
+
+⸻
+
+🔍 Functional Requirements:
+	1.	Search Scope and Priority:
+	•	The search should prioritize results in the following order:
+	1.	Tenant Preferences (Tenant-specific entities and data)
+	2.	Users (search by name, email, ID)
+	3.	Superadmin Entities (if accessible based on role)
+	2.	Entity Identification:
+	•	Each result should include a marker/tag (like icon or label) indicating its source/entity type, such as:
+	•	🧑‍💼 User
+	•	🏢 Tenant
+	•	⚙️ Superadmin
+	•	📄 Static Page
+	•	🧾 Audit Log, etc.
+	3.	UX/UI Details:
+	•	As the user types in the search bar:
+	•	Show auto-suggestions in a dropdown.
+	•	Add a subtle loader/spinner (near the input or suggestions dropdown) while fetching data.
+	•	On selecting a result, redirect or open the related detail view dynamically.
+	4.	API Call Requirements:
+	•	The API should:
+	•	Support debounced input (e.g., 250ms) to avoid excessive requests.
+	•	Be extremely fast and optimized – include indexing, caching if necessary.
+	•	Return structured and tagged results (with type, id, display name, and link).
+	5.	Backend/API Support:
+	•	One unified search endpoint should handle multiple entity types.
+	•	Include pagination or limit in API responses for performance.
+	•	Backend should support full-text search or fuzzy search using optimized methods (e.g., Elasticsearch, MySQL full-text, or in-memory search).
+	6.	Accessibility and Role Handling:
+	•	The visibility of results should respect the user’s role:
+	•	Tenant-level users should only see tenant-relevant data.
+	•	Superadmins should see everything.
+	•	Normal users may only see their own or allowed entities.
+
+⸻
+
+🧪 Edge Cases to Handle:
+	•	Empty search term → show default placeholder or trending/popular results.
+	•	No results found → graceful message with retry suggestion.
+	•	API errors → show fallback message or retry option.
+	•	Debounce must not skip fast typing users but limit API pressure.
+	•	Very large datasets must not block the UI – use limits and async pagination if needed.
