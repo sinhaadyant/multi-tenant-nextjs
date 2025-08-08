@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useTransition, useCallback, memo } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef, GridOptions, GridReadyEvent, ICellRendererParams, ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import { 
@@ -37,84 +37,97 @@ interface DataTableProps {
   pageSize?: number;
 }
 
-// Status Badge Component
-const StatusBadge: React.FC<{ value: string }> = ({ value }) => {
-  const getStatusConfig = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'active':
-        return {
-          icon: <CheckCircle className="w-4 h-4" />,
-          className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-        };
-      case 'pending':
-        return {
-          icon: <Clock className="w-4 h-4" />,
-          className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-        };
-      case 'suspended':
-        return {
-          icon: <XCircle className="w-4 h-4" />,
-          className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
-        };
-      case 'warning':
-        return {
-          icon: <AlertTriangle className="w-4 h-4" />,
-          className: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
-        };
-      default:
-        return {
-          icon: <MoreHorizontal className="w-4 h-4" />,
-          className: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300',
-        };
+// Memoized Actions Cell Renderer for better performance
+const ActionsCellRenderer = memo(({ data, onView, onEdit, onDelete }: ICellRendererParams & {
+  onView?: (data: any) => void;
+  onEdit?: (data: any) => void;
+  onDelete?: (data: any) => void;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleAction = useCallback((action: 'view' | 'edit' | 'delete') => {
+    setIsOpen(false);
+    switch (action) {
+      case 'view':
+        onView?.(data);
+        break;
+      case 'edit':
+        onEdit?.(data);
+        break;
+      case 'delete':
+        onDelete?.(data);
+        break;
     }
-  };
-
-  const config = getStatusConfig(value);
+  }, [data, onView, onEdit, onDelete]);
 
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.className}`}>
-      {config.icon}
-      <span className="ml-1">{value}</span>
-    </span>
-  );
-};
-
-// Actions Cell Renderer
-const ActionsCellRenderer: React.FC<ICellRendererParams> = ({ data, onEdit, onDelete, onView }) => {
-  return (
-    <div className="flex items-center space-x-2">
-      {onView && (
-        <button
-          onClick={() => onView(data)}
-          className="p-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-          title="View Details"
-        >
-          <Eye className="w-4 h-4" />
-        </button>
-      )}
-      {onEdit && (
-        <button
-          onClick={() => onEdit(data)}
-          className="p-1 text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
-          title="Edit"
-        >
-          <Edit className="w-4 h-4" />
-        </button>
-      )}
-      {onDelete && (
-        <button
-          onClick={() => onDelete(data)}
-          className="p-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-          title="Delete"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+      >
+        <MoreHorizontal className="w-4 h-4" />
+      </button>
+      
+      {isOpen && (
+        <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10 border border-gray-200 dark:border-gray-700">
+          <div className="py-1">
+            {onView && (
+              <button
+                onClick={() => handleAction('view')}
+                className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                <Eye className="w-4 h-4 mr-3" />
+                View
+              </button>
+            )}
+            {onEdit && (
+              <button
+                onClick={() => handleAction('edit')}
+                className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                <Edit className="w-4 h-4 mr-3" />
+                Edit
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={() => handleAction('delete')}
+                className="flex items-center w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                <Trash2 className="w-4 h-4 mr-3" />
+                Delete
+              </button>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
+});
+
+ActionsCellRenderer.displayName = 'ActionsCellRenderer';
+
+// Debounced search hook for better performance
+const useDebouncedSearch = (delay: number = 300) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [isPending, startTransition] = useTransition();
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      startTransition(() => {
+        setDebouncedSearchTerm(searchTerm);
+      });
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, delay]);
+
+  return { searchTerm, setSearchTerm, debouncedSearchTerm, isPending };
 };
 
-const DataTable: React.FC<DataTableProps> = ({
+const DataTable: React.FC<DataTableProps> = memo(({
   data,
   columns,
   title,
@@ -127,22 +140,22 @@ const DataTable: React.FC<DataTableProps> = ({
   pagination = true,
   pageSize = 10,
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
   const [gridApi, setGridApi] = useState<any>(null);
+  const { searchTerm, setSearchTerm, debouncedSearchTerm, isPending } = useDebouncedSearch(300);
 
-  // Filter data based on search term
+  // Memoized filtered data with debounced search
   const filteredData = useMemo(() => {
-    if (!searchTerm) return data;
+    if (!debouncedSearchTerm) return data;
     
     return data.filter((item) =>
       Object.values(item).some((value) =>
-        String(value).toLowerCase().includes(searchTerm.toLowerCase())
+        String(value).toLowerCase().includes(debouncedSearchTerm.toLowerCase())
       )
     );
-  }, [data, searchTerm]);
+  }, [data, debouncedSearchTerm]);
 
-  // Grid options
-  const gridOptions: GridOptions = {
+  // Memoized grid options to prevent unnecessary re-renders
+  const gridOptions: GridOptions = useMemo(() => ({
     defaultColDef: {
       sortable: true,
       filter: true,
@@ -158,9 +171,9 @@ const DataTable: React.FC<DataTableProps> = ({
     onGridReady: (params: GridReadyEvent) => {
       setGridApi(params.api);
     },
-  };
+  }), [pagination, pageSize]);
 
-  // Enhanced columns with actions
+  // Memoized enhanced columns with actions
   const enhancedColumns = useMemo(() => {
     const cols = [...columns];
     
@@ -186,18 +199,17 @@ const DataTable: React.FC<DataTableProps> = ({
     return cols;
   }, [columns, onView, onEdit, onDelete]);
 
-  const handleRowClick = (event: any) => {
+  // Memoized row click handler
+  const handleRowClick = useCallback((event: any) => {
     if (onRowClick) {
       onRowClick(event.data);
     }
-  };
+  }, [onRowClick]);
 
-  const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(event.target.value);
-    if (gridApi) {
-      gridApi.setQuickFilter(event.target.value);
-    }
-  };
+  // Memoized search handler
+  const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  }, []);
 
   if (loading) {
     return (
@@ -227,6 +239,7 @@ const DataTable: React.FC<DataTableProps> = ({
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">
               {filteredData.length} records found
+              {isPending && <span className="ml-2 text-blue-500">Searching...</span>}
             </p>
           </div>
           {searchable && (
@@ -260,6 +273,8 @@ const DataTable: React.FC<DataTableProps> = ({
       </div>
     </div>
   );
-};
+});
+
+DataTable.displayName = 'DataTable';
 
 export default DataTable; 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireSuperAdmin } from '@/middleware/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import { asyncHandler } from '@/lib/errorHandler';
 import { createSuccessResponse } from '@/lib/apiResponse';
 

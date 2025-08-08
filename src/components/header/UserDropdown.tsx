@@ -2,18 +2,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAppSelector, useAppDispatch } from "@/store/hooks";
-import { logout } from "@/store/slices/authSlice";
+import { useAppSelector } from "@/hooks/redux";
+import { useLogout } from "@/hooks/useLogout";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
-import toast from "react-hot-toast";
 
 export default function UserDropdown() {
   const [isOpen, setIsOpen] = useState(false);
-  const router = useRouter();
-  const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
+  const { logout } = useLogout();
 
   function toggleDropdown(e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
     e.stopPropagation();
@@ -24,11 +21,13 @@ export default function UserDropdown() {
     setIsOpen(false);
   }
 
-  const handleLogout = () => {
-    dispatch(logout());
-    toast.success('Logged out successfully');
-    router.push('/superadmin/signin');
+  const handleLogout = async () => {
     closeDropdown();
+    await logout({
+      redirect: true,
+      redirectTo: '/superadmin/login',
+      showToast: true,
+    });
   };
 
   return (

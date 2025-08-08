@@ -119,7 +119,7 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClo
         setTimeout(() => {
           onClose();
           // Redirect to login page for security
-          router.push('/superadmin/signin');
+          router.push('/superadmin/login');
         }, 2000);
       } else {
         setMessage({ type: 'error', text: result.message });

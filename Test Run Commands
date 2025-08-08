@@ -1,0 +1,729 @@
+# Multi-Tenant NextJS Application - Comprehensive Test Commands
+
+## Login Credentials
+Email:    admin@superadmin.com
+Password: SuperAdmin123!
+
+## Database Setup Commands
+```bash
+# Setup database and generate Prisma client
+npm run setup-db
+npm run db:generate
+npm run db:push
+
+# Seed database with initial data
+npm run db:seed
+npm run db:add-dynamic-data
+npm run db:seed-users
+npm run db:seed-audit-logs
+npm run db:seed-notifications
+npm run db:seed-support-tickets
+```
+
+## 1. AUTHENTICATION MODULE TESTS
+
+### 1.1 SuperAdmin Authentication
+```bash
+# Test SuperAdmin Login
+curl -X POST http://localhost:3000/api/superadmin/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin@superadmin.com", "password": "SuperAdmin123!"}'
+
+# Test SuperAdmin Logout
+curl -X POST http://localhost:3000/api/superadmin/auth/logout \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Test Forgot Password
+curl -X POST http://localhost:3000/api/superadmin/auth/forgot-password \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin@superadmin.com"}'
+
+# Test Reset Password
+curl -X POST http://localhost:3000/api/superadmin/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{"token": "RESET_TOKEN", "password": "NewPassword123!"}'
+
+# Test Token Validation
+curl -X GET http://localhost:3000/api/superadmin/auth/validate \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### 1.2 Frontend Authentication Tests
+```bash
+# Run authentication component tests
+npm test -- --testPathPattern="auth" --testNamePattern="login|logout|forgot|reset"
+
+# Test specific auth components
+npm test -- src/__tests__/components/auth/SuperAdminLogin.test.tsx
+npm test -- src/__tests__/components/auth/ForgotPassword.test.tsx
+npm test -- src/__tests__/components/auth/ResetPassword.test.tsx
+```
+
+## 2. SUPERADMIN DASHBOARD MODULE TESTS
+
+### 2.1 Dashboard API Tests
+```bash
+# Test Dashboard Stats
+curl -X GET http://localhost:3000/api/superadmin/dashboard/stats \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Test Dashboard Overview
+curl -X GET http://localhost:3000/api/superadmin/dashboard \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### 2.2 Dashboard Component Tests
+```bash
+# Test dashboard components
+npm test -- src/__tests__/components/superadmin/DashboardClient.test.tsx
+npm test -- --testPathPattern="dashboard"
+```
+
+## 3. TENANT MANAGEMENT MODULE TESTS
+
+### 3.1 Tenant API Tests
+```bash
+# Test Get All Tenants
+curl -X GET http://localhost:3000/api/superadmin/tenants \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Test Create Tenant
+curl -X POST http://localhost:3000/api/superadmin/tenants \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"name": "Test Tenant", "slug": "test-tenant", "email": "admin@testtenant.com"}'
+
+# Test Get Single Tenant
+curl -X GET http://localhost:3000/api/superadmin/tenants/TENANT_ID \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Test Update Tenant
+curl -X PUT http://localhost:3000/api/superadmin/tenants/TENANT_ID \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"name": "Updated Tenant Name"}'
+
+# Test Delete Tenant
+curl -X DELETE http://localhost:3000/api/superadmin/tenants/TENANT_ID \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### 3.2 Tenant Component Tests
+```bash
+# Test tenant management components
+npm test -- src/__tests__/components/superadmin/CreateTenantForm.test.tsx
+npm test -- --testPathPattern="tenant"
+```
+
+## 4. USER MANAGEMENT MODULE TESTS
+
+### 4.1 User API Tests
+```bash
+# Test Get All Users
+curl -X GET http://localhost:3000/api/superadmin/users \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Test Create User
+curl -X POST http://localhost:3000/api/superadmin/users \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"email": "user@example.com", "name": "Test User", "role": "USER"}'
+
+# Test Get Single User
+curl -X GET http://localhost:3000/api/superadmin/users/USER_ID \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Test Update User
+curl -X PUT http://localhost:3000/api/superadmin/users/USER_ID \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"name": "Updated User Name"}'
+
+# Test Delete User
+curl -X DELETE http://localhost:3000/api/superadmin/users/USER_ID \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+## 5. ROLE MANAGEMENT MODULE TESTS
+
+### 5.1 Role API Tests
+```bash
+# Test Get All Roles
+curl -X GET http://localhost:3000/api/superadmin/roles \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Test Create Role
+curl -X POST http://localhost:3000/api/superadmin/roles \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"name": "Test Role", "permissions": ["read", "write"]}'
+
+# Test Get Single Role
+curl -X GET http://localhost:3000/api/superadmin/roles/ROLE_ID \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Test Update Role
+curl -X PUT http://localhost:3000/api/superadmin/roles/ROLE_ID \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"name": "Updated Role", "permissions": ["read", "write", "delete"]}'
+
+# Test Delete Role
+curl -X DELETE http://localhost:3000/api/superadmin/roles/ROLE_ID \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### 5.2 Role Component Tests
+```bash
+# Test role management components
+npm test -- --testPathPattern="role"
+```
+
+## 6. AUDIT LOGS MODULE TESTS
+
+### 6.1 Audit Logs API Tests
+```bash
+# Test Get Audit Logs
+curl -X GET http://localhost:3000/api/superadmin/audit-logs \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Test Export Audit Logs
+curl -X GET http://localhost:3000/api/superadmin/audit-logs/export \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Test Get Single Audit Log
+curl -X GET http://localhost:3000/api/superadmin/audit-logs/AUDIT_LOG_ID \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### 6.2 Audit Logs Component Tests
+```bash
+# Test audit logs components
+npm test -- src/__tests__/components/superadmin/AuditLogsTable.test.tsx
+npm test -- --testPathPattern="audit"
+```
+
+## 7. BACKUP & IMPORT MODULE TESTS
+
+### 7.1 Backup API Tests
+```bash
+# Test Create Backup
+curl -X POST http://localhost:3000/api/superadmin/backup \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Test Get Backup History
+curl -X GET http://localhost:3000/api/superadmin/backup/history \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Test Download Backup
+curl -X GET http://localhost:3000/api/superadmin/backup/BACKUP_ID/download \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### 7.2 Import API Tests
+```bash
+# Test Import Data
+curl -X POST http://localhost:3000/api/superadmin/import \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@backup_file.json"
+```
+
+## 8. NOTIFICATIONS MODULE TESTS
+
+### 8.1 Notifications API Tests
+```bash
+# Test Get Notifications
+curl -X GET http://localhost:3000/api/superadmin/notifications \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Test Send Notification
+curl -X POST http://localhost:3000/api/superadmin/notifications \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"title": "Test Notification", "message": "This is a test notification", "type": "info"}'
+
+# Test Mark Notification as Read
+curl -X PUT http://localhost:3000/api/superadmin/notifications/NOTIFICATION_ID/read \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+## 9. SUPPORT TICKETS MODULE TESTS
+
+### 9.1 Support Tickets API Tests
+```bash
+# Test Get Support Tickets
+curl -X GET http://localhost:3000/api/superadmin/support-tickets \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Test Create Support Ticket
+curl -X POST http://localhost:3000/api/superadmin/support-tickets \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"title": "Test Ticket", "description": "This is a test ticket", "priority": "medium"}'
+
+# Test Get Single Ticket
+curl -X GET http://localhost:3000/api/superadmin/support-tickets/TICKET_ID \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Test Update Ticket Status
+curl -X PUT http://localhost:3000/api/superadmin/support-tickets/TICKET_ID \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"status": "resolved"}'
+```
+
+## 10. REPORTS MODULE TESTS
+
+### 10.1 Reports API Tests
+```bash
+# Test Get Reports
+curl -X GET http://localhost:3000/api/superadmin/reports \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Test Generate Report
+curl -X POST http://localhost:3000/api/superadmin/reports \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"type": "user_activity", "dateRange": {"start": "2024-01-01", "end": "2024-12-31"}}'
+```
+
+## 11. SEARCH MODULE TESTS
+
+### 11.1 Search API Tests
+```bash
+# Test Global Search
+curl -X GET "http://localhost:3000/api/search?q=test&type=all" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+## 12. TENANT-SPECIFIC MODULE TESTS
+
+### 12.1 Tenant Backup Tests
+```bash
+# Test Tenant Backup
+curl -X POST http://localhost:3000/api/tenant/backup \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### 12.2 Tenant Dummy Data Tests
+```bash
+# Test Generate Dummy Data
+curl -X POST http://localhost:3000/api/tenant/dummy-data \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"type": "users", "count": 10}'
+```
+
+## 13. COMPREHENSIVE TESTING COMMANDS
+
+### 13.1 Run All Unit Tests
+```bash
+# Run all tests
+npm test
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests for CI
+npm run test:ci
+```
+
+### 13.2 Run E2E Tests
+```bash
+# Run all E2E tests
+npm test -- src/__tests__/e2e/
+
+# Run specific E2E test suites
+npm test -- src/__tests__/e2e/auth.test.ts
+npm test -- src/__tests__/e2e/dashboard.test.ts
+npm test -- src/__tests__/e2e/audit-logs.test.ts
+npm test -- src/__tests__/e2e/backup-import.test.ts
+```
+
+### 13.3 Run Hook Tests
+```bash
+# Test custom hooks
+npm test -- src/__tests__/hooks/useSuperadminDashboard.test.ts
+```
+
+## 14. MANUAL TESTING CHECKLIST
+
+### 14.1 Authentication Flow
+- [ ] SuperAdmin login with valid credentials
+- [ ] SuperAdmin login with invalid credentials
+- [ ] Forgot password flow
+- [ ] Reset password flow
+- [ ] Token validation
+- [ ] Logout functionality
+
+### 14.2 Dashboard Features
+- [ ] Dashboard loads correctly
+- [ ] Stats are displayed
+- [ ] Charts render properly
+- [ ] Navigation works
+- [ ] Responsive design
+
+### 14.3 Tenant Management
+- [ ] Create new tenant
+- [ ] Edit tenant details
+- [ ] Delete tenant
+- [ ] View tenant list
+- [ ] Search tenants
+
+### 14.4 User Management
+- [ ] Create new user
+- [ ] Edit user details
+- [ ] Delete user
+- [ ] View user list
+- [ ] Assign roles
+
+### 14.5 Role Management
+- [ ] Create new role
+- [ ] Edit role permissions
+- [ ] Delete role
+- [ ] Assign roles to users
+
+### 14.6 Audit Logs
+- [ ] View audit logs
+- [ ] Filter logs
+- [ ] Export logs
+- [ ] View log details
+
+### 14.7 Backup & Import
+- [ ] Create backup
+- [ ] Download backup
+- [ ] Import data
+- [ ] View backup history
+
+### 14.8 Notifications
+- [ ] Send notification
+- [ ] View notifications
+- [ ] Mark as read
+- [ ] Delete notification
+
+### 14.9 Support Tickets
+- [ ] Create ticket
+- [ ] View tickets
+- [ ] Update ticket status
+- [ ] Add comments
+
+### 14.10 Reports
+- [ ] Generate reports
+- [ ] View report history
+- [ ] Export reports
+- [ ] Filter reports
+
+## 15. PERFORMANCE TESTING
+
+### 15.1 Load Testing
+```bash
+# Test API endpoints with multiple concurrent requests
+# Use tools like Apache Bench or Artillery
+ab -n 1000 -c 10 http://localhost:3000/api/superadmin/dashboard
+```
+
+### 15.2 Memory Leak Testing
+```bash
+# Monitor memory usage during testing
+node --inspect npm test
+```
+
+## 16. SECURITY TESTING
+
+### 16.1 Authentication Security
+- [ ] Test JWT token expiration
+- [ ] Test invalid token handling
+- [ ] Test CSRF protection
+- [ ] Test SQL injection prevention
+
+### 16.2 Authorization Security
+- [ ] Test role-based access control
+- [ ] Test permission validation
+- [ ] Test unauthorized access attempts
+
+## 17. BROWSER COMPATIBILITY TESTING
+
+### 17.1 Cross-Browser Testing
+- [ ] Chrome (latest)
+- [ ] Firefox (latest)
+- [ ] Safari (latest)
+- [ ] Edge (latest)
+
+### 17.2 Mobile Responsiveness
+- [ ] iPhone Safari
+- [ ] Android Chrome
+- [ ] Tablet browsers
+
+## 18. ERROR HANDLING TESTS
+
+### 18.1 API Error Handling
+```bash
+# Test 404 errors
+curl -X GET http://localhost:3000/api/nonexistent
+
+# Test 500 errors
+curl -X POST http://localhost:3000/api/superadmin/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"invalid": "data"}'
+```
+
+## 19. CLEANUP COMMANDS
+
+### 19.1 Database Cleanup
+```bash
+# Clear test data
+npm run db:clear-users
+npm run db:clear-users-safe
+```
+
+### 19.2 Test Environment Reset
+```bash
+# Reset test environment
+npm run setup-db
+npm run db:seed
+```
+
+## 20. MONITORING & DEBUGGING
+
+### 20.1 Development Server
+```bash
+# Start development server with debugging
+npm run dev
+
+# Monitor logs
+tail -f logs/app.log
+```
+
+### 20.2 Database Monitoring
+```bash
+# Monitor database queries
+npx prisma studio
+```
+
+---
+
+## 21. CURSOR AI PROMPTS FOR TESTING & FIXING
+
+### 21.1 Authentication Module Prompts
+
+**Prompt 1: Test SuperAdmin Login and Fix Issues**
+```
+Test the SuperAdmin login functionality at /superadmin/login. Check if the login form works correctly, validates inputs, handles errors properly, and redirects to dashboard on success. Fix any issues with form validation, error handling, API calls, or UI components. Also test the logout functionality and ensure proper session management.
+```
+
+**Prompt 2: Test Forgot Password Flow and Fix Issues**
+```
+Test the forgot password functionality at /superadmin/forgot-password. Verify the form sends reset emails correctly, handles invalid emails, shows proper success/error messages, and the reset password page works. Fix any issues with email sending, token validation, or UI components.
+```
+
+**Prompt 3: Test Password Reset and Fix Issues**
+```
+Test the password reset functionality at /superadmin/reset-password. Check if the reset token validation works, password strength validation is enforced, and the user can successfully reset their password. Fix any issues with token handling, password validation, or database updates.
+```
+
+### 21.2 Dashboard Module Prompts
+
+**Prompt 4: Test SuperAdmin Dashboard and Fix Issues**
+```
+Test the SuperAdmin dashboard at /superadmin/dashboard. Verify all charts render correctly, stats are accurate, navigation works, and the page loads without errors. Check for any issues with data fetching, chart rendering, responsive design, or API calls. Fix any broken components or missing data.
+```
+
+**Prompt 5: Test Dashboard Stats API and Fix Issues**
+```
+Test the dashboard stats API endpoint at /api/superadmin/dashboard/stats. Verify it returns correct data for users, tenants, audit logs, and other metrics. Check for any issues with database queries, data aggregation, or API response format. Fix any performance issues or incorrect calculations.
+```
+
+### 21.3 Tenant Management Module Prompts
+
+**Prompt 6: Test Tenant List and Fix Issues**
+```
+Test the tenant management page at /superadmin/tenants. Verify the tenant list loads correctly, search and filtering work, pagination functions properly, and all CRUD operations work. Check for any issues with data display, API calls, or UI components. Fix any broken functionality.
+```
+
+**Prompt 7: Test Create Tenant Form and Fix Issues**
+```
+Test the create tenant form at /superadmin/tenants/create. Verify form validation works, required fields are enforced, slug generation is correct, and tenant creation succeeds. Check for any issues with form handling, API integration, or error messages. Fix any validation or submission problems.
+```
+
+**Prompt 8: Test Edit Tenant and Fix Issues**
+```
+Test the edit tenant functionality at /superadmin/tenants/[id]. Verify the form pre-populates correctly, updates are saved properly, validation works, and the tenant data is updated in the database. Fix any issues with form state management, API calls, or data persistence.
+```
+
+### 21.4 User Management Module Prompts
+
+**Prompt 9: Test User List and Fix Issues**
+```
+Test the user management page at /superadmin/users. Verify the user list displays correctly, search and filtering work, role assignments are shown properly, and all user operations function. Check for any issues with data fetching, pagination, or UI components. Fix any broken functionality.
+```
+
+**Prompt 10: Test Create User Form and Fix Issues**
+```
+Test the create user form functionality. Verify form validation works, email uniqueness is checked, role assignment works, and user creation succeeds. Check for any issues with password generation, email sending, or database operations. Fix any validation or creation problems.
+```
+
+### 21.5 Role Management Module Prompts
+
+**Prompt 11: Test Role Management and Fix Issues**
+```
+Test the role management page at /superadmin/roles. Verify role list displays correctly, permission management works, role creation and editing function properly, and role deletion is handled safely. Check for any issues with permission handling, role assignments, or UI components. Fix any broken functionality.
+```
+
+**Prompt 12: Test Permission System and Fix Issues**
+```
+Test the permission system throughout the application. Verify role-based access control works correctly, users can only access authorized features, and permission checks are enforced on both frontend and backend. Fix any security issues or permission bypass problems.
+```
+
+### 21.6 Audit Logs Module Prompts
+
+**Prompt 13: Test Audit Logs and Fix Issues**
+```
+Test the audit logs page at /superadmin/audit. Verify logs are displayed correctly, filtering and search work, export functionality operates properly, and log details are accessible. Check for any issues with log generation, data display, or export features. Fix any broken functionality.
+```
+
+**Prompt 14: Test Audit Log Generation and Fix Issues**
+```
+Test audit log generation throughout the application. Verify all user actions are properly logged, log data is accurate and complete, and the audit trail is maintained correctly. Check for any missing log entries or incorrect data. Fix any logging issues.
+```
+
+### 21.7 Backup & Import Module Prompts
+
+**Prompt 15: Test Backup System and Fix Issues**
+```
+Test the backup functionality at /superadmin/backup. Verify backup creation works, backup history is displayed correctly, download functionality operates properly, and backup files are valid. Check for any issues with backup generation, file handling, or storage. Fix any backup problems.
+```
+
+**Prompt 16: Test Import System and Fix Issues**
+```
+Test the import functionality at /superadmin/import. Verify file upload works, data validation is enforced, import process handles errors gracefully, and imported data is correctly stored. Check for any issues with file processing, data mapping, or import validation. Fix any import problems.
+```
+
+### 21.8 Notifications Module Prompts
+
+**Prompt 17: Test Notifications and Fix Issues**
+```
+Test the notifications system at /superadmin/notifications. Verify notifications are displayed correctly, sending functionality works, read/unread status is managed properly, and notification preferences are respected. Check for any issues with notification delivery, display, or management. Fix any notification problems.
+```
+
+**Prompt 18: Test Notification Sending and Fix Issues**
+```
+Test notification sending functionality. Verify notifications can be sent to users, different notification types work correctly, and delivery mechanisms function properly. Check for any issues with notification creation, delivery, or user preferences. Fix any sending problems.
+```
+
+### 21.9 Support Tickets Module Prompts
+
+**Prompt 19: Test Support Tickets and Fix Issues**
+```
+Test the support tickets system at /superadmin/support. Verify ticket list displays correctly, ticket creation works, status updates function properly, and ticket details are accessible. Check for any issues with ticket management, status handling, or UI components. Fix any ticket system problems.
+```
+
+**Prompt 20: Test Ticket Management and Fix Issues**
+```
+Test ticket management functionality. Verify ticket assignment works, priority levels are handled correctly, comments can be added, and ticket resolution process functions properly. Check for any issues with ticket workflow, user assignments, or communication features. Fix any management problems.
+```
+
+### 21.10 Reports Module Prompts
+
+**Prompt 21: Test Reports Generation and Fix Issues**
+```
+Test the reports system at /superadmin/reports. Verify report generation works, different report types function correctly, export functionality operates properly, and report data is accurate. Check for any issues with data aggregation, report formatting, or export features. Fix any reporting problems.
+```
+
+**Prompt 22: Test Report Data Accuracy and Fix Issues**
+```
+Test report data accuracy and calculations. Verify all metrics are calculated correctly, data filtering works properly, and reports reflect actual system data. Check for any issues with data queries, calculations, or report logic. Fix any data accuracy problems.
+```
+
+### 21.11 Search Module Prompts
+
+**Prompt 23: Test Global Search and Fix Issues**
+```
+Test the global search functionality at /api/search. Verify search returns relevant results, different search types work correctly, search performance is acceptable, and results are properly formatted. Check for any issues with search indexing, query processing, or result display. Fix any search problems.
+```
+
+### 21.12 Tenant-Specific Module Prompts
+
+**Prompt 24: Test Tenant Dashboard and Fix Issues**
+```
+Test the tenant dashboard at /[tenantSlug]. Verify tenant-specific data is displayed correctly, tenant isolation works properly, and tenant users can access their features. Check for any issues with tenant data separation, access control, or dashboard functionality. Fix any tenant-specific problems.
+```
+
+**Prompt 25: Test Tenant Backup and Fix Issues**
+```
+Test tenant-specific backup functionality. Verify tenant data can be backed up independently, backup files contain correct tenant data, and tenant isolation is maintained during backup operations. Check for any issues with tenant data handling or backup processes. Fix any tenant backup problems.
+```
+
+### 21.13 API Testing Prompts
+
+**Prompt 26: Test All API Endpoints and Fix Issues**
+```
+Test all API endpoints in the application. Verify each endpoint returns correct status codes, proper error handling, authentication works, and data validation is enforced. Check for any issues with API responses, error messages, or data format. Fix any API problems.
+```
+
+**Prompt 27: Test API Authentication and Fix Issues**
+```
+Test API authentication throughout the application. Verify JWT tokens are validated correctly, unauthorized access is blocked, token expiration is handled properly, and refresh tokens work. Check for any security issues or authentication bypass problems. Fix any authentication problems.
+```
+
+### 21.14 Performance Testing Prompts
+
+**Prompt 28: Test Application Performance and Fix Issues**
+```
+Test the overall application performance. Verify page load times are acceptable, API responses are fast, database queries are optimized, and the application handles concurrent users properly. Check for any performance bottlenecks, memory leaks, or slow operations. Fix any performance issues.
+```
+
+### 21.15 Security Testing Prompts
+
+**Prompt 29: Test Application Security and Fix Issues**
+```
+Test the application security thoroughly. Verify SQL injection is prevented, XSS attacks are blocked, CSRF protection works, and sensitive data is properly encrypted. Check for any security vulnerabilities or data exposure issues. Fix any security problems.
+```
+
+### 21.16 UI/UX Testing Prompts
+
+**Prompt 30: Test UI/UX and Fix Issues**
+```
+Test the user interface and user experience throughout the application. Verify all pages are responsive, navigation is intuitive, forms are user-friendly, and error messages are clear. Check for any UI/UX issues, accessibility problems, or design inconsistencies. Fix any interface problems.
+```
+
+### 21.17 Database Testing Prompts
+
+**Prompt 31: Test Database Operations and Fix Issues**
+```
+Test all database operations in the application. Verify CRUD operations work correctly, database relationships are maintained, data integrity is preserved, and database performance is acceptable. Check for any issues with database queries, data consistency, or performance. Fix any database problems.
+```
+
+### 21.18 Error Handling Prompts
+
+**Prompt 32: Test Error Handling and Fix Issues**
+```
+Test error handling throughout the application. Verify all error scenarios are handled gracefully, error messages are user-friendly, and the application doesn't crash on errors. Check for any unhandled exceptions, poor error messages, or error recovery issues. Fix any error handling problems.
+```
+
+### 21.19 Integration Testing Prompts
+
+**Prompt 33: Test Module Integration and Fix Issues**
+```
+Test the integration between all modules in the application. Verify data flows correctly between components, API calls work properly, and module dependencies are handled correctly. Check for any integration issues, data consistency problems, or communication failures. Fix any integration problems.
+```
+
+### 21.20 End-to-End Testing Prompts
+
+**Prompt 34: Test Complete User Workflows and Fix Issues**
+```
+Test complete user workflows from start to finish. Verify users can perform all necessary tasks, data is saved correctly, and the application works as expected for real-world usage. Check for any workflow issues, data loss problems, or user experience problems. Fix any workflow issues.
+```
+
+---
+
+## NOTES:
+1. Replace `YOUR_TOKEN` with actual JWT token from login response
+2. Replace `TENANT_ID`, `USER_ID`, `ROLE_ID`, etc. with actual IDs from your database
+3. Run tests in order from top to bottom
+4. Check console logs for any errors during testing
+5. Verify all API responses have correct status codes and data structure
+6. Test both positive and negative scenarios
+7. Ensure proper error handling for all edge cases
+8. Copy and paste these prompts directly into Cursor AI to test and fix specific modules
