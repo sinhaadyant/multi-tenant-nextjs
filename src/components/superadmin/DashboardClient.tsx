@@ -89,7 +89,7 @@ export const DashboardClient: React.FC = () => {
   useEffect(() => {
     if (error && error.message.includes('Authentication required')) {
       toast.error('Please log in to access the dashboard');
-      router.push('/superadmin/signin');
+      router.push('/superadmin/login');
     }
   }, [error, router]);
 
@@ -117,7 +117,7 @@ export const DashboardClient: React.FC = () => {
           error={error.message} 
           onRetry={() => {
             if (error.message.includes('Authentication required')) {
-              router.push('/superadmin/signin');
+              router.push('/superadmin/login');
             } else {
               refetch();
             }

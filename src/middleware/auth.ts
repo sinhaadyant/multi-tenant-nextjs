@@ -124,4 +124,63 @@ export const checkPermission = (permissionName: string) => {
 
     return authResult;
   };
+};
+
+export const requireTenantAuth = async (req: NextRequest): Promise<NextResponse | JWTPayload> => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🏢 Checking tenant authentication');
+  }
+
+  const authResult = await authenticateJWT(req);
+  
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+
+  const payload = authResult as JWTPayload;
+
+  // For tenant routes, we need a user with a tenantId
+  if (!payload.tenantId) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('❌ User has no tenant association:', payload.email);
+    }
+    
+    return createErrorResponse(
+      'Tenant access required',
+      403
+    );
+  }
+
+  // Verify user exists and is active
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: payload.id, isActive: true, tenantId: payload.tenantId }
+    });
+
+    if (!user) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('❌ User not found or inactive:', payload.id);
+      }
+      
+      return createErrorResponse(
+        'User account not found or inactive',
+        403
+      );
+    }
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ Tenant access granted:', payload.email);
+    }
+
+    return payload;
+  } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('❌ Database error checking user:', error);
+    }
+    
+    return createErrorResponse(
+      'Authentication error',
+      500
+    );
+  }
 }; 

@@ -1,104 +1,107 @@
 "use client";
-import React from "react";
-
+import React, { useMemo, memo } from "react";
 import { ApexOptions } from "apexcharts";
+import { DynamicChart } from "@/lib/dynamicImports";
 
-import dynamic from "next/dynamic";
-// Dynamically import the ReactApexChart component
-const ReactApexChart = dynamic(() => import("react-apexcharts"), {
-  ssr: false,
-});
-
-export default function BarChartOne() {
-  const options: ApexOptions = {
-    colors: ["#465fff"],
-    chart: {
-      fontFamily: "Outfit, sans-serif",
-      type: "bar",
-      height: 180,
-      toolbar: {
-        show: false,
+// Memoized chart options to prevent unnecessary re-renders
+const useChartOptions = (): ApexOptions => useMemo(() => ({
+  colors: ["#465fff"],
+  chart: {
+    fontFamily: "Outfit, sans-serif",
+    type: "bar",
+    height: 180,
+    toolbar: {
+      show: false,
+    },
+    animations: {
+      enabled: true,
+      easing: 'easeinout',
+      speed: 800,
+      animateGradually: {
+        enabled: true,
+        delay: 150
       },
+      dynamicAnimation: {
+        enabled: true,
+        speed: 350
+      }
+    }
+  },
+  plotOptions: {
+    bar: {
+      horizontal: false,
+      columnWidth: "39%",
+      borderRadius: 5,
+      borderRadiusApplication: "end",
     },
-    plotOptions: {
-      bar: {
-        horizontal: false,
-        columnWidth: "39%",
-        borderRadius: 5,
-        borderRadiusApplication: "end",
-      },
+  },
+  dataLabels: {
+    enabled: false,
+  },
+  stroke: {
+    show: true,
+    width: 4,
+    colors: ["transparent"],
+  },
+  xaxis: {
+    categories: [
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ],
+    axisBorder: {
+      show: false,
     },
-    dataLabels: {
-      enabled: false,
+    axisTicks: {
+      show: false,
     },
-    stroke: {
-      show: true,
-      width: 4,
-      colors: ["transparent"],
+  },
+  legend: {
+    show: true,
+    position: "top",
+    horizontalAlign: "left",
+    fontFamily: "Outfit",
+  },
+  yaxis: {
+    title: {
+      text: undefined,
     },
-    xaxis: {
-      categories: [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-      ],
-      axisBorder: {
-        show: false,
-      },
-      axisTicks: {
-        show: false,
-      },
-    },
-    legend: {
-      show: true,
-      position: "top",
-      horizontalAlign: "left",
-      fontFamily: "Outfit",
-    },
+  },
+  grid: {
     yaxis: {
-      title: {
-        text: undefined,
+      lines: {
+        show: true,
       },
     },
-    grid: {
-      yaxis: {
-        lines: {
-          show: true,
-        },
-      },
+  },
+  fill: {
+    opacity: 1,
+  },
+  tooltip: {
+    x: {
+      show: false,
     },
-    fill: {
-      opacity: 1,
+    y: {
+      formatter: (val: number) => `${val}`,
     },
+  },
+}), []);
 
-    tooltip: {
-      x: {
-        show: false,
-      },
-      y: {
-        formatter: (val: number) => `${val}`,
-      },
-    },
-  };
-  const series = [
-    {
-      name: "Sales",
-      data: [168, 385, 201, 298, 187, 195, 291, 110, 215, 390, 280, 112],
-    },
-  ];
+// Memoized chart series data
+const useChartSeries = () => useMemo(() => [
+  {
+    name: "Sales",
+    data: [168, 385, 201, 298, 187, 195, 291, 110, 215, 390, 280, 112],
+  },
+], []);
+
+const BarChartOne: React.FC = memo(() => {
+  const options = useChartOptions();
+  const series = useChartSeries();
+
   return (
     <div className="max-w-full overflow-x-auto custom-scrollbar">
       <div id="chartOne" className="min-w-[1000px]">
-        <ReactApexChart
+        <DynamicChart
           options={options}
           series={series}
           type="bar"
@@ -107,4 +110,8 @@ export default function BarChartOne() {
       </div>
     </div>
   );
-}
+});
+
+BarChartOne.displayName = 'BarChartOne';
+
+export default BarChartOne;

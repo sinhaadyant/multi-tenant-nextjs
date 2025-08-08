@@ -1,87 +1,230 @@
-import api from '@/lib/api';
-import { User } from '@/store/slices/authSlice';
+// Real authentication service for SuperAdmin
 
-export interface LoginCredentials {
+export interface LoginRequest {
   email: string;
   password: string;
-}
-
-export interface SignupData {
-  name: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-  contactNumber: string;
-  token: string;
 }
 
 export interface LoginResponse {
   success: boolean;
-  status: number;
   message: string;
-  data: {
+  data?: {
     token: string;
-    user: User;
-  };
-  meta: {
-    timestamp: string;
+    refreshToken: string;
+    expiresAt: number;
+    user: any;
   };
 }
 
-export interface SignupResponse {
+export interface PasswordResetRequest {
+  email: string;
+}
+
+export interface PasswordResetResponse {
   success: boolean;
-  status: number;
   message: string;
-  data: {
-    token: string;
-    user: User;
-  };
-  meta: {
-    timestamp: string;
-  };
+  token?: string; // Only for development - remove in production
 }
 
-export interface VerifyTokenResponse {
+export interface ResetPasswordRequest {
+  token: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+export interface ResetPasswordResponse {
   success: boolean;
-  status: number;
   message: string;
-  data: {
-    isValid: boolean;
-    email?: string;
-  };
-  meta: {
-    timestamp: string;
-  };
 }
 
-export const authService = {
-  // Login
-  login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
-    const response = await api.post('/superadmin/auth/login', credentials);
-    return response.data;
-  },
+/**
+ * Login SuperAdmin
+ * Makes actual API call to backend
+ */
+export const login = async (data: LoginRequest): Promise<LoginResponse> => {
+  try {
+    const response = await fetch('/api/superadmin/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
 
-  // Signup
-  signup: async (data: SignupData): Promise<SignupResponse> => {
-    const response = await api.post('/superadmin/auth/signup', data);
-    return response.data;
-  },
+    const result = await response.json();
 
-  // Verify invite token
-  verifyToken: async (token: string): Promise<VerifyTokenResponse> => {
-    const response = await api.get(`/superadmin/auth/verify-token?token=${token}`);
-    return response.data;
-  },
+    if (response.ok) {
+      return {
+        success: true,
+        message: result.data?.message || 'Login successful.',
+        data: result.data,
+      };
+    } else {
+      return {
+        success: false,
+        message: result.error || 'Login failed.',
+      };
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+    return {
+      success: false,
+      message: 'Network error. Please check your connection and try again.',
+    };
+  }
+};
 
-  // Get current user profile
-  getProfile: async () => {
-    const response = await api.get('/superadmin/profile');
-    return response.data;
-  },
+/**
+ * Request password reset for SuperAdmin
+ * Makes actual API call to backend
+ */
+export const requestPasswordReset = async (email: string): Promise<PasswordResetResponse> => {
+  try {
+    const response = await fetch('/api/superadmin/auth/forgot-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email }),
+    });
 
-  // Update profile
-  updateProfile: async (data: { name?: string; email?: string; currentPassword?: string; newPassword?: string }) => {
-    const response = await api.put('/superadmin/profile', data);
-    return response.data;
-  },
-}; 
+    const data = await response.json();
+
+    if (response.ok) {
+      return {
+        success: true,
+        message: data.data?.message || 'Password reset instructions have been sent.',
+        token: data.data?.token, // Only for development
+      };
+    } else {
+      return {
+        success: false,
+        message: data.error || 'Failed to process password reset request.',
+      };
+    }
+  } catch (error) {
+    console.error('Password reset request error:', error);
+    return {
+      success: false,
+      message: 'Network error. Please check your connection and try again.',
+    };
+  }
+};
+
+/**
+ * Reset password using token
+ * Makes actual API call to backend
+ */
+export const resetPassword = async (
+  token: string,
+  newPassword: string,
+  confirmPassword: string
+): Promise<ResetPasswordResponse> => {
+  try {
+    const response = await fetch('/api/superadmin/auth/reset-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        token,
+        newPassword,
+        confirmPassword,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      return {
+        success: true,
+        message: data.data?.message || 'Password has been successfully updated.',
+      };
+    } else {
+      return {
+        success: false,
+        message: data.error || 'Failed to reset password.',
+      };
+    }
+  } catch (error) {
+    console.error('Password reset error:', error);
+    return {
+      success: false,
+      message: 'Network error. Please check your connection and try again.',
+    };
+  }
+};
+
+/**
+ * Logout SuperAdmin
+ * Clears all authentication data
+ */
+export const logout = async (): Promise<{ success: boolean; message: string }> => {
+  try {
+    // Call logout API if needed
+    await fetch('/api/superadmin/auth/logout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    // Clear cookie
+    document.cookie = 'superadmin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    
+    return {
+      success: true,
+      message: 'Logged out successfully',
+    };
+  } catch (error) {
+    console.error('Logout error:', error);
+    // Even if API fails, clear local data
+    document.cookie = 'superadmin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    
+    return {
+      success: true,
+      message: 'Logged out successfully',
+    };
+  }
+};
+
+/**
+ * Validate password strength
+ * Returns strength score and validation checks
+ */
+export const validatePasswordStrength = (password: string) => {
+  if (!password) {
+    return null;
+  }
+
+  const checks = {
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    number: /\d/.test(password),
+    special: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+  };
+
+  const score = Object.values(checks).filter(Boolean).length;
+  
+  let strength = 'Very Weak';
+  let color = 'text-red-600';
+  
+  if (score >= 4) {
+    strength = 'Strong';
+    color = 'text-green-600';
+  } else if (score >= 3) {
+    strength = 'Medium';
+    color = 'text-yellow-600';
+  } else if (score >= 2) {
+    strength = 'Weak';
+    color = 'text-orange-600';
+  }
+
+  return {
+    score,
+    strength,
+    color,
+    checks,
+  };
+};

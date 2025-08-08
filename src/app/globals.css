@@ -2,6 +2,110 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Theme transition utilities */
+.theme-transition {
+  transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, color 0.2s ease-in-out;
+}
+
+/* Multi-tenant theme variables */
+:root {
+  --tenant-primary: #465fff;
+  --tenant-secondary: #667085;
+  --tenant-accent: #12b76a;
+  --tenant-primary-dark: #3641f5;
+  --tenant-secondary-dark: #98a2b3;
+  --tenant-accent-dark: #32d583;
+}
+
+/* Tenant theme utility classes */
+.bg-tenant-primary {
+  background-color: var(--tenant-primary);
+}
+
+.bg-tenant-secondary {
+  background-color: var(--tenant-secondary);
+}
+
+.bg-tenant-accent {
+  background-color: var(--tenant-accent);
+}
+
+.text-tenant-primary {
+  color: var(--tenant-primary);
+}
+
+.text-tenant-secondary {
+  color: var(--tenant-secondary);
+}
+
+.text-tenant-accent {
+  color: var(--tenant-accent);
+}
+
+.border-tenant-primary {
+  border-color: var(--tenant-primary);
+}
+
+/* Dark mode tenant colors */
+.dark .bg-tenant-primary {
+  background-color: var(--tenant-primary-dark);
+}
+
+.dark .bg-tenant-secondary {
+  background-color: var(--tenant-secondary-dark);
+}
+
+.dark .bg-tenant-accent {
+  background-color: var(--tenant-accent-dark);
+}
+
+.dark .text-tenant-primary {
+  color: var(--tenant-primary-dark);
+}
+
+.dark .text-tenant-secondary {
+  color: var(--tenant-secondary-dark);
+}
+
+.dark .text-tenant-accent {
+  color: var(--tenant-accent-dark);
+}
+
+.dark .border-tenant-primary {
+  border-color: var(--tenant-primary-dark);
+}
+
+/* Theme-aware scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
 @theme {
   --font-*: initial;
   --font-outfit: Outfit, sans-serif;

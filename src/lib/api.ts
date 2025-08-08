@@ -3,16 +3,40 @@ import toast from 'react-hot-toast';
 import { storage } from './localStorage';
 
 // We'll need to access the store for logout action
-let store: any = null;
+let store: { dispatch: (action: { type: string }) => void } | null = null;
 
-export const setStore = (storeInstance: any) => {
+export const setStore = (storeInstance: { dispatch: (action: { type: string }) => void }) => {
   store = storeInstance;
 };
 
 // Token management utilities
 const getAuthToken = (): string | null => {
   try {
-    return storage.getAuthToken();
+    // First try to get from sessionStorage (where we store it)
+    if (typeof window !== 'undefined') {
+      const sessionToken = sessionStorage.getItem('access_token');
+      if (sessionToken) {
+        return sessionToken;
+      }
+      
+      // Fallback to localStorage
+      const localToken = storage.getAuthToken();
+      if (localToken) {
+        return localToken;
+      }
+      
+      // Check Redux persist state
+      const persistedState = localStorage.getItem('persist:superadmin-root');
+      if (persistedState) {
+        const parsed = JSON.parse(persistedState);
+        const authData = parsed.auth ? JSON.parse(parsed.auth) : null;
+        if (authData?.token) {
+          return authData.token;
+        }
+      }
+    }
+    
+    return null;
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
       console.warn('Error getting auth token:', error);
@@ -25,7 +49,16 @@ const clearAuthData = () => {
   try {
     storage.clearAuth();
     if (typeof window !== 'undefined') {
+      // Clear all possible token locations
+      sessionStorage.removeItem('access_token');
       sessionStorage.removeItem('auth_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('persist:superadmin-root');
+      
+      // Clear cookies
+      document.cookie = 'superadmin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      document.cookie = 'refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     }
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
@@ -105,7 +138,7 @@ api.interceptors.request.use(
             // Redirect to login if not already there
             if (!window.location.pathname.includes('/signin')) {
               toast.error('Session expired. Please log in again.');
-              window.location.href = '/superadmin/signin';
+              window.location.href = '/superadmin/login';
             }
             return Promise.reject(new Error('Token expired'));
           }
@@ -128,7 +161,7 @@ api.interceptors.request.use(
           if (config.url?.includes('/superadmin/') && !config.url?.includes('/auth/')) {
             if (!window.location.pathname.includes('/signin')) {
               toast.error('Authentication required. Please log in.');
-              window.location.href = '/superadmin/signin';
+              window.location.href = '/superadmin/login';
             }
             return Promise.reject(new Error('Authentication required'));
           }
@@ -178,7 +211,7 @@ api.interceptors.response.use(
           // Only redirect if we're not already on the login page
           if (!window.location.pathname.includes('/signin')) {
             toast.error('Session expired. Please log in again.');
-            window.location.href = '/superadmin/signin';
+            window.location.href = '/superadmin/login';
           }
         } catch (error) {
           if (process.env.NODE_ENV === 'development') {
@@ -193,11 +226,11 @@ api.interceptors.response.use(
     } else if (error.response?.status === 404) {
       toast.error('Resource not found.');
     } else if (error.response?.status === 422) {
-      const errorMessage = (error.response?.data as any)?.message || 'Validation error';
+      const errorMessage = (error.response?.data as { message?: string })?.message || 'Validation error';
       toast.error(errorMessage);
     } else {
       // Show error toast for other API errors
-      const errorMessage = (error.response?.data as any)?.message || 'An error occurred';
+      const errorMessage = (error.response?.data as { message?: string })?.message || 'An error occurred';
       toast.error(errorMessage);
     }
 
@@ -205,4 +238,5 @@ api.interceptors.response.use(
   }
 );
 
-export default api; 
+export default api;
+export { api }; 

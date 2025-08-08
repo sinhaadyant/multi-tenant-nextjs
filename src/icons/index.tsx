@@ -52,6 +52,9 @@ import ChatIcon from "./chat.svg";
 import MoreDotIcon from "./more-dot.svg";
 import BellIcon from "./bell.svg";
 
+// Add missing icons as React components
+import { Lock, Shield, Upload, X, Mail, User, Phone, Calendar, Clock, Building2, Users, Activity, TrendingUp, TrendingDown, Database, AlertTriangle, CheckCircle, DollarSign, Plus, Settings, Eye, MoreHorizontal, Search, Filter, MessageSquare, Download, Edit, Trash2, RefreshCw, Camera, Check, AlertCircle, Package, MapPin, Key, HardDrive, FileImage, Video, Badge, LayoutDashboard, FileText } from 'lucide-react';
+
 export {
   DownloadIcon,
   BellIcon,
@@ -106,4 +109,46 @@ export {
   HorizontaLDots,
   ChevronUpIcon,
   ChatIcon,
+  // Add missing icons
+  Lock,
+  Shield,
+  Upload,
+  X,
+  Mail,
+  User,
+  Phone,
+  Calendar,
+  Clock,
+  Building2,
+  Users,
+  Activity,
+  TrendingUp,
+  TrendingDown,
+  Database,
+  AlertTriangle,
+  CheckCircle,
+  DollarSign,
+  Plus,
+  Settings,
+  Eye,
+  MoreHorizontal,
+  Search,
+  Filter,
+  MessageSquare,
+  Download,
+  Edit,
+  Trash2,
+  RefreshCw,
+  Camera,
+  Check,
+  AlertCircle,
+  Package,
+  MapPin,
+  Key,
+  HardDrive,
+  FileImage,
+  Video,
+  Badge,
+  LayoutDashboard,
+  FileText,
 };

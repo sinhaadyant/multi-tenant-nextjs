@@ -1,15 +1,10 @@
 "use client";
 import { ApexOptions } from "apexcharts";
-import dynamic from "next/dynamic";
+import { DynamicChart } from "@/lib/dynamicImports";
 import { MoreDotIcon } from "@/icons";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { useState } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
-
-// Dynamically import the ReactApexChart component
-const ReactApexChart = dynamic(() => import("react-apexcharts"), {
-  ssr: false,
-});
 
 export default function MonthlySalesChart() {
   const options: ApexOptions = {
@@ -141,7 +136,7 @@ export default function MonthlySalesChart() {
 
       <div className="max-w-full overflow-x-auto custom-scrollbar">
         <div className="-ml-5 min-w-[650px] xl:min-w-full pl-2">
-          <ReactApexChart
+          <DynamicChart
             options={options}
             series={series}
             type="bar"

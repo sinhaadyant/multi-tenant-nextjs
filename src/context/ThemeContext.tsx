@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { createContext, useState, useContext, useEffect } from "react";
+import { createContext, useState, useContext, useEffect, useCallback } from "react";
 import { storage } from "@/lib/localStorage";
 
 type Theme = "light" | "dark";
@@ -9,6 +9,9 @@ type Theme = "light" | "dark";
 type ThemeContextType = {
   theme: Theme;
   toggleTheme: () => void;
+  setTheme: (theme: Theme) => void;
+  isInitialized: boolean;
+  syncWithUserPreferences: (userTheme?: Theme) => void;
 };
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -16,42 +19,130 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [theme, setTheme] = useState<Theme>("light");
+  const [theme, setThemeState] = useState<Theme>("light");
   const [isInitialized, setIsInitialized] = useState(false);
 
-  useEffect(() => {
-    // This code will only run on the client side
+  // Function to apply theme to DOM
+  const applyThemeToDOM = useCallback((newTheme: Theme) => {
     if (typeof window !== 'undefined') {
-      try {
-        const savedTheme = storage.getTheme() as Theme;
-        const initialTheme = savedTheme || "light"; // Default to light theme
-
-        setTheme(initialTheme);
-      } catch (error) {
-        // If localStorage is not available, use default theme
-        setTheme("light");
-      }
-      setIsInitialized(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isInitialized) {
-      storage.setTheme(theme);
-      if (theme === "dark") {
+      if (newTheme === "dark") {
         document.documentElement.classList.add("dark");
       } else {
         document.documentElement.classList.remove("dark");
       }
+      
+      // Also set a data attribute for CSS custom properties if needed
+      document.documentElement.setAttribute('data-theme', newTheme);
+      
+      // Set CSS custom property for theme-aware components
+      document.documentElement.style.setProperty('--theme', newTheme);
     }
-  }, [theme, isInitialized]);
+  }, []);
 
-  const toggleTheme = () => {
-    setTheme((prevTheme) => (prevTheme === "light" ? "dark" : "light"));
+  // Initialize theme from localStorage or system preference
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        // First check localStorage
+        const savedTheme = storage.getTheme() as Theme;
+        
+        let initialTheme: Theme;
+        
+        if (savedTheme) {
+          initialTheme = savedTheme;
+        } else {
+          // Fallback to system preference
+          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          initialTheme = prefersDark ? "dark" : "light";
+        }
+
+        setThemeState(initialTheme);
+        applyThemeToDOM(initialTheme);
+      } catch (error) {
+        console.warn('Error loading theme preference:', error);
+        setThemeState("light");
+        applyThemeToDOM("light");
+      }
+      setIsInitialized(true);
+    }
+  }, [applyThemeToDOM]);
+
+  // Save theme to localStorage and apply to DOM when theme changes
+  useEffect(() => {
+    if (isInitialized) {
+      storage.setTheme(theme);
+      applyThemeToDOM(theme);
+      
+      // Sync with user preferences API if authenticated
+      syncThemeWithServer(theme);
+    }
+  }, [theme, isInitialized, applyThemeToDOM]);
+
+  // Listen for system theme changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      
+      const handleSystemThemeChange = (e: MediaQueryListEvent) => {
+        // Only apply system theme if user hasn't explicitly set a preference
+        const userHasPreference = storage.getTheme();
+        if (!userHasPreference) {
+          const systemTheme: Theme = e.matches ? "dark" : "light";
+          setThemeState(systemTheme);
+        }
+      };
+
+      mediaQuery.addEventListener('change', handleSystemThemeChange);
+      return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
+    }
+  }, []);
+
+  // Function to sync theme with server-side user preferences
+  const syncThemeWithServer = async (newTheme: Theme) => {
+    try {
+      const authUser = storage.getAuthUser();
+      if (authUser?.id) {
+        // Update user preferences on the server
+        await fetch('/api/user/preferences', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${storage.getAuthToken()}`,
+          },
+          body: JSON.stringify({ theme: newTheme }),
+        });
+      }
+    } catch (error) {
+      // Silently fail - theme still works locally
+      console.warn('Failed to sync theme with server:', error);
+    }
   };
 
+  const toggleTheme = useCallback(() => {
+    setThemeState((prevTheme) => (prevTheme === "light" ? "dark" : "light"));
+  }, []);
+
+  const setTheme = useCallback((newTheme: Theme) => {
+    setThemeState(newTheme);
+  }, []);
+
+  // Function to sync with user preferences from server
+  const syncWithUserPreferences = useCallback((userTheme?: Theme) => {
+    if (userTheme && (userTheme === "light" || userTheme === "dark")) {
+      setThemeState(userTheme);
+      storage.setTheme(userTheme);
+      applyThemeToDOM(userTheme);
+    }
+  }, [applyThemeToDOM]);
+
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ 
+      theme, 
+      toggleTheme, 
+      setTheme, 
+      isInitialized, 
+      syncWithUserPreferences 
+    }}>
       {children}
     </ThemeContext.Provider>
   );

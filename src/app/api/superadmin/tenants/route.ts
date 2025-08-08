@@ -60,29 +60,23 @@ export const GET = asyncHandler(async (req: NextRequest) => {
   orderBy[sortBy] = sortOrder;
 
   try {
-    // Get tenants with pagination
-    const [tenants, totalCount] = await Promise.all([
+    // Get tenants with pagination and statistics in parallel
+    const [tenants, totalCount, stats] = await Promise.all([
       prisma.tenant.findMany({
         where,
         skip,
         take: limit,
         orderBy,
         include: {
-          _count: {
-            select: { users: true }
-          }
+          _count: { select: { users: true } }
         }
       }),
-      prisma.tenant.count({ where })
+      prisma.tenant.count({ where }),
+      prisma.tenant.groupBy({
+        by: ['isActive'],
+        _count: { id: true }
+      })
     ]);
-
-    // Get statistics
-    const stats = await prisma.tenant.groupBy({
-      by: ['isActive'],
-      _count: {
-        id: true
-      }
-    });
 
     const activeCount = stats.find(s => s.isActive)?._count.id || 0;
     const inactiveCount = stats.find(s => !s.isActive)?._count.id || 0;

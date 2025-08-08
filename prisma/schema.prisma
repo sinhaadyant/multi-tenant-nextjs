@@ -8,19 +8,21 @@ datasource db {
 }
 
 model SuperAdmin {
-  id            String         @id @default(cuid())
-  email         String         @unique
-  name          String
-  password      String
-  isActive      Boolean        @default(true)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  contactNumber String?
-  avatar        String?
-  auditLogs     AuditLog[]
-  inviteTokens  InviteToken[]
-  notifications Notification[]
-  reports       Report[]
+  id                  String               @id @default(cuid())
+  email               String               @unique
+  name                String
+  password            String
+  isActive            Boolean              @default(true)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  contactNumber       String?
+  avatar              String?
+  auditLogs           AuditLog[]
+  inviteTokens        InviteToken[]
+  notifications       Notification[]
+  reports             Report[]
+  passwordResetTokens PasswordResetToken[]
+  refreshTokens       RefreshToken[]
 
   @@map("super_admins")
 }
@@ -289,4 +291,38 @@ model Report {
   @@index([tenantId], map: "reports_tenantId_fkey")
   @@index([superAdminId], map: "reports_superAdminId_fkey")
   @@map("reports")
+}
+
+model PasswordResetToken {
+  id           String      @id @default(cuid())
+  token        String      @unique
+  email        String
+  expiresAt    DateTime
+  used         Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  superAdminId String?
+  superAdmin   SuperAdmin? @relation(fields: [superAdminId], references: [id])
+
+  @@index([email], map: "password_reset_tokens_email_idx")
+  @@index([superAdminId], map: "password_reset_tokens_superAdminId_fkey")
+  @@map("password_reset_tokens")
+}
+
+model RefreshToken {
+  id           String      @id @default(cuid())
+  tokenId      String      @unique // Unique identifier for the token pair
+  hashedToken  String      @unique // Hashed refresh token for security
+  superAdminId String
+  superAdmin   SuperAdmin  @relation(fields: [superAdminId], references: [id], onDelete: Cascade)
+  isRevoked    Boolean     @default(false)
+  expiresAt    DateTime
+  createdAt    DateTime    @default(now())
+  lastUsedAt   DateTime?
+  deviceInfo   String?     // User agent, device fingerprint
+  ipAddress    String?     // IP address where token was issued
+  
+  @@index([superAdminId], map: "refresh_tokens_superAdminId_fkey")
+  @@index([tokenId], map: "refresh_tokens_tokenId_idx")
+  @@index([expiresAt], map: "refresh_tokens_expiresAt_idx")
+  @@map("refresh_tokens")
 }

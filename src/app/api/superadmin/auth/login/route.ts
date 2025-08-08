@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { comparePassword, generateToken } from '@/lib/jwt';
+import { comparePassword, generateTokenPair, verifyRefreshToken } from '@/lib/jwt';
 import { createAuditLogFromRequest } from '@/lib/audit';
 import { asyncHandler } from '@/lib/errorHandler';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
+import bcrypt from 'bcryptjs';
 
 export const POST = asyncHandler(async (req: NextRequest) => {
   if (process.env.NODE_ENV === 'development') {
@@ -67,11 +68,32 @@ export const POST = asyncHandler(async (req: NextRequest) => {
     );
   }
 
-  // Generate JWT token
-  const token = generateToken({
+  // Generate token pair (access + refresh)
+  const tokenPair = generateTokenPair({
     id: superAdmin.id,
     email: superAdmin.email,
     role: 'superadmin'
+  });
+
+  // Get request info for device tracking
+  const userAgent = req.headers.get('user-agent') || 'Unknown';
+  const forwardedFor = req.headers.get('x-forwarded-for');
+  const remoteAddress = req.headers.get('x-real-ip') || req.ip;
+  const ipAddress = forwardedFor ? forwardedFor.split(',')[0] : remoteAddress;
+
+  // Store refresh token in database
+  const hashedRefreshToken = await bcrypt.hash(tokenPair.refreshToken, 10);
+  const refreshTokenPayload = verifyRefreshToken(tokenPair.refreshToken);
+  
+  await prisma.refreshToken.create({
+    data: {
+      tokenId: refreshTokenPayload.tokenId,
+      hashedToken: hashedRefreshToken,
+      superAdminId: superAdmin.id,
+      expiresAt: new Date(tokenPair.refreshExpiresAt),
+      deviceInfo: userAgent,
+      ipAddress: ipAddress || 'Unknown',
+    }
   });
 
   // Create audit log
@@ -79,20 +101,40 @@ export const POST = asyncHandler(async (req: NextRequest) => {
     req,
     { id: superAdmin.id, email: superAdmin.email, role: 'superadmin' },
     'superadmin.login',
-    { email: superAdmin.email }
+    { 
+      email: superAdmin.email,
+      deviceInfo: userAgent,
+      ipAddress: ipAddress || 'Unknown',
+      tokenId: refreshTokenPayload.tokenId
+    }
   );
 
   if (process.env.NODE_ENV === 'development') {
     console.log('✅ SuperAdmin login successful:', email);
   }
 
-  return createSuccessResponse({
-    token,
+  // Create response with success data
+  const response = createSuccessResponse({
+    token: tokenPair.accessToken,
+    refreshToken: tokenPair.refreshToken,
+    expiresAt: tokenPair.expiresAt,
     user: {
       id: superAdmin.id,
       email: superAdmin.email,
       name: superAdmin.name,
-      role: 'superadmin'
+      role: 'superadmin',
+      avatar: superAdmin.avatar
     }
   }, 'Login successful');
+
+  // Set cookie for middleware authentication
+  response.cookies.set('superadmin_token', tokenPair.accessToken, {
+    httpOnly: false, // Allow JS access
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 15 * 60, // 15 minutes (same as access token)
+    path: '/',
+  });
+
+  return response;
 }); 
