@@ -1,225 +1,277 @@
 "use client";
-import { ThemeToggleButton } from "@/components/common/ThemeToggleButton";
-import NotificationDropdown from "@/components/header/NotificationDropdown";
-import UserDropdown from "@/components/header/UserDropdown";
-import GlobalSearch from "@/components/header/GlobalSearch";
-import MobileSearch from "@/components/header/MobileSearch";
-import { useSidebar } from "@/context/SidebarContext";
-import Image from "next/image";
-import Link from "next/link";
-import React, { useState ,useEffect,useRef} from "react";
-import { Search } from "lucide-react";
 
-const AppHeader: React.FC = () => {
-  const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
+import { 
+  Bell, 
+  Search, 
+  Settings, 
+  User, 
+  LogOut, 
+  ChevronDown,
+  Mail,
+  AlertCircle,
+  CheckCircle,
+  Info,
+  Clock
+} from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { useUserNotifications, useMarkNotificationsAsRead } from '@/hooks/useTenantNotifications';
+import ErrorBoundary from '@/components/ui/ErrorBoundary';
 
-  const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
+const AppHeader = () => {
+  const params = useParams();
+  const tenantSlug = params.tenantSlug as string;
+  const { user, logout } = useAuth();
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
-  const handleToggle = () => {
-    if (window.innerWidth >= 1024) {
-      toggleSidebar();
-    } else {
-      toggleMobileSidebar();
+  // Fetch user notifications
+  const { notifications, isLoading: notificationsLoading, refetch } = useUserNotifications(tenantSlug, {
+    limit: 10,
+    sortBy: 'createdAt',
+    sortOrder: 'desc'
+  });
+
+  // Mark notification as read mutation
+  const markReadMutation = useMarkNotificationsAsRead(tenantSlug);
+
+  // Get unread notifications count
+  const unreadCount = notifications?.filter(n => n.status === 'unread').length || 0;
+
+  // Handle mark as read
+  const handleMarkAsRead = async (notificationId: string) => {
+    try {
+      await markReadMutation.mutateAsync({ notificationIds: [notificationId] });
+      refetch(); // Refresh notifications
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
     }
   };
 
-  const toggleApplicationMenu = () => {
-    setApplicationMenuOpen(!isApplicationMenuOpen);
+  // Handle mark all as read
+  const handleMarkAllAsRead = async () => {
+    try {
+      await markReadMutation.mutateAsync({ markAllAsRead: true });
+      refetch(); // Refresh notifications
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+    }
   };
 
-  const toggleSearch = () => {
-    setIsSearchOpen(!isSearchOpen);
+  // Get notification icon based on type
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'success':
+        return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'error':
+        return <AlertCircle className="w-4 h-4 text-red-500" />;
+      case 'warning':
+        return <AlertCircle className="w-4 h-4 text-yellow-500" />;
+      case 'info':
+        return <Info className="w-4 h-4 text-blue-500" />;
+      default:
+        return <Mail className="w-4 h-4 text-gray-500" />;
+    }
   };
 
-  const toggleMobileSearch = () => {
-    setIsMobileSearchOpen(!isMobileSearchOpen);
+  // Format notification time
+  const formatNotificationTime = (date: Date) => {
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - new Date(date).getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+    return `${Math.floor(diffInMinutes / 1440)}d ago`;
   };
-
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key === "k") {
-        event.preventDefault();
-        if (window.innerWidth >= 1024) {
-          setIsSearchOpen(true);
-        } else {
-          setIsMobileSearchOpen(true);
-        }
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, []);
 
   return (
-    <>
-      <header className="sticky top-0 flex w-full bg-white border-gray-200 z-99999 dark:border-gray-800 dark:bg-gray-900 lg:border-b">
-        <div className="flex flex-col items-center justify-between grow lg:flex-row lg:px-6">
-          <div className="flex items-center justify-between w-full gap-2 px-3 py-3 border-b border-gray-200 dark:border-gray-800 sm:gap-4 lg:justify-normal lg:border-b-0 lg:px-0 lg:py-4">
-            <button
-              className="items-center justify-center w-10 h-10 text-gray-500 border-gray-200 rounded-lg z-99999 dark:border-gray-800 lg:flex dark:text-gray-400 lg:h-11 lg:w-11 lg:border"
-              onClick={handleToggle}
-              aria-label="Toggle Sidebar"
-            >
-              {isMobileOpen ? (
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    fillRule="evenodd"
-                    clipRule="evenodd"
-                    d="M6.21967 7.28131C5.92678 6.98841 5.92678 6.51354 6.21967 6.22065C6.51256 5.92775 6.98744 5.92775 7.28033 6.22065L11.999 10.9393L16.7176 6.22078C17.0105 5.92789 17.4854 5.92788 17.7782 6.22078C18.0711 6.51367 18.0711 6.98855 17.7782 7.28144L13.0597 12L17.7782 16.7186C18.0711 17.0115 18.0711 17.4863 17.7782 17.7792C17.4854 18.0721 17.0105 18.0721 16.7176 17.7792L11.999 13.0607L7.28033 17.7794C6.98744 18.0722 6.51256 18.0722 6.21967 17.7794C5.92678 17.4865 5.92678 17.0116 6.21967 16.7187L10.9384 12L6.21967 7.28131Z"
-                    fill="currentColor"
-                  />
-                </svg>
-              ) : (
-                <svg
-                  width="16"
-                  height="12"
-                  viewBox="0 0 16 12"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    fillRule="evenodd"
-                    clipRule="evenodd"
-                    d="M0.583252 1C0.583252 0.585788 0.919038 0.25 1.33325 0.25H14.6666C15.0808 0.25 15.4166 0.585786 15.4166 1C15.4166 1.41421 15.0808 1.75 14.6666 1.75L1.33325 1.75C0.919038 1.75 0.583252 1.41422 0.583252 1ZM0.583252 11C0.583252 10.5858 0.919038 10.25 1.33325 10.25L14.6666 10.25C15.0808 10.25 15.4166 10.5858 15.4166 11C15.4166 11.4142 15.0808 11.75 14.6666 11.75L1.33325 11.75C0.919038 11.75 0.583252 11.4142 0.583252 11ZM1.33325 5.25C0.919038 5.25 0.583252 5.58579 0.583252 6C0.583252 6.41421 0.919038 6.75 1.33325 6.75L7.99992 6.75C8.41413 6.75 8.74992 6.41421 8.74992 6C8.74992 5.58579 8.41413 5.25 7.99992 5.25L1.33325 5.25Z"
-                    fill="currentColor"
-                  />
-                </svg>
-              )}
-            </button>
+    <ErrorBoundary>
+      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* Left side - Logo/Brand */}
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                  {tenantSlug ? tenantSlug.charAt(0).toUpperCase() + tenantSlug.slice(1) : 'Dashboard'}
+                </h1>
+              </div>
+            </div>
 
-            <Link href="/" className="lg:hidden">
-              <Image
-                width={154}
-                height={32}
-                className="dark:hidden"
-                src="./images/logo/logo.svg"
-                alt="Logo"
-              />
-              <Image
-                width={154}
-                height={32}
-                className="hidden dark:block"
-                src="./images/logo/logo-dark.svg"
-                alt="Logo"
-              />
-            </Link>
-
-            {/* Mobile Search Button */}
-            <button
-              onClick={toggleMobileSearch}
-              className="flex items-center justify-center w-10 h-10 text-gray-700 rounded-lg z-99999 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 lg:hidden"
-              aria-label="Search"
-            >
-              <Search className="h-5 w-5" />
-            </button>
-
-            <button
-              onClick={toggleApplicationMenu}
-              className="flex items-center justify-center w-10 h-10 text-gray-700 rounded-lg z-99999 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 lg:hidden"
-            >
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  fillRule="evenodd"
-                  clipRule="evenodd"
-                  d="M5.99902 10.4951C6.82745 10.4951 7.49902 11.1667 7.49902 11.9951V12.0051C7.49902 12.8335 6.82745 13.5051 5.99902 13.5051C5.1706 13.5051 4.49902 12.8335 4.49902 12.0051V11.9951C4.49902 11.1667 5.1706 10.4951 5.99902 10.4951ZM17.999 10.4951C18.8275 10.4951 19.499 11.1667 19.499 11.9951V12.0051C19.499 12.8335 18.8275 13.5051 17.999 13.5051C17.1706 13.5051 16.499 12.8335 16.499 12.0051V11.9951C16.499 11.1667 17.1706 10.4951 17.999 10.4951ZM13.499 11.9951C13.499 11.1667 12.8275 10.4951 11.999 10.4951C11.1706 10.4951 10.499 11.1667 10.499 11.9951V12.0051C10.499 12.8335 11.1706 13.5051 11.999 13.5051C12.8275 13.5051 13.499 12.8335 13.499 12.0051V11.9951Z"
-                  fill="currentColor"
-                />
-              </svg>
-            </button>
-
-            <div className="hidden lg:block">
-              <form onSubmit={(e) => { e.preventDefault(); toggleSearch(); }}>
-                <div className="relative">
-                  <span className="absolute -translate-y-1/2 left-4 top-1/2 pointer-events-none">
-                    <svg
-                      className="fill-gray-500 dark:fill-gray-400"
-                      width="20"
-                      height="20"
-                      viewBox="0 0 20 20"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        clipRule="evenodd"
-                        d="M3.04175 9.37363C3.04175 5.87693 5.87711 3.04199 9.37508 3.04199C12.8731 3.04199 15.7084 5.87693 15.7084 9.37363C15.7084 12.8703 12.8731 15.7053 9.37508 15.7053C5.87711 15.7053 3.04175 12.8703 3.04175 9.37363ZM9.37508 1.54199C5.04902 1.54199 1.54175 5.04817 1.54175 9.37363C1.54175 13.6991 5.04902 17.2053 9.37508 17.2053C11.2674 17.2053 13.003 16.5344 14.357 15.4176L17.177 18.238C17.4699 18.5309 17.9448 18.5309 18.2377 18.238C18.5306 17.9451 18.5306 17.4703 18.2377 17.1774L15.418 14.3573C16.5365 13.0033 17.2084 11.2669 17.2084 9.37363C17.2084 5.04817 13.7011 1.54199 9.37508 1.54199Z"
-                        fill=""
-                      />
-                    </svg>
-                  </span>
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    placeholder="Search or type command..."
-                    className="h-11 w-full rounded-lg border border-gray-200 bg-transparent py-2.5 pl-12 pr-14 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 xl:w-[430px] cursor-pointer"
-                    readOnly
-                    onClick={toggleSearch}
-                  />
-
-                  <button 
-                    type="button"
-                    onClick={toggleSearch}
-                    className="absolute right-2.5 top-1/2 inline-flex -translate-y-1/2 items-center gap-0.5 rounded-lg border border-gray-200 bg-gray-50 px-[7px] py-[4.5px] text-xs -tracking-[0.2px] text-gray-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    <span> ⌘ </span>
-                    <span> K </span>
-                  </button>
+            {/* Right side - Search, Notifications, User Menu */}
+            <div className="flex items-center space-x-4">
+              {/* Search */}
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search className="h-5 w-5 text-gray-400" />
                 </div>
-              </form>
-            </div>
-          </div>
-          <div
-            className={`${
-              isApplicationMenuOpen ? "flex" : "hidden"
-            } items-center justify-between w-full gap-4 px-5 py-4 lg:flex shadow-theme-md lg:justify-end lg:px-0 lg:shadow-none`}
-          >
-            <div className="flex items-center gap-2 2xsm:gap-3">
-              {/* <!-- Dark Mode Toggler --> */}
-              <ThemeToggleButton />
-              {/* <!-- Dark Mode Toggler --> */}
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+              </div>
 
-             <NotificationDropdown /> 
-              {/* <!-- Notification Menu Area --> */}
+              {/* Notifications Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                  className="relative p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 rounded-md"
+                >
+                  <Bell className="h-6 w-6" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* Notifications Dropdown Menu */}
+                {isNotificationsOpen && (
+                  <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
+                    <div className="py-2">
+                      {/* Header */}
+                      <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                          Notifications
+                        </h3>
+                        {unreadCount > 0 && (
+                          <button
+                            onClick={handleMarkAllAsRead}
+                            className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                          >
+                            Mark all as read
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Notifications List */}
+                      <div className="max-h-96 overflow-y-auto">
+                        {notificationsLoading ? (
+                          <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                            Loading notifications...
+                          </div>
+                        ) : notifications && notifications.length > 0 ? (
+                          notifications.map((notification) => (
+                            <div
+                              key={notification.id}
+                              className={`px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer ${
+                                !notification.isRead ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                              }`}
+                              onClick={() => handleMarkAsRead(notification.id)}
+                            >
+                              <div className="flex items-start space-x-3">
+                                <div className="flex-shrink-0 mt-0.5">
+                                  {getNotificationIcon(notification.type)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-sm font-medium ${
+                                    !notification.isRead 
+                                      ? 'text-gray-900 dark:text-white' 
+                                      : 'text-gray-600 dark:text-gray-400'
+                                  }`}>
+                                    {notification.title}
+                                  </p>
+                                  <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                                    {notification.message}
+                                  </p>
+                                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                    {formatNotificationTime(notification.createdAt)}
+                                  </p>
+                                </div>
+                                {!notification.isRead && (
+                                  <div className="flex-shrink-0">
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                            No notifications
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Footer */}
+                      {notifications && notifications.length > 0 && (
+                        <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700">
+                          <a
+                            href={`/${tenantSlug}/notifications`}
+                            className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                          >
+                            View all notifications
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* User Menu */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  className="flex items-center space-x-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 rounded-md p-2"
+                >
+                  <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                    <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <span className="hidden md:block text-sm font-medium">
+                    {user?.name || 'User'}
+                  </span>
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+
+                {/* User Dropdown Menu */}
+                {isUserMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
+                    <div className="py-1">
+                      <a
+                        href={`/${tenantSlug}/profile`}
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        <User className="w-4 h-4 mr-3" />
+                        Profile
+                      </a>
+                      <a
+                        href={`/${tenantSlug}/settings`}
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        <Settings className="w-4 h-4 mr-3" />
+                        Settings
+                      </a>
+                      <button
+                        onClick={logout}
+                        className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        <LogOut className="w-4 h-4 mr-3" />
+                        Sign out
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-            {/* <!-- User Area --> */}
-            <UserDropdown /> 
-      
           </div>
         </div>
+
+        {/* Click outside to close dropdowns */}
+        {(isNotificationsOpen || isUserMenuOpen) && (
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => {
+              setIsNotificationsOpen(false);
+              setIsUserMenuOpen(false);
+            }}
+          />
+        )}
       </header>
-
-      {/* Global Search Modal (Desktop) */}
-      <GlobalSearch 
-        isOpen={isSearchOpen} 
-        onClose={() => setIsSearchOpen(false)} 
-      />
-
-      {/* Mobile Search Modal */}
-      <MobileSearch 
-        isOpen={isMobileSearchOpen} 
-        onClose={() => setIsMobileSearchOpen(false)} 
-      />
-    </>
+    </ErrorBoundary>
   );
 };
 

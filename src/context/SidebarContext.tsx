@@ -1,6 +1,6 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { storage } from "@/lib/localStorage";
+
 
 type SidebarContextType = {
   isExpanded: boolean;
@@ -40,7 +40,8 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     // Load saved sidebar state from localStorage after hydration
     if (typeof window !== 'undefined') {
-      const savedSidebarState = storage.getSidebarState();
+      const savedSidebarStateStr = localStorage.getItem('sidebar_state');
+      const savedSidebarState = savedSidebarStateStr ? JSON.parse(savedSidebarStateStr) : null;
       if (savedSidebarState?.isExpanded !== undefined) {
         setIsExpanded(savedSidebarState.isExpanded);
       }
@@ -68,7 +69,7 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({
   const toggleSidebar = () => {
     setIsExpanded((prev) => {
       const newValue = !prev;
-      storage.setSidebarState({ isExpanded: newValue });
+      localStorage.setItem('sidebar_state', JSON.stringify({ isExpanded: newValue }));
       return newValue;
     });
   };

@@ -78,6 +78,16 @@ export const DashboardClient: React.FC = () => {
   const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useRealTimeStats();
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
+  // Debug logging
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔍 DashboardClient Debug:', {
+      data: data,
+      isLoading,
+      error,
+      selectedRange
+    });
+  }
+
   // Update last updated time when data changes
   useEffect(() => {
     if (data || stats) {
@@ -199,20 +209,28 @@ export const DashboardClient: React.FC = () => {
       </div>
 
       {/* Overview Cards */}
-      <DashboardOverviewCards summary={data.summary} />
+      {data.summary && (
+        <DashboardOverviewCards summary={data.summary} />
+      )}
 
       {/* Quick Actions */}
       <QuickActions />
 
       {/* Charts Section */}
-      <DashboardAnalyticsChart 
-        chartData={data.charts}
-      />
+      {data.charts && (
+        <DashboardAnalyticsChart 
+          chartData={data.charts}
+        />
+      )}
 
       {/* Recent Tenants and Recent Activity */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <RecentTenants tenants={data.topTenants} />
-        <RecentActivity auditLogs={data.recentActivity.auditLogs} />
+        {data.topTenants && (
+          <RecentTenants tenants={data.topTenants} />
+        )}
+        {data.recentActivity?.auditLogs && (
+          <RecentActivity auditLogs={data.recentActivity.auditLogs} />
+        )}
       </div>
     </div>
   );

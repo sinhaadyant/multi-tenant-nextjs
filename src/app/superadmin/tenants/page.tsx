@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useTransition, memo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Download, RefreshCw } from '@/icons';
-import { useTenants, useDeleteTenant, useToggleTenantStatus, TenantFilters as TenantFiltersType, Tenant } from '@/hooks/useTenantsAPI';
+import { useTenants, useDeleteTenant, useToggleTenantStatus, useExportTenants, TenantFilters as TenantFiltersType, Tenant } from '@/hooks/useTenantsAPI';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import TenantTable from '@/components/superadmin/TenantTable';
 import TenantFilters from '@/components/superadmin/TenantFilters';
@@ -94,8 +94,7 @@ const TenantsPage: React.FC = () => {
     limit: parseInt(searchParams.get('limit') || '10'),
     search: searchParams.get('search') || '',
     status: searchParams.get('status') || '',
-    plan: searchParams.get('plan') || '',
-    region: searchParams.get('region') || '',
+     region: searchParams.get('region') || '',
     sortBy: searchParams.get('sortBy') || 'createdAt',
     sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc',
   }));
@@ -106,6 +105,7 @@ const TenantsPage: React.FC = () => {
   const { data: tenantsData, isLoading, error, refetch } = useTenants(filters);
   const deleteTenantMutation = useDeleteTenant();
   const toggleStatusMutation = useToggleTenantStatus();
+  const exportTenantsMutation = useExportTenants();
 
   // Optimized data extraction with memoization
   const { tenants, stats, pagination, totalUsers } = React.useMemo(() => {
@@ -116,17 +116,6 @@ const TenantsPage: React.FC = () => {
     
     return { tenants, stats, pagination, totalUsers };
   }, [tenantsData]);
-
-  // Debug logging
-  if (process.env.NODE_ENV === 'development') {
-    console.log('🔍 Tenants Page Data:', {
-      rawData: tenantsData,
-      tenants: tenants,
-      stats: stats,
-      pagination: pagination,
-      tenantsLength: tenants.length
-    });
-  }
 
   // Memoized filter handlers with transitions
   const handleFiltersChange = useCallback((newFilters: TenantFiltersType) => {
@@ -142,7 +131,6 @@ const TenantsPage: React.FC = () => {
         limit: 10,
         search: '',
         status: '',
-        plan: '',
         region: '',
         sortBy: 'createdAt',
         sortOrder: 'desc'
@@ -194,16 +182,12 @@ const TenantsPage: React.FC = () => {
   }, [router]);
 
   const handleExportData = useCallback(() => {
-    startTransition(() => {
-      refetch();
-      console.log('Export functionality not yet implemented.');
-    });
-  }, [refetch]);
+    exportTenantsMutation.mutate(filters);
+  }, [exportTenantsMutation, filters]);
 
   const handleRefresh = useCallback(() => {
     startTransition(() => {
       refetch();
-      console.log('Data refreshed successfully!');
     });
   }, [refetch]);
 
@@ -259,12 +243,12 @@ const TenantsPage: React.FC = () => {
           </Button>
           <Button
             onClick={handleExportData}
-            disabled={isLoading || isPending || deleteTenantMutation.isPending}
+            disabled={isLoading || isPending || exportTenantsMutation.isPending}
             variant="outline"
             size="sm"
           >
-            <Download className="w-4 h-4 mr-2 inline" />
-            Export
+            <Download className={`w-4 h-4 mr-2 inline ${exportTenantsMutation.isPending ? 'animate-spin' : ''}`} />
+            {exportTenantsMutation.isPending ? 'Exporting...' : 'Export'}
           </Button>
           <Button
             onClick={handleCreateTenant}

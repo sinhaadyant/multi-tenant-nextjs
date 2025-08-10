@@ -13,77 +13,84 @@ export interface InstantAuthResult {
  * Instantly checks authentication status from localStorage
  * This runs synchronously and doesn't wait for Redux
  */
-export const instantAuthCheck = (): InstantAuthResult => {
+export const instantAuthCheck = (): boolean => {
   try {
-    console.log('🔍 instantAuthCheck: Starting authentication check...');
-    
-    // Check sessionStorage for access token (from authApi)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 instantAuthCheck: Starting authentication check...');
+    }
+
+    // Check sessionStorage for access token
     const accessToken = sessionStorage.getItem('access_token');
-    console.log('🔍 instantAuthCheck: sessionStorage access_token:', accessToken ? 'FOUND' : 'NOT FOUND');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 instantAuthCheck: sessionStorage access_token:', accessToken ? 'FOUND' : 'NOT FOUND');
+    }
+    
     if (accessToken) {
-      console.log('🔍 instantAuthCheck: Returning authenticated with access token');
-      return {
-        hasToken: true,
-        token: accessToken,
-        isAuthenticated: true,
-      };
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 instantAuthCheck: Returning authenticated with access token');
+      }
+      return true;
     }
 
     // Check localStorage for refresh token
     const refreshToken = localStorage.getItem('refresh_token');
-    console.log('🔍 instantAuthCheck: localStorage refresh_token:', refreshToken ? 'FOUND' : 'NOT FOUND');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 instantAuthCheck: localStorage refresh_token:', refreshToken ? 'FOUND' : 'NOT FOUND');
+    }
+    
     if (refreshToken) {
-      console.log('🔍 instantAuthCheck: Returning authenticated with refresh token');
-      return {
-        hasToken: true,
-        token: refreshToken,
-        isAuthenticated: true,
-      };
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 instantAuthCheck: Returning authenticated with refresh token');
+      }
+      return true;
     }
 
-    // Check Redux Persist data for refresh token and login status
+    // Check Redux persisted state
     const persistedRoot = localStorage.getItem('persist:superadmin-root');
-    console.log('🔍 instantAuthCheck: localStorage persist:superadmin-root:', persistedRoot ? 'EXISTS' : 'NOT FOUND');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 instantAuthCheck: localStorage persist:superadmin-root:', persistedRoot ? 'EXISTS' : 'NOT FOUND');
+    }
+    
     if (persistedRoot) {
-      const parsed = JSON.parse(persistedRoot);
-      const authData = parsed.auth ? JSON.parse(parsed.auth) : null;
-      console.log('🔍 instantAuthCheck: Redux auth data:', authData);
-      
-      if (authData?.isLoggedIn && authData?.refreshToken) {
-        console.log('🔍 instantAuthCheck: Returning authenticated with Redux refresh token');
-        return {
-          hasToken: true,
-          token: authData.refreshToken, // Use refresh token as fallback
-          isAuthenticated: true,
-        };
+      try {
+        const authData = JSON.parse(persistedRoot);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 instantAuthCheck: Redux auth data:', authData);
+        }
+        
+        if (authData && authData.refreshToken) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔍 instantAuthCheck: Returning authenticated with Redux refresh token');
+          }
+          return true;
+        }
+      } catch (error) {
+        // Ignore parsing errors
       }
     }
 
-    // Fallback: Check cookie
-    const cookieToken = getCookieToken() || getCookieTokenAlt();
-    console.log('🔍 instantAuthCheck: Cookie token:', cookieToken ? 'FOUND' : 'NOT FOUND');
+    // Check cookies for token
+    const cookieToken = getCookie('auth_token');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 instantAuthCheck: Cookie token:', cookieToken ? 'FOUND' : 'NOT FOUND');
+    }
+    
     if (cookieToken) {
-      console.log('🔍 instantAuthCheck: Returning authenticated with cookie token');
-      return {
-        hasToken: true,
-        token: cookieToken,
-        isAuthenticated: true,
-      };
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 instantAuthCheck: Returning authenticated with cookie token');
+      }
+      return true;
     }
 
-    console.log('🔍 instantAuthCheck: No authentication found, returning false');
-    return {
-      hasToken: false,
-      token: null,
-      isAuthenticated: false,
-    };
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 instantAuthCheck: No authentication found, returning false');
+    }
+    return false;
   } catch (error) {
-    console.warn('Instant auth check failed:', error);
-    return {
-      hasToken: false,
-      token: null,
-      isAuthenticated: false,
-    };
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('Instant auth check failed:', error);
+    }
+    return false;
   }
 };
 

@@ -23,6 +23,41 @@ interface RecentTenantsProps {
 
 
 export const RecentTenants: React.FC<RecentTenantsProps> = ({ tenants }) => {
+  // Add null checks to prevent errors
+  if (!tenants) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Recent Tenants
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Latest tenant registrations and updates
+            </p>
+          </div>
+        </div>
+        <div className="divide-y divide-gray-200 dark:divide-gray-700">
+          {[1, 2, 3, 4, 5].map((index) => (
+            <div key={index} className="p-6 animate-pulse">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <div className="w-10 h-10 bg-gray-200 rounded-lg dark:bg-gray-700"></div>
+                    <div className="flex-1">
+                      <div className="h-4 bg-gray-200 rounded w-32 dark:bg-gray-700"></div>
+                      <div className="h-3 bg-gray-200 rounded w-24 mt-2 dark:bg-gray-700"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
       {/* Header */}

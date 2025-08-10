@@ -312,13 +312,13 @@ export async function seedDatabase() {
       {
         token: 'invite-superadmin-1',
         email: 'newadmin@example.com',
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+        expiresAt: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000), // 1 day from now
         createdBy: existingSuperAdmin?.id
       },
       {
         token: 'invite-superadmin-2',
         email: 'admin2@example.com',
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+        expiresAt: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000), // 1 day from now
         createdBy: existingSuperAdmin?.id
       }
     ];

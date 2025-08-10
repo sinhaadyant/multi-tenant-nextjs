@@ -11,7 +11,6 @@ import {
   Users,
   Globe,
   Calendar,
-  Package,
   MapPin
 } from 'lucide-react';
 import { Tenant } from '@/hooks/useTenantsAPI';
@@ -47,23 +46,6 @@ const StatusBadge = memo(({ isActive }: { isActive: boolean }) => (
 ));
 
 StatusBadge.displayName = 'StatusBadge';
-
-// Memoized Plan Badge Component
-const PlanBadge = memo(({ plan }: { plan: string }) => {
-  const planColors = {
-    starter: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-    professional: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-    enterprise: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-  };
-
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${planColors[plan as keyof typeof planColors] || planColors.starter}`}>
-      {plan.charAt(0).toUpperCase() + plan.slice(1)}
-    </span>
-  );
-});
-
-PlanBadge.displayName = 'PlanBadge';
 
 // Memoized Sort Icon Component
 const SortIcon = memo(({ field, sortBy, sortOrder }: { field: string; sortBy?: string; sortOrder?: 'asc' | 'desc' }) => {
@@ -142,14 +124,9 @@ const TenantRow = memo(({
             {tenant.name}
           </div>
         </td>
-        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-          {tenant.email}
-        </td>
+        
         <td className="px-6 py-4 whitespace-nowrap">
           <StatusBadge isActive={tenant.isActive} />
-        </td>
-        <td className="px-6 py-4 whitespace-nowrap">
-          <PlanBadge plan={tenant.plan} />
         </td>
         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
           <div className="flex items-center">
@@ -199,7 +176,7 @@ const TenantRow = memo(({
       </tr>
       {isExpanded && (
         <tr>
-          <td colSpan={7} className="px-6 py-4 bg-gray-50 dark:bg-gray-800">
+          <td colSpan={6} className="px-6 py-4 bg-gray-50 dark:bg-gray-800">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
                 <Globe className="w-4 h-4 mr-2" />
@@ -282,7 +259,7 @@ const TenantTable: React.FC<TenantTableProps> = memo(({
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
-                {['Name', 'Email', 'Status', 'Plan', 'Users', 'Created', 'Actions'].map((header) => (
+                {['Name', 'Status', 'Users', 'Created', 'Actions'].map((header) => (
                   <th key={header} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
                   </th>
@@ -292,7 +269,7 @@ const TenantTable: React.FC<TenantTableProps> = memo(({
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {[...Array(5)].map((_, i) => (
                 <tr key={i}>
-                  {[...Array(7)].map((_, j) => (
+                  {[...Array(6)].map((_, j) => (
                     <td key={j} className="px-6 py-4">
                       <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
                     </td>
@@ -330,9 +307,7 @@ const TenantTable: React.FC<TenantTableProps> = memo(({
             <tr>
               {[
                 { key: 'name', label: 'Name' },
-                { key: 'email', label: 'Email' },
-                { key: 'status', label: 'Status' },
-                { key: 'plan', label: 'Plan' },
+                 { key: 'status', label: 'Status' },
                 { key: 'userCount', label: 'Users' },
                 { key: 'createdAt', label: 'Created' },
                 { key: 'actions', label: 'Actions' }

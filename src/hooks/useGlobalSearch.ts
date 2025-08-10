@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { storage } from '@/lib/localStorage';
+import { simpleStorage } from '@/lib/simpleStorage';
 
 export interface SearchResult {
   id: string;
@@ -52,7 +52,7 @@ export const useGlobalSearch = (
   const searchQuery = useQuery({
     queryKey: ['global-search', debouncedQuery, limit],
     queryFn: async (): Promise<SearchResponse> => {
-      const token = storage.getToken();
+      const token = simpleStorage.getAuthToken();
       const params = new URLSearchParams({
         q: debouncedQuery,
         limit: limit.toString(),
@@ -72,8 +72,6 @@ export const useGlobalSearch = (
       return response.json();
     },
     enabled: shouldSearch,
-    staleTime: 30000, // Cache results for 30 seconds
-    cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
   });
 
   return {
@@ -92,7 +90,7 @@ export const useTrendingResults = (limit: number = 5) => {
   return useQuery({
     queryKey: ['trending-results', limit],
     queryFn: async (): Promise<SearchResult[]> => {
-      const token = storage.getToken();
+      const token = simpleStorage.getAuthToken();
       
       // Get recent support tickets
       const ticketsResponse = await fetch('/api/superadmin/support-tickets?limit=3&sortBy=createdAt&sortOrder=desc', {
@@ -105,12 +103,14 @@ export const useTrendingResults = (limit: number = 5) => {
       const ticketsData = await ticketsResponse.json();
       
       // Get recent users
-      const usersResponse = await fetch('/api/superadmin/users?limit=2&sortBy=createdAt&sortOrder=desc', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+        // Note: This would need to be updated to use tenant-specific search
+  // For now, we'll keep the superadmin endpoint but this should be refactored
+  const usersResponse = await fetch('/api/superadmin/users?limit=2&sortBy=createdAt&sortOrder=desc', {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
 
       const usersData = await usersResponse.json();
 

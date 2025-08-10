@@ -7,29 +7,20 @@ import { useConfirmModalContext } from './ConfirmModalProvider';
 const ConfirmModalExample: React.FC = () => {
   const { confirm } = useConfirmModalContext();
 
-  const handleDeleteUser = async () => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log('User deleted successfully');
-    // You could show a toast notification here
+  const handleDelete = () => {
+    // Handle delete logic
   };
 
-  const handleArchiveData = async () => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    console.log('Data archived successfully');
+  const handleArchive = () => {
+    // Handle archive logic
   };
 
-  const handleSuspendUser = async () => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800));
-    console.log('User suspended successfully');
+  const handleSuspend = () => {
+    // Handle suspend logic
   };
 
-  const handleBulkDelete = async () => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    console.log('Bulk delete completed');
+  const handleBulkDelete = () => {
+    // Handle bulk delete logic
   };
 
   return (
@@ -57,7 +48,7 @@ const ConfirmModalExample: React.FC = () => {
                 message: 'Are you sure you want to delete this user? This action cannot be undone and will permanently remove all user data.',
                 confirmText: 'Delete User',
                 variant: 'danger',
-                onConfirm: handleDeleteUser,
+                onConfirm: handleDelete,
               })}
               className="flex items-center gap-2 w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
             >
@@ -71,7 +62,7 @@ const ConfirmModalExample: React.FC = () => {
                 message: 'This will temporarily suspend the user account. They will not be able to access the system until you reactivate their account.',
                 confirmText: 'Suspend User',
                 variant: 'warning',
-                onConfirm: handleSuspendUser,
+                onConfirm: handleSuspend,
               })}
               className="flex items-center gap-2 w-full px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors"
             >
@@ -94,7 +85,7 @@ const ConfirmModalExample: React.FC = () => {
                 message: 'This will archive the selected data. Archived data will be moved to long-term storage and may take longer to retrieve.',
                 confirmText: 'Archive Data',
                 variant: 'info',
-                onConfirm: handleArchiveData,
+                onConfirm: handleArchive,
               })}
               className="flex items-center gap-2 w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
             >

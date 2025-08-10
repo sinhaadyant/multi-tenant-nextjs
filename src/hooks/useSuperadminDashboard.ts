@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { storage } from '@/lib/localStorage';
+
 
 interface DashboardData {
   summary: {
@@ -62,14 +62,7 @@ const fetchDashboardData = async (range: string): Promise<DashboardData> => {
       console.log('📊 Fetching dashboard data for range:', range);
     }
 
-    // Check cache first
-    const cachedData = storage.getDashboardData(range);
-    if (cachedData) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('📊 Using cached dashboard data for range:', range);
-      }
-      return cachedData;
-    }
+
 
     const response = await api.get(`/superadmin/dashboard?range=${range}`);
     
@@ -78,8 +71,7 @@ const fetchDashboardData = async (range: string): Promise<DashboardData> => {
         console.log('✅ Dashboard data fetched successfully');
       }
       
-      // Cache the data
-      storage.setDashboardData(range, response.data.data);
+
       
       return response.data.data;
     } else {
@@ -124,6 +116,8 @@ export const useSuperadminDashboard = (): UseSuperadminDashboardReturn => {
       return failureCount < 3;
     },
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    // Add a small delay to allow auth state to settle after login
+    enabled: true,
   });
 
   const handleRangeChange = useCallback((range: string) => {

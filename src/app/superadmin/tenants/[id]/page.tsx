@@ -250,7 +250,7 @@ export default function TenantDetailsPage() {
           </button>
           <div className="h-8 bg-gray-200 dark:bg-gray-600 rounded animate-pulse w-48"></div>
         </div>
-        <TenantSkeleton type="details" />
+        <TenantSkeleton type="card" />
       </div>
     );
   }
@@ -577,10 +577,26 @@ export default function TenantDetailsPage() {
 
               {/* Users Table */}
               {usersLoading ? (
-                <TenantSkeleton type="table-row" count={5} />
+                <TenantSkeleton type="table" />
               ) : usersError ? (
-                <div className="text-center text-red-600 dark:text-red-400">
-                  Error loading users: {usersError.message}
+                <div className="text-center py-8">
+                  <div className="text-red-600 dark:text-red-400 mb-2">
+                    <Users className="w-12 h-12 mx-auto mb-4 text-red-300 dark:text-red-600" />
+                    <p className="text-lg font-medium">Unable to load users</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      Please try refreshing the page or contact support if the problem persists.
+                    </p>
+                    {process.env.NODE_ENV === 'development' && (
+                      <details className="mt-4 text-left">
+                        <summary className="cursor-pointer text-sm text-gray-600 dark:text-gray-400">
+                          Technical Details (Development)
+                        </summary>
+                        <pre className="mt-2 text-xs bg-gray-100 dark:bg-gray-800 p-2 rounded overflow-auto">
+                          {usersError.message}
+                        </pre>
+                      </details>
+                    )}
+                  </div>
                 </div>
               ) : users.length === 0 ? (
                 <div className="text-center text-gray-500 dark:text-gray-400 py-8">
@@ -795,7 +811,7 @@ export default function TenantDetailsPage() {
 
               {/* Activity Table */}
               {activityLoading ? (
-                <TenantSkeleton type="table-row" count={5} />
+                <TenantSkeleton type="table" />
               ) : activityError ? (
                 <div className="text-center text-red-600 dark:text-red-400">
                   Error loading activities: {activityError.message}

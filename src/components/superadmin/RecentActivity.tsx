@@ -109,6 +109,30 @@ const formatActionText = (action: string, tenant?: any, user?: any, superAdmin?:
 };
 
 export const RecentActivity: React.FC<RecentActivityProps> = ({ auditLogs }) => {
+  // Add null checks to prevent errors
+  if (!auditLogs) {
+    return (
+      <div className="p-6 bg-white rounded-lg shadow-sm border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Recent Activity
+          </h3>
+        </div>
+        <div className="space-y-3">
+          {[1, 2, 3, 4].map((index) => (
+            <div key={index} className="flex items-start space-x-3 p-3 rounded-lg animate-pulse">
+              <div className="w-8 h-8 bg-gray-200 rounded-full dark:bg-gray-700"></div>
+              <div className="flex-1">
+                <div className="h-4 bg-gray-200 rounded w-3/4 dark:bg-gray-700"></div>
+                <div className="h-3 bg-gray-200 rounded w-1/2 mt-2 dark:bg-gray-700"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 bg-white rounded-lg shadow-sm border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
       <div className="flex items-center justify-between mb-4">

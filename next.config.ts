@@ -2,6 +2,15 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  
+  // Disable SWC compiler
+  swcMinify: false,
+  
+  // Disable SWC compilation
+  compiler: {
+    removeConsole: false,
+  },
+  
   webpack(config, { dev, isServer }) {
     // SVG handling
     config.module.rules.push({

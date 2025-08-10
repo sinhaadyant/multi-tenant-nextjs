@@ -26,7 +26,6 @@ export interface TenantStats {
 export interface TenantFilters {
   search?: string;
   status?: string;
-  plan?: string;
   region?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
@@ -72,12 +71,18 @@ export const useTenants = (filters: TenantFilters = {}) => {
           }
         });
 
-        console.log('🔍 Fetching tenants with params:', params.toString());
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 Fetching tenants with params:', params.toString());
+        }
         const response = await api.get(`/superadmin/tenants?${params.toString()}`);
-        console.log('✅ Tenants response:', response.data);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('✅ Tenants response:', response.data);
+        }
         return response.data;
       } catch (error) {
-        console.error('❌ Error fetching tenants:', error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('❌ Error fetching tenants:', error);
+        }
         throw error;
       }
     },
@@ -92,12 +97,18 @@ export const useTenant = (id: string) => {
     queryKey: ['tenant', id],
     queryFn: async () => {
       try {
-        console.log('🔍 useTenant making API call for ID:', id);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 useTenant making API call for ID:', id);
+        }
         const response = await api.get(`/superadmin/tenants/${id}`);
-        console.log('🔍 useTenant API Response:', response.data);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 useTenant API Response:', response.data);
+        }
         return response.data;
       } catch (error) {
-        console.error('❌ useTenant API Error:', error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('❌ useTenant API Error:', error);
+        }
         throw error;
       }
     },
@@ -120,7 +131,9 @@ export const useTenantUsers = (tenantId: string, filters: {
     queryKey: ['tenant-users', tenantId, filters],
     queryFn: async () => {
       try {
-        console.log('🔍 useTenantUsers making API call for tenant ID:', tenantId, 'with filters:', filters);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 useTenantUsers making API call for tenant ID:', tenantId, 'with filters:', filters);
+        }
         const params = new URLSearchParams();
         
         Object.entries(filters).forEach(([key, value]) => {
@@ -130,10 +143,14 @@ export const useTenantUsers = (tenantId: string, filters: {
         });
 
         const response = await api.get(`/superadmin/tenants/${tenantId}/users?${params.toString()}`);
-        console.log('🔍 useTenantUsers API Response:', response.data);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 useTenantUsers API Response:', response.data);
+        }
         return response.data;
       } catch (error) {
-        console.error('❌ useTenantUsers API Error:', error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('❌ useTenantUsers API Error:', error);
+        }
         throw error;
       }
     },
@@ -275,6 +292,25 @@ export const useResetUserPassword = () => {
     onError: (error: any) => {
       const message = error.response?.data?.message || 'Failed to reset password';
       toast.error(message);
+    },
+  });
+};
+
+// Check email availability
+export const useCheckEmail = () => {
+  return useMutation({
+    mutationFn: async ({ email, tenantId }: { email: string; tenantId?: string }) => {
+      const params = new URLSearchParams();
+      params.append('email', email);
+      if (tenantId) {
+        params.append('tenantId', tenantId);
+      }
+
+      const response = await api.get(`/superadmin/check-email?${params.toString()}`);
+      return response.data;
+    },
+    onError: (error: any) => {
+      console.error('Email check error:', error);
     },
   });
 };

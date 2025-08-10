@@ -22,7 +22,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
       where: { id: params.id },
       include: {
         _count: {
-          select: { users: true }
+          select: { userRoles: true }
         },
         permissions: {
           include: {
@@ -52,7 +52,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
         isActive: role.isActive,
         createdAt: role.createdAt,
         updatedAt: role.updatedAt,
-        userCount: role._count.users,
+        userCount: role._count.userRoles,
         permissions: role.permissions.map(rp => ({
           id: rp.permission.id,
           name: rp.permission.name,
@@ -207,7 +207,7 @@ export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params
       where: { id: params.id },
       include: {
         _count: {
-          select: { users: true }
+          select: { userRoles: true }
         }
       }
     });
@@ -220,12 +220,12 @@ export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params
     }
 
     // Check if role is assigned to any users
-    if (existingRole._count.users > 0) {
+    if (existingRole._count.userRoles > 0) {
       if (process.env.NODE_ENV === 'development') {
         console.log('❌ Role is assigned to users, cannot delete:', params.id);
       }
       return createErrorResponse(
-        `Cannot delete role that is assigned to ${existingRole._count.users} user(s). Please reassign or remove users from this role first.`,
+        `Cannot delete role that is assigned to ${existingRole._count.userRoles} user(s). Please reassign or remove users from this role first.`,
         409
       );
     }

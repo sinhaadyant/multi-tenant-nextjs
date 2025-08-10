@@ -7,28 +7,24 @@ import { useConfirmModalHelpers } from '@/hooks/useConfirmModal';
 const ConfirmModalDemo: React.FC = () => {
   const { confirmDelete, confirmAction, confirmInfo, confirmSuccess } = useConfirmModalHelpers();
 
-  const handleDeleteUser = async () => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log('User deleted successfully');
+  const handleDelete = () => {
+    // Handle delete logic
   };
 
-  const handleUpdateSettings = async () => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    console.log('Settings updated successfully');
+  const handleUpdate = () => {
+    // Handle update logic
   };
 
-  const handleProceedWithAction = async () => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800));
-    console.log('Action completed successfully');
+  const handleComplete = () => {
+    // Handle complete logic
   };
 
-  const handleSystemRestart = async () => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    console.log('System restart initiated');
+  const handleRestart = () => {
+    // Handle restart logic
+  };
+
+  const handleCustom = () => {
+    // Handle custom logic
   };
 
   return (
@@ -53,7 +49,7 @@ const ConfirmModalDemo: React.FC = () => {
             Delete a user account permanently
           </p>
           <button
-            onClick={() => confirmDelete('John Doe', handleDeleteUser)}
+            onClick={() => confirmDelete('John Doe', handleDelete)}
             className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
           >
             Delete User
@@ -73,7 +69,7 @@ const ConfirmModalDemo: React.FC = () => {
             onClick={() => confirmAction(
               'Update System Settings',
               'This will update critical system settings. Some services may be temporarily unavailable during the update.',
-              handleUpdateSettings
+              handleUpdate
             )}
             className="w-full px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors"
           >
@@ -94,7 +90,7 @@ const ConfirmModalDemo: React.FC = () => {
             onClick={() => confirmInfo(
               'Proceed with Action',
               'This action will process your request and may take a few moments to complete.',
-              handleProceedWithAction
+              handleComplete
             )}
             className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
           >
@@ -115,7 +111,7 @@ const ConfirmModalDemo: React.FC = () => {
             onClick={() => confirmSuccess(
               'Restart System',
               'The system will restart with the new configuration. All active sessions will be terminated.',
-              handleSystemRestart
+              handleRestart
             )}
             className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
           >

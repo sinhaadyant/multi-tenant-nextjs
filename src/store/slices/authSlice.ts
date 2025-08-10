@@ -14,6 +14,7 @@ export interface AuthState {
   user: User | null;
   token: string | null; // Access token (short-lived)
   refreshToken: string | null; // Refresh token (longer-lived)
+  email: string | null; // User email
   isHydrated: boolean; // Tracks if Redux Persist has rehydrated
   lastValidatedAt: number | null; // Timestamp of last token validation
   sessionExpiresAt: number | null; // When the session expires
@@ -28,6 +29,7 @@ const initialState: AuthState = {
   user: null,
   token: null,
   refreshToken: null,
+  email: null,
   isHydrated: false,
   lastValidatedAt: null,
   sessionExpiresAt: null,
@@ -41,6 +43,7 @@ export interface LoginPayload {
   user: User;
   token: string;
   refreshToken: string;
+  email: string;
   expiresAt?: number;
 }
 
@@ -55,48 +58,68 @@ export interface ImpersonationPayload {
   token: string;
 }
 
+// Auth slice
 const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
     setLogin: (state, action: PayloadAction<LoginPayload>) => {
-      console.log('🔄 Redux: setLogin called with payload:', {
-        user: action.payload.user?.email,
-        hasToken: !!action.payload.token,
-        hasRefreshToken: !!action.payload.refreshToken,
-      });
+      const { user, token, refreshToken, email } = action.payload;
       
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔄 Redux: setLogin called with payload:', {
+          email: email,
+          hasToken: !!token,
+          hasRefreshToken: !!refreshToken,
+          hasUser: !!user,
+        });
+      }
+      
+      state.user = user;
+      state.token = token;
+      state.refreshToken = refreshToken;
+      state.email = email;
       state.isLoggedIn = true;
-      state.user = action.payload.user;
-      state.token = action.payload.token;
-      state.refreshToken = action.payload.refreshToken;
       state.lastValidatedAt = Date.now();
-      state.sessionExpiresAt = action.payload.expiresAt || null;
       state.isInitialized = true;
-      // Clear any impersonation state
-      state.isImpersonating = false;
-      state.impersonatedUser = null;
-      state.originalUser = null;
+      state.isHydrated = true; // Mark as hydrated after successful login
       
-      console.log('🔄 Redux: setLogin completed, new state:', {
-        isLoggedIn: state.isLoggedIn,
-        hasUser: !!state.user,
-        hasToken: !!state.token,
-        hasRefreshToken: !!state.refreshToken,
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔄 Redux: setLogin completed, new state:', {
+          isLoggedIn: state.isLoggedIn,
+          hasUser: !!state.user,
+          hasToken: !!state.token,
+          hasRefreshToken: !!state.refreshToken,
+          email: state.email,
+        });
+      }
     },
     setLogout: (state) => {
-      console.log('🔄 Redux: setLogout called');
-      state.isLoggedIn = false;
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔄 Redux: setLogout called');
+      }
+      
       state.user = null;
       state.token = null;
       state.refreshToken = null;
+      state.email = null;
+      state.isLoggedIn = false;
       state.lastValidatedAt = null;
       state.sessionExpiresAt = null;
       state.isImpersonating = false;
       state.impersonatedUser = null;
       state.originalUser = null;
       state.isInitialized = true;
+      state.isHydrated = false; // Reset hydration state on logout
+    },
+    setUser: (state, action: PayloadAction<User>) => {
+      state.user = action.payload;
+    },
+    setToken: (state, action: PayloadAction<string>) => {
+      state.token = action.payload;
+    },
+    setRefreshToken: (state, action: PayloadAction<string>) => {
+      state.refreshToken = action.payload;
     },
     setHydrated: (state) => {
       state.isHydrated = true;
@@ -134,12 +157,22 @@ const authSlice = createSlice({
       state.originalUser = null;
       state.isImpersonating = false;
     },
+    clearAuth: (state) => {
+      state.user = null;
+      state.token = null;
+      state.refreshToken = null;
+      state.email = null;
+      state.isLoggedIn = false;
+    },
   },
 });
 
 export const {
   setLogin,
   setLogout,
+  setUser,
+  setToken,
+  setRefreshToken,
   setHydrated,
   setInitialized,
   updateUser,
@@ -148,6 +181,7 @@ export const {
   updateLastValidated,
   startImpersonation,
   stopImpersonation,
+  clearAuth,
 } = authSlice.actions;
 
 // Selectors
@@ -156,6 +190,7 @@ export const selectIsLoggedIn = (state: { auth: AuthState }) => state.auth.isLog
 export const selectUser = (state: { auth: AuthState }) => state.auth.user;
 export const selectToken = (state: { auth: AuthState }) => state.auth.token;
 export const selectRefreshToken = (state: { auth: AuthState }) => state.auth.refreshToken;
+export const selectEmail = (state: { auth: AuthState }) => state.auth.email;
 export const selectIsHydrated = (state: { auth: AuthState }) => state.auth.isHydrated;
 export const selectIsInitialized = (state: { auth: AuthState }) => state.auth.isInitialized;
 export const selectLastValidatedAt = (state: { auth: AuthState }) => state.auth.lastValidatedAt;

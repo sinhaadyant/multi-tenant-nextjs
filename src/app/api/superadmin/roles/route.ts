@@ -1,6 +1,6 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireSuperAdmin } from '@/lib/auth';
+import { requireSuperAdmin } from '@/middleware/auth';
 import { asyncHandler } from '@/lib/errorHandler';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 import { createAuditLogFromRequest } from '@/lib/audit';
@@ -8,8 +8,8 @@ import { createAuditLogFromRequest } from '@/lib/audit';
 // GET /api/superadmin/roles - Get all roles (for tenant management)
 export const GET = asyncHandler(async (req: NextRequest) => {
   const authResult = await requireSuperAdmin(req);
-  if (!authResult.success) {
-    return createErrorResponse('Unauthorized', 401);
+  if (authResult instanceof NextResponse) {
+    return authResult;
   }
 
   try {
@@ -21,7 +21,7 @@ export const GET = asyncHandler(async (req: NextRequest) => {
           }
         },
         _count: {
-          select: { users: true }
+          select: { userRoles: true }
         }
       },
       orderBy: { createdAt: 'desc' }
@@ -60,11 +60,11 @@ export const GET = asyncHandler(async (req: NextRequest) => {
 // POST /api/superadmin/roles - Create new role (for tenant management)
 export const POST = asyncHandler(async (req: NextRequest) => {
   const authResult = await requireSuperAdmin(req);
-  if (!authResult.success) {
-    return createErrorResponse('Unauthorized', 401);
+  if (authResult instanceof NextResponse) {
+    return authResult;
   }
 
-  const { name, description, isGlobal = false, permissions = [] } = await req.json();
+  const { name, description, isTemplate = false, permissions = [] } = await req.json();
 
   // Validation
   if (!name || name.trim().length === 0) {
@@ -103,7 +103,7 @@ export const POST = asyncHandler(async (req: NextRequest) => {
         data: {
           name: name.trim(),
           description: description?.trim() || null,
-          isGlobal,
+          isTemplate,
           isActive: true
         }
       });
@@ -133,7 +133,7 @@ export const POST = asyncHandler(async (req: NextRequest) => {
           }
         },
         _count: {
-          select: { users: true }
+          select: { userRoles: true }
         }
       }
     });
@@ -165,7 +165,7 @@ export const POST = asyncHandler(async (req: NextRequest) => {
       roleId: result.id,
       roleName: result.name,
       permissionsCount: permissions.length,
-      isGlobal: result.isGlobal
+      isTemplate: result.isTemplate
     });
 
     return createSuccessResponse({ role: transformedRole }, 'Role created successfully', 201);

@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireSuperAdmin } from '@/middleware/auth';
+import { asyncHandler } from '@/lib/errorHandler';
+import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 
-export async function GET(request: NextRequest) {
-  try {
-    const authResult = await requireSuperAdmin(request);
-    if (authResult instanceof NextResponse) {
-      return authResult;
-    }
+export const GET = asyncHandler(async (request: NextRequest) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🎫 Fetching support tickets list');
+  }
+
+  // Authenticate SuperAdmin
+  const authResult = await requireSuperAdmin(request);
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
@@ -32,8 +38,8 @@ export async function GET(request: NextRequest) {
     if (category) where.category = category;
     if (search) {
       where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
+        { title: { contains: search } },
+        { description: { contains: search } },
       ];
     }
 
@@ -89,39 +95,43 @@ export async function GET(request: NextRequest) {
 
     const totalPages = Math.ceil(total / limit);
 
-    return NextResponse.json({
-      tickets: ticketsWithCounts,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages,
-      },
-    });
-  } catch (error) {
-    console.error('Error fetching support tickets:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const authResult = await requireSuperAdmin(request);
-    if (authResult instanceof NextResponse) {
-      return authResult;
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ Support tickets fetched successfully:', ticketsWithCounts.length);
     }
+
+    return createSuccessResponse({
+      tickets: ticketsWithCounts
+    }, 'Support tickets fetched successfully', 200, {
+      page,
+      limit,
+      totalPages,
+      totalRecords: total
+    });
+});
+
+export const POST = asyncHandler(async (request: NextRequest) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🎫 Creating support ticket');
+  }
+
+  // Authenticate SuperAdmin
+  const authResult = await requireSuperAdmin(request);
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
 
     const body = await request.json();
     const { title, description, category, priority, tenantId, userId } = body;
 
     // Validate required fields
     if (!title || !description) {
-      return NextResponse.json(
-        { error: 'Title and description are required' },
-        { status: 400 }
+      return createErrorResponse(
+        'Title and description are required',
+        400,
+        [
+          { field: 'title', message: 'Title is required' },
+          { field: 'description', message: 'Description is required' }
+        ]
       );
     }
 
@@ -153,12 +163,11 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ ticket }, { status: 201 });
-  } catch (error) {
-    console.error('Error creating support ticket:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-} 
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ Support ticket created successfully:', ticket.id);
+    }
+
+    return createSuccessResponse({
+      ticket
+    }, 'Support ticket created successfully', 201);
+}); 

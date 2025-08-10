@@ -357,6 +357,67 @@ export const handlers = [
     })
   }),
 
+  // Auth API
+  http.post('/api/superadmin/auth/login', ({ request }) => {
+    return HttpResponse.json({
+      success: true,
+      data: {
+        token: 'mock-access-token',
+        refreshToken: 'mock-refresh-token',
+        expiresAt: Date.now() + 15 * 60 * 1000, // 15 minutes from now
+        user: {
+          id: 'superadmin-1',
+          email: 'admin@superadmin.com',
+          name: 'Super Admin',
+          role: 'superadmin',
+          avatar: null,
+        },
+      },
+      message: 'Login successful',
+    })
+  }),
+
+  // Forgot Password API
+  http.post('/api/superadmin/auth/forgot-password', async ({ request }) => {
+    const { email } = await request.json()
+    
+    if (email === 'admin@example.com') {
+      return HttpResponse.json({
+        success: true,
+        data: {
+          message: 'If an account with this email exists, password reset instructions have been sent.',
+          token: 'mock-reset-token-12345'
+        }
+      })
+    } else {
+      return HttpResponse.json({
+        success: true,
+        data: {
+          message: 'If an account with this email exists, password reset instructions have been sent.'
+        }
+      })
+    }
+  }),
+
+  // Reset Password API
+  http.post('/api/superadmin/auth/reset-password', async ({ request }) => {
+    const { token, newPassword, confirmPassword } = await request.json()
+    
+    if (token === 'mock-reset-token-12345' && newPassword === confirmPassword) {
+      return HttpResponse.json({
+        success: true,
+        data: {
+          message: 'Password has been successfully updated.'
+        }
+      })
+    } else {
+      return HttpResponse.json({
+        success: false,
+        error: 'Invalid or expired reset token'
+      }, { status: 400 })
+    }
+  }),
+
   // Profile API
   http.get('/api/superadmin/profile', () => {
     return HttpResponse.json({

@@ -1,112 +1,98 @@
 "use client";
 
-import { ReactNode, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useEffect, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
-  children: ReactNode;
+  children: React.ReactNode;
+  requireAuth?: boolean;
+  allowedRoles?: string[];
   redirectTo?: string;
-  fallback?: ReactNode;
-  requireSuperAdmin?: boolean;
+  fallback?: React.ReactNode;
 }
 
-/**
- * ProtectedRoute - Comprehensive route protection with authentication validation
- * Handles Redux hydration, token validation, and automatic logout
- */
-export default function ProtectedRoute({ 
-  children, 
-  redirectTo = '/superadmin/login',
-  fallback = <div>Loading...</div>,
-  requireSuperAdmin = true
-}: ProtectedRouteProps) {
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  children,
+  requireAuth = true,
+  allowedRoles = [],
+  redirectTo,
+  fallback
+}) => {
   const router = useRouter();
-  const { 
-    isAuthenticated, 
-    isLoading, 
-    isLoggedIn, 
-    isHydrated, 
-    isInitialized,
-    user,
-    logout,
-    validateAuth
-  } = useAuth();
+  const pathname = usePathname();
+  const { user, isLoading, isAuthenticated } = useAuth();
+  const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    console.log('🛡️ ProtectedRoute: Checking authentication...', {
-      isAuthenticated,
-      isLoading,
-      isLoggedIn,
-      isHydrated,
-      isInitialized,
-      userRole: user?.role
-    });
+    const checkAuth = async () => {
+      // If auth is not required, allow access
+      if (!requireAuth) {
+        setIsChecking(false);
+        return;
+      }
 
-    // Wait for Redux to hydrate and auth to initialize
-    if (isLoading) {
-      console.log('🛡️ ProtectedRoute: Still loading, waiting...');
-      return;
-    }
+      // Wait for auth to load
+      if (isLoading) {
+        return;
+      }
 
-    // Check if user is authenticated
-    if (!isAuthenticated) {
-      console.log('🛡️ ProtectedRoute: User not authenticated, redirecting to login');
-      router.replace(redirectTo);
-      return;
-    }
+      // If not authenticated, redirect to login
+      if (!isAuthenticated) {
+        const loginUrl = redirectTo || getLoginUrl(pathname);
+        router.push(loginUrl);
+        return;
+      }
 
-    // Validate authentication
-    const validation = validateAuth();
-    if (!validation.isValid) {
-      console.log('🛡️ ProtectedRoute: Authentication invalid, logging out');
-      logout();
-      router.replace(redirectTo);
-      return;
-    }
+      // Check role permissions if specified
+      if (allowedRoles.length > 0 && user && !allowedRoles.includes(user.role)) {
+        // Redirect to unauthorized page or show error
+        router.push('/unauthorized');
+        return;
+      }
 
-    // Check superadmin requirement
-    if (requireSuperAdmin && user?.role !== 'superadmin') {
-      console.log('🛡️ ProtectedRoute: User is not superadmin, redirecting');
-      logout();
-      router.replace(redirectTo);
-      return;
-    }
+      setIsChecking(false);
+    };
 
-    console.log('🛡️ ProtectedRoute: Authentication valid, allowing access');
-  }, [
-    isAuthenticated, 
-    isLoading, 
-    isLoggedIn, 
-    isHydrated, 
-    isInitialized, 
-    user, 
-    router, 
-    redirectTo, 
-    requireSuperAdmin, 
-    logout, 
-    validateAuth
-  ]);
+    checkAuth();
+  }, [isLoading, isAuthenticated, user, requireAuth, allowedRoles, redirectTo, pathname, router]);
 
-  // Show loading while checking authentication
-  if (isLoading) {
-    console.log('🛡️ ProtectedRoute: Showing loading fallback');
-    return <>{fallback}</>;
+  // Show loading state
+  if (isLoading || isChecking) {
+    return fallback || (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
-  // Show loading if not authenticated (will redirect)
-  if (!isAuthenticated) {
-    console.log('🛡️ ProtectedRoute: Not authenticated, showing fallback');
-    return <>{fallback}</>;
+  // If auth is not required or user is authenticated with proper role, render children
+  if (!requireAuth || (isAuthenticated && user && (allowedRoles.length === 0 || allowedRoles.includes(user.role)))) {
+    return <>{children}</>;
   }
 
-  // Check superadmin requirement
-  if (requireSuperAdmin && user?.role !== 'superadmin') {
-    console.log('🛡️ ProtectedRoute: Not superadmin, showing fallback');
-    return <>{fallback}</>;
-  }
+  // This should not be reached, but just in case
+  return null;
+};
 
-  // User is authenticated and authorized
-  console.log('🛡️ ProtectedRoute: Rendering protected content');
-  return <>{children}</>;
-} 
+// Helper function to determine login URL based on current path
+const getLoginUrl = (pathname: string): string => {
+  if (pathname.startsWith('/superadmin')) {
+    return '/superadmin/login';
+  }
+  
+  // Extract tenant slug from path for tenant-specific login
+  const pathParts = pathname.split('/');
+  const tenantIndex = pathParts.findIndex(part => part && part !== 'tenant');
+  if (tenantIndex !== -1 && pathParts[tenantIndex]) {
+    return `/${pathParts[tenantIndex]}/login`;
+  }
+  
+  return '/login';
+};
+
+export default ProtectedRoute; 

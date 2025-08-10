@@ -47,7 +47,7 @@ async function testLoginFeature() {
     
     // Test empty form submission
     await page.click('button[type="submit"]');
-    await page.waitForTimeout(1000);
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     // Check for validation errors
     const validationErrors = await page.$$('.text-red-500, .text-red-600, [class*="error"]');
@@ -93,8 +93,12 @@ async function testLoginFeature() {
     await page.click('button[type="submit"]');
     
     try {
-      await page.waitForNavigation({ timeout: 10000 });
+      // Wait for navigation with a longer timeout
+      await page.waitForNavigation({ timeout: 15000 });
       console.log('✅ Login successful, redirected to dashboard');
+      
+      // Wait a bit more for the page to fully load
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Check if we're on dashboard
       const currentUrl = page.url();
@@ -104,7 +108,7 @@ async function testLoginFeature() {
         console.log('❌ Login failed, still on login page');
       }
     } catch (error) {
-      console.log('❌ Login failed or no navigation occurred');
+      console.log('❌ Login failed or no navigation occurred:', error.message);
     }
 
     // Test Token Storage

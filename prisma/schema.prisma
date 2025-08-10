@@ -90,11 +90,32 @@ model Role {
   @@map("roles")
 }
 
+model Module {
+  id              String           @id @default(cuid())
+  moduleKey       String           @unique // e.g., "dashboard", "users", "reports"
+  moduleName      String           // Display name e.g., "Dashboard", "User Management"
+  path            String?          // Frontend route path
+  icon            String?          // Icon identifier
+  parentModuleKey String?          // For hierarchical menu structure
+  parentModule    Module?          @relation("ModuleHierarchy", fields: [parentModuleKey], references: [moduleKey])
+  childModules    Module[]         @relation("ModuleHierarchy")
+  description     String?
+  isActive        Boolean          @default(true)
+  isVisible       Boolean          @default(true) // Whether to show in menu
+  orderIndex      Int              @default(0) // Menu ordering
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  permissions     Permission[]
+
+  @@map("modules")
+}
+
 model Permission {
   id              String           @id @default(cuid())
   name            String           @unique
   description     String?
-  module          String           // e.g., "Dashboard", "Users", "Content"
+  moduleKey       String           // Reference to Module.moduleKey
+  module          Module           @relation(fields: [moduleKey], references: [moduleKey])
   submodule       String?          // e.g., "Analytics", "Management", "News"
   action          String           // e.g., "view", "create", "edit", "delete"
   isActive        Boolean          @default(true)
@@ -299,6 +320,7 @@ model PasswordResetToken {
   email        String
   expiresAt    DateTime
   used         Boolean     @default(false)
+  type         String      @default("superadmin") // "superadmin" or "tenant"
   createdAt    DateTime    @default(now())
   superAdminId String?
   superAdmin   SuperAdmin? @relation(fields: [superAdminId], references: [id])

@@ -99,7 +99,7 @@ export const requestPasswordReset = async (email: string): Promise<PasswordReset
     } else {
       return {
         success: false,
-        message: data.error || 'Failed to process password reset request.',
+        message: data.message || data.error || 'Failed to process password reset request.',
       };
     }
   } catch (error) {
