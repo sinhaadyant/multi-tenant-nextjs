@@ -9,6 +9,7 @@ export interface Tenant {
   domain?: string;
   description?: string;
   isActive: boolean;
+  status: 'active' | 'pending' | 'suspended';
   plan: 'starter' | 'professional' | 'enterprise';
   region: string;
   features: string[];

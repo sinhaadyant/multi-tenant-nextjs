@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-import { verifyAccessToken } from '@/lib/jwt';
+import { verifyAccessToken, verifyRefreshToken } from '@/lib/jwt';
 import { createAuditLogFromRequest } from '@/lib/audit';
 
 export async function POST(req: NextRequest) {
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       } else if (refreshToken) {
         // Revoke specific refresh token
         try {
-          const refreshPayload = require('@/lib/jwt').verifyRefreshToken(refreshToken);
+          const refreshPayload = verifyRefreshToken(refreshToken);
           
           await prisma.refreshToken.updateMany({
             where: {
@@ -104,48 +104,19 @@ export async function POST(req: NextRequest) {
           console.warn('Invalid refresh token during logout:', refreshError);
           // Continue with logout even if refresh token is invalid
         }
-      } else {
-        // No refresh token provided, just revoke all for safety
-        await prisma.refreshToken.updateMany({
-          where: {
-            superAdminId: userPayload.id,
-            isRevoked: false,
-          },
-          data: {
-            isRevoked: true,
-            lastUsedAt: new Date(),
-          }
-        });
-
-        // Create audit log
-        await createAuditLogFromRequest(
-          req,
-          { 
-            id: userPayload.id, 
-            email: userPayload.email, 
-            role: userPayload.role 
-          },
-          'superadmin.logout',
-          { 
-            deviceInfo: req.headers.get('user-agent') || 'Unknown',
-            ipAddress: req.headers.get('x-forwarded-for')?.split(',')[0] || req.ip || 'Unknown'
-          }
-        );
-
-        if (process.env.NODE_ENV === 'development') {
-          console.log('✅ Logout successful for:', userPayload.email);
-        }
       }
     }
 
+    // Always return success for logout
     return createSuccessResponse(
       { message: 'Logged out successfully' },
       'Logout successful'
     );
 
-  } catch (error) {
-    console.error('Logout error:', error);
-    // Return success even on error to prevent information leakage
+  } catch (error: any) {
+    console.error('Error during logout:', error);
+    // Even if there's an error, we still return success
+    // because the client will clear local data anyway
     return createSuccessResponse(
       { message: 'Logged out successfully' },
       'Logout successful'

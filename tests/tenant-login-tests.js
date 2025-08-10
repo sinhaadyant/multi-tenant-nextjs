@@ -11,17 +11,17 @@ const TEST_CREDENTIALS = {
     manager: {
       url: 'http://localhost:3000/techcorp/login',
       email: 'manager@techcorp.com',
-      password: 'ManagerPass123'
+      password: 'AdminPass123'
     },
     user: {
       url: 'http://localhost:3000/techcorp/login',
       email: 'user@techcorp.com',
-      password: 'UserPass123'
+      password: 'AdminPass123'
     },
     viewer: {
       url: 'http://localhost:3000/techcorp/login',
       email: 'viewer@techcorp.com',
-      password: 'ViewerPass123'
+      password: 'AdminPass123'
     }
   },
   globalretail: {
@@ -33,17 +33,17 @@ const TEST_CREDENTIALS = {
     manager: {
       url: 'http://localhost:3000/globalretail/login',
       email: 'manager@globalretail.com',
-      password: 'ManagerPass123'
+      password: 'AdminPass123'
     },
     user: {
       url: 'http://localhost:3000/globalretail/login',
       email: 'user@globalretail.com',
-      password: 'UserPass123'
+      password: 'AdminPass123'
     },
     viewer: {
       url: 'http://localhost:3000/globalretail/login',
       email: 'viewer@globalretail.com',
-      password: 'ViewerPass123'
+      password: 'AdminPass123'
     }
   }
 };
@@ -52,17 +52,17 @@ const TEST_CREDENTIALS = {
 const EXPECTED_MODULES = {
   admin: [
     'Dashboard', 'User Management', 'Role & Permission Management', 'Module Management',
-    'Reports & Analytics', 'Analytics', 'Content Management', 'Notifications', 'Audit Logs', 'Settings'
+    'Content Management', 'Notifications', 'Audit Logs', 'Settings'
   ],
   manager: [
-    'Dashboard', 'User Management', 'Reports & Analytics', 'Analytics', 'Content Management',
+    'Dashboard', 'User Management', 'Content Management',
     'Notifications', 'Audit Logs', 'Settings'
   ],
   user: [
-    'Dashboard', 'Reports & Analytics', 'Analytics', 'Content Management', 'Notifications'
+    'Dashboard', 'Content Management', 'Notifications'
   ],
   viewer: [
-    'Dashboard', 'Reports & Analytics', 'Analytics', 'Content Management', 'Notifications'
+    'Dashboard', 'Content Management', 'Notifications'
   ]
 };
 

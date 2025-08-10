@@ -22,6 +22,7 @@ async function resetAndSeedDatabase() {
     await prisma.user.deleteMany({});
     await prisma.role.deleteMany({});
     await prisma.permission.deleteMany({});
+    await prisma.module.deleteMany({});
     await prisma.tenant.deleteMany({});
     await prisma.inviteToken.deleteMany({});
     await prisma.passwordResetToken.deleteMany({});
@@ -43,69 +44,88 @@ async function resetAndSeedDatabase() {
     });
     console.log('✅ SuperAdmin created:', superAdmin.email);
 
+    // Create modules first
+    console.log('📦 Creating modules...');
+    const modules = await prisma.module.createMany({
+      data: [
+        { moduleKey: 'dashboard', moduleName: 'Dashboard', path: '/dashboard', icon: 'dashboard', orderIndex: 1 },
+        { moduleKey: 'users', moduleName: 'User Management', path: '/users', icon: 'users', orderIndex: 2 },
+        { moduleKey: 'roles', moduleName: 'Role Management', path: '/roles', icon: 'roles', orderIndex: 3 },
+        { moduleKey: 'reports', moduleName: 'Reports', path: '/reports', icon: 'reports', orderIndex: 4 },
+        { moduleKey: 'settings', moduleName: 'Settings', path: '/settings', icon: 'settings', orderIndex: 5 },
+        { moduleKey: 'audit', moduleName: 'Audit Logs', path: '/audit', icon: 'audit', orderIndex: 6 },
+        { moduleKey: 'notifications', moduleName: 'Notifications', path: '/notifications', icon: 'notifications', orderIndex: 7 },
+        { moduleKey: 'backup', moduleName: 'Backup & Restore', path: '/backup', icon: 'backup', orderIndex: 8 },
+        { moduleKey: 'support', moduleName: 'Support', path: '/support', icon: 'support', orderIndex: 9 },
+        { moduleKey: 'analytics', moduleName: 'Analytics', path: '/analytics', icon: 'analytics', orderIndex: 10 },
+        { moduleKey: 'content', moduleName: 'Content Management', path: '/content', icon: 'content', orderIndex: 11 }
+      ]
+    });
+    console.log('✅ Modules created:', modules.count);
+
     // Create permissions
     console.log('🔐 Creating permissions...');
     const permissions = await prisma.permission.createMany({
       data: [
         // Dashboard permissions
-        { name: 'dashboard.view', description: 'View dashboard', module: 'dashboard', action: 'view' },
-        { name: 'dashboard.manage', description: 'Manage dashboard', module: 'dashboard', action: 'manage' },
+        { name: 'dashboard.view', description: 'View dashboard', moduleKey: 'dashboard', action: 'view' },
+        { name: 'dashboard.manage', description: 'Manage dashboard', moduleKey: 'dashboard', action: 'manage' },
         
         // User management permissions
-        { name: 'users.view', description: 'View users', module: 'users', action: 'view' },
-        { name: 'users.create', description: 'Create users', module: 'users', action: 'create' },
-        { name: 'users.edit', description: 'Edit users', module: 'users', action: 'edit' },
-        { name: 'users.delete', description: 'Delete users', module: 'users', action: 'delete' },
-        { name: 'users.manage', description: 'Manage users', module: 'users', action: 'manage' },
+        { name: 'users.view', description: 'View users', moduleKey: 'users', action: 'view' },
+        { name: 'users.create', description: 'Create users', moduleKey: 'users', action: 'create' },
+        { name: 'users.edit', description: 'Edit users', moduleKey: 'users', action: 'edit' },
+        { name: 'users.delete', description: 'Delete users', moduleKey: 'users', action: 'delete' },
+        { name: 'users.manage', description: 'Manage users', moduleKey: 'users', action: 'manage' },
         
         // Role management permissions
-        { name: 'roles.view', description: 'View roles', module: 'roles', action: 'view' },
-        { name: 'roles.create', description: 'Create roles', module: 'roles', action: 'create' },
-        { name: 'roles.edit', description: 'Edit roles', module: 'roles', action: 'edit' },
-        { name: 'roles.delete', description: 'Delete roles', module: 'roles', action: 'delete' },
-        { name: 'roles.manage', description: 'Manage roles', module: 'roles', action: 'manage' },
+        { name: 'roles.view', description: 'View roles', moduleKey: 'roles', action: 'view' },
+        { name: 'roles.create', description: 'Create roles', moduleKey: 'roles', action: 'create' },
+        { name: 'roles.edit', description: 'Edit roles', moduleKey: 'roles', action: 'edit' },
+        { name: 'roles.delete', description: 'Delete roles', moduleKey: 'roles', action: 'delete' },
+        { name: 'roles.manage', description: 'Manage roles', moduleKey: 'roles', action: 'manage' },
         
         // Reports permissions
-        { name: 'reports.view', description: 'View reports', module: 'reports', action: 'view' },
-        { name: 'reports.create', description: 'Create reports', module: 'reports', action: 'create' },
-        { name: 'reports.edit', description: 'Edit reports', module: 'reports', action: 'edit' },
-        { name: 'reports.delete', description: 'Delete reports', module: 'reports', action: 'delete' },
+        { name: 'reports.view', description: 'View reports', moduleKey: 'reports', action: 'view' },
+        { name: 'reports.create', description: 'Create reports', moduleKey: 'reports', action: 'create' },
+        { name: 'reports.edit', description: 'Edit reports', moduleKey: 'reports', action: 'edit' },
+        { name: 'reports.delete', description: 'Delete reports', moduleKey: 'reports', action: 'delete' },
         
         // Settings permissions
-        { name: 'settings.view', description: 'View settings', module: 'settings', action: 'view' },
-        { name: 'settings.edit', description: 'Edit settings', module: 'settings', action: 'edit' },
-        { name: 'settings.manage', description: 'Manage settings', module: 'settings', action: 'manage' },
+        { name: 'settings.view', description: 'View settings', moduleKey: 'settings', action: 'view' },
+        { name: 'settings.edit', description: 'Edit settings', moduleKey: 'settings', action: 'edit' },
+        { name: 'settings.manage', description: 'Manage settings', moduleKey: 'settings', action: 'manage' },
         
         // Audit permissions
-        { name: 'audit.view', description: 'View audit logs', module: 'audit', action: 'view' },
-        { name: 'audit.manage', description: 'Manage audit logs', module: 'audit', action: 'manage' },
+        { name: 'audit.view', description: 'View audit logs', moduleKey: 'audit', action: 'view' },
+        { name: 'audit.manage', description: 'Manage audit logs', moduleKey: 'audit', action: 'manage' },
         
         // Notifications permissions
-        { name: 'notifications.view', description: 'View notifications', module: 'notifications', action: 'view' },
-        { name: 'notifications.create', description: 'Create notifications', module: 'notifications', action: 'create' },
-        { name: 'notifications.manage', description: 'Manage notifications', module: 'notifications', action: 'manage' },
+        { name: 'notifications.view', description: 'View notifications', moduleKey: 'notifications', action: 'view' },
+        { name: 'notifications.create', description: 'Create notifications', moduleKey: 'notifications', action: 'create' },
+        { name: 'notifications.manage', description: 'Manage notifications', moduleKey: 'notifications', action: 'manage' },
         
         // Backup permissions
-        { name: 'backup.view', description: 'View backups', module: 'backup', action: 'view' },
-        { name: 'backup.create', description: 'Create backups', module: 'backup', action: 'create' },
-        { name: 'backup.restore', description: 'Restore backups', module: 'backup', action: 'restore' },
+        { name: 'backup.view', description: 'View backups', moduleKey: 'backup', action: 'view' },
+        { name: 'backup.create', description: 'Create backups', moduleKey: 'backup', action: 'create' },
+        { name: 'backup.restore', description: 'Restore backups', moduleKey: 'backup', action: 'restore' },
         
         // Support permissions
-        { name: 'support.view', description: 'View support tickets', module: 'support', action: 'view' },
-        { name: 'support.create', description: 'Create support tickets', module: 'support', action: 'create' },
-        { name: 'support.edit', description: 'Edit support tickets', module: 'support', action: 'edit' },
-        { name: 'support.manage', description: 'Manage support tickets', module: 'support', action: 'manage' },
+        { name: 'support.view', description: 'View support tickets', moduleKey: 'support', action: 'view' },
+        { name: 'support.create', description: 'Create support tickets', moduleKey: 'support', action: 'create' },
+        { name: 'support.edit', description: 'Edit support tickets', moduleKey: 'support', action: 'edit' },
+        { name: 'support.manage', description: 'Manage support tickets', moduleKey: 'support', action: 'manage' },
         
         // Analytics permissions
-        { name: 'analytics.view', description: 'View analytics', module: 'analytics', action: 'view' },
-        { name: 'analytics.manage', description: 'Manage analytics', module: 'analytics', action: 'manage' },
+        { name: 'analytics.view', description: 'View analytics', moduleKey: 'analytics', action: 'view' },
+        { name: 'analytics.manage', description: 'Manage analytics', moduleKey: 'analytics', action: 'manage' },
         
         // Content permissions
-        { name: 'content.view', description: 'View content', module: 'content', action: 'view' },
-        { name: 'content.create', description: 'Create content', module: 'content', action: 'create' },
-        { name: 'content.edit', description: 'Edit content', module: 'content', action: 'edit' },
-        { name: 'content.delete', description: 'Delete content', module: 'content', action: 'delete' },
-        { name: 'content.manage', description: 'Manage content', module: 'content', action: 'manage' }
+        { name: 'content.view', description: 'View content', moduleKey: 'content', action: 'view' },
+        { name: 'content.create', description: 'Create content', moduleKey: 'content', action: 'create' },
+        { name: 'content.edit', description: 'Edit content', moduleKey: 'content', action: 'edit' },
+        { name: 'content.delete', description: 'Delete content', moduleKey: 'content', action: 'delete' },
+        { name: 'content.manage', description: 'Manage content', moduleKey: 'content', action: 'manage' }
       ]
     });
     console.log('✅ Permissions created:', permissions.count);

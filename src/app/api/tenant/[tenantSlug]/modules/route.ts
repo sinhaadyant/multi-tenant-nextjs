@@ -1,34 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { asyncHandler } from '@/lib/errorHandler';
-import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-import { verifyToken } from '@/lib/jwt';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { checkTenantPermission } from '@/lib/permissions';
 
-// GET /api/tenant/[tenantSlug]/modules - Get all available modules
-export const GET = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
-  const { tenantSlug } = await params;
-  
-  // Get authorization header
-  const authHeader = req.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return createErrorResponse('Unauthorized - No token provided', 401);
-  }
+// Permission constants for module management
+const MODULE_PERMISSIONS = {
+  VIEW_MODULES: 'modules.view',
+  ENABLE_DISABLE_MODULES: 'modules.enable_disable',
+  MANAGE_MODULE_VERSIONS: 'modules.manage_versions',
+  VIEW_MODULE_ANALYTICS: 'modules.view_analytics'
+};
 
-  const token = authHeader.substring(7);
-  
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { tenantSlug: string } }
+) {
   try {
-    // Verify JWT token
-    const decoded = verifyToken(token);
-    if (!decoded || !decoded.id || !decoded.tenantId) {
-      return createErrorResponse('Invalid token', 401);
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Fetch user with roles and permissions
+    const { tenantSlug } = params;
+    const { searchParams } = new URL(request.url);
+    const includeAnalytics = searchParams.get('includeAnalytics') === 'true';
+
+    // Get tenant
+    const tenant = await prisma.tenant.findUnique({
+      where: { slug: tenantSlug },
+      include: { tenantModules: true }
+    });
+
+    if (!tenant) {
+      return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+    }
+
+    // Check if user has access to this tenant
     const user = await prisma.user.findFirst({
       where: {
-        id: decoded.id,
-        tenantId: decoded.tenantId,
-        isActive: true
+        email: session.user.email,
+        tenantId: tenant.id
       },
       include: {
         userRoles: {
@@ -37,160 +49,176 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
               include: {
                 permissions: {
                   include: {
-                    permission: {
-                      include: {
-                        module: true
-                      }
-                    }
+                    permission: true
                   }
                 }
               }
             }
-          }
-        },
-        tenant: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            isActive: true
           }
         }
       }
     });
 
     if (!user) {
-      return createErrorResponse('User not found', 404);
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    if (!user.tenant || user.tenant.slug !== tenantSlug) {
-      return createErrorResponse('Tenant mismatch', 403);
-    }
-
-    if (!user.tenant.isActive) {
-      return createErrorResponse('Tenant is disabled', 403);
-    }
-
-    // Check if user has permission to view modules
-    const hasPermission = user.userRoles.some(userRole =>
-      userRole.role.permissions.some(rp => 
-        rp.permission.module.moduleKey === 'roles' && 
-        (rp.permission.action === 'view' || rp.permission.action === 'manage')
-      )
+    // Check view modules permission
+    const hasViewPermission = await checkTenantPermission(
+      user,
+      tenant.id,
+      MODULE_PERMISSIONS.VIEW_MODULES
     );
 
-    if (!hasPermission) {
-      return createErrorResponse('Insufficient permissions to view modules', 403);
+    if (!hasViewPermission) {
+      return NextResponse.json({ error: 'Insufficient permissions to view modules' }, { status: 403 });
     }
 
-    // Get query parameters
-    const { searchParams } = new URL(req.url);
-    const includeInactive = searchParams.get('includeInactive') === 'true';
-    const includePermissions = searchParams.get('includePermissions') === 'true';
-
-    // Build where clause
-    const whereClause: any = {};
-    if (!includeInactive) {
-      whereClause.isActive = true;
-    }
-
-    // Fetch modules with optional permissions
+    // Get all available modules
     const modules = await prisma.module.findMany({
-      where: whereClause,
-      include: includePermissions ? {
-        permissions: {
+      where: { isActive: true },
+      orderBy: { orderIndex: 'asc' },
+      include: {
+        permissions: true,
+        childModules: {
           where: { isActive: true },
-          orderBy: { action: 'asc' }
+          orderBy: { orderIndex: 'asc' }
         }
-      } : undefined,
-      orderBy: [
-        { orderIndex: 'asc' },
-        { moduleName: 'asc' }
-      ]
+      }
     });
 
-    // Build hierarchical structure
-    const buildModuleTree = (modules: any[], parentKey: string | null = null) => {
-      return modules
-        .filter(module => {
-          if (parentKey === null) {
-            return !module.parentModuleKey;
+    // Get tenant-specific module settings
+    const tenantModules = await prisma.tenantModule.findMany({
+      where: { tenantId: tenant.id },
+      include: {
+        module: {
+          include: {
+            permissions: true,
+            childModules: {
+              where: { isActive: true },
+              orderBy: { orderIndex: 'asc' }
+            }
           }
-          return module.parentModuleKey === parentKey;
-        })
-        .map(module => ({
-          id: module.id,
-          moduleKey: module.moduleKey,
-          moduleName: module.moduleName,
-          path: module.path,
-          icon: module.icon,
-          parentModuleKey: module.parentModuleKey,
-          description: module.description,
-          isActive: module.isActive,
-          isVisible: module.isVisible,
-          orderIndex: module.orderIndex,
-          createdAt: module.createdAt,
-          updatedAt: module.updatedAt,
-          permissions: module.permissions || [],
-          children: buildModuleTree(modules, module.moduleKey)
-        }));
-    };
+        }
+      }
+    });
 
-    const moduleTree = buildModuleTree(modules);
-
-    return createSuccessResponse({
-      modules: moduleTree,
-      flatModules: modules.map(module => ({
+    // Merge module data with tenant-specific settings
+    const modulesWithTenantSettings = modules.map(module => {
+      const tenantModule = tenantModules.find(tm => tm.moduleKey === module.moduleKey);
+      
+      const baseModule = {
         id: module.id,
         moduleKey: module.moduleKey,
         moduleName: module.moduleName,
         path: module.path,
         icon: module.icon,
-        parentModuleKey: module.parentModuleKey,
         description: module.description,
-        isActive: module.isActive,
+        version: module.version,
+        minVersion: module.minVersion,
+        maxVersion: module.maxVersion,
+        releaseNotes: module.releaseNotes,
         isVisible: module.isVisible,
         orderIndex: module.orderIndex,
-        createdAt: module.createdAt,
-        updatedAt: module.updatedAt,
-        permissions: module.permissions || []
-      })),
-      totalModules: modules.length,
-      activeModules: modules.filter(m => m.isActive).length,
-      visibleModules: modules.filter(m => m.isVisible).length
-    }, 'Modules retrieved successfully');
+        permissions: module.permissions,
+        childModules: module.childModules,
+        // Tenant-specific settings
+        isEnabled: tenantModule?.isEnabled ?? true,
+        isVisibleInTenant: tenantModule?.isVisible ?? true,
+        tenantVersion: tenantModule?.version,
+        tenantSettings: tenantModule?.settings ? JSON.parse(tenantModule.settings) : null,
+        enabledAt: tenantModule?.enabledAt,
+        disabledAt: tenantModule?.disabledAt,
+        enabledBy: tenantModule?.enabledBy,
+        disabledBy: tenantModule?.disabledBy
+      };
 
-  } catch (error: any) {
+      // Include analytics if requested and user has permission
+      if (includeAnalytics) {
+        const hasAnalyticsPermission = checkTenantPermission(
+          user,
+          tenant.id,
+          MODULE_PERMISSIONS.VIEW_MODULE_ANALYTICS
+        );
+
+        if (hasAnalyticsPermission && tenantModule) {
+          baseModule.analytics = {
+            lastAccessedAt: tenantModule.lastAccessedAt,
+            accessCount: tenantModule.accessCount
+          };
+        }
+      }
+
+      return baseModule;
+    });
+
+    // Check additional permissions for UI controls
+    const hasEnableDisablePermission = await checkTenantPermission(
+      user,
+      tenant.id,
+      MODULE_PERMISSIONS.ENABLE_DISABLE_MODULES
+    );
+
+    const hasVersionManagementPermission = await checkTenantPermission(
+      user,
+      tenant.id,
+      MODULE_PERMISSIONS.MANAGE_MODULE_VERSIONS
+    );
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        modules: modulesWithTenantSettings,
+        permissions: {
+          canViewModules: true,
+          canEnableDisableModules: hasEnableDisablePermission,
+          canManageVersions: hasVersionManagementPermission,
+          canViewAnalytics: includeAnalytics && await checkTenantPermission(
+            user,
+            tenant.id,
+            MODULE_PERMISSIONS.VIEW_MODULE_ANALYTICS
+          )
+        }
+      }
+    });
+
+  } catch (error) {
     console.error('Error fetching modules:', error);
-    return createErrorResponse('Failed to fetch modules', 500);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
-});
+}
 
-// POST /api/tenant/[tenantSlug]/modules - Create a new module
-export const POST = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
-  const { tenantSlug } = await params;
-  
-  // Get authorization header
-  const authHeader = req.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return createErrorResponse('Unauthorized - No token provided', 401);
-  }
-
-  const token = authHeader.substring(7);
-  
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { tenantSlug: string } }
+) {
   try {
-    // Verify JWT token
-    const decoded = verifyToken(token);
-    if (!decoded || !decoded.id || !decoded.tenantId) {
-      return createErrorResponse('Invalid token', 401);
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user has permission to create modules
+    const { tenantSlug } = params;
+    const body = await request.json();
+    const { action, moduleKey, settings, version } = body;
+
+    // Get tenant
+    const tenant = await prisma.tenant.findUnique({
+      where: { slug: tenantSlug }
+    });
+
+    if (!tenant) {
+      return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+    }
+
+    // Get user with roles and permissions
     const user = await prisma.user.findFirst({
       where: {
-        id: decoded.id,
-        tenantId: decoded.tenantId,
-        isActive: true
+        email: session.user.email,
+        tenantId: tenant.id
       },
       include: {
         userRoles: {
@@ -199,11 +227,7 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
               include: {
                 permissions: {
                   include: {
-                    permission: {
-                      include: {
-                        module: true
-                      }
-                    }
+                    permission: true
                   }
                 }
               }
@@ -214,56 +238,198 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
     });
 
     if (!user) {
-      return createErrorResponse('User not found', 404);
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    const hasPermission = user.userRoles.some(userRole =>
-      userRole.role.permissions.some(rp => 
-        rp.permission.module.moduleKey === 'roles' && 
-        rp.permission.action === 'create'
-      )
-    );
+    // Handle different actions
+    switch (action) {
+      case 'enable':
+      case 'disable': {
+        const hasPermission = await checkTenantPermission(
+          user,
+          tenant.id,
+          MODULE_PERMISSIONS.ENABLE_DISABLE_MODULES
+        );
 
-    if (!hasPermission) {
-      return createErrorResponse('Insufficient permissions to create modules', 403);
-    }
+        if (!hasPermission) {
+          return NextResponse.json(
+            { error: 'Insufficient permissions to enable/disable modules' },
+            { status: 403 }
+          );
+        }
 
-    const body = await req.json();
-    const { moduleKey, moduleName, path, icon, parentModuleKey, description, orderIndex } = body;
+        const isEnabled = action === 'enable';
+        
+        // Upsert tenant module setting
+        const tenantModule = await prisma.tenantModule.upsert({
+          where: {
+            tenantId_moduleKey: {
+              tenantId: tenant.id,
+              moduleKey
+            }
+          },
+          update: {
+            isEnabled,
+            isVisible: isEnabled, // Auto-show when enabled
+            enabledAt: isEnabled ? new Date() : null,
+            disabledAt: !isEnabled ? new Date() : null,
+            enabledBy: isEnabled ? user.id : null,
+            disabledBy: !isEnabled ? user.id : null,
+            updatedAt: new Date()
+          },
+          create: {
+            tenantId: tenant.id,
+            moduleKey,
+            isEnabled,
+            isVisible: isEnabled,
+            enabledAt: isEnabled ? new Date() : null,
+            disabledAt: !isEnabled ? new Date() : null,
+            enabledBy: isEnabled ? user.id : null,
+            disabledBy: !isEnabled ? user.id : null
+          }
+        });
 
-    // Validate required fields
-    if (!moduleKey || !moduleName) {
-      return createErrorResponse('Module key and name are required', 400);
-    }
+        // Log the action
+        await prisma.auditLog.create({
+          data: {
+            action: `module_${action}`,
+            details: JSON.stringify({
+              moduleKey,
+              isEnabled,
+              userId: user.id,
+              userName: user.name
+            }),
+            tenantId: tenant.id,
+            userId: user.id,
+            ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
+            userAgent: request.headers.get('user-agent')
+          }
+        });
 
-    // Check if module key already exists
-    const existingModule = await prisma.module.findUnique({
-      where: { moduleKey }
-    });
-
-    if (existingModule) {
-      return createErrorResponse('Module key already exists', 409);
-    }
-
-    // Create module
-    const newModule = await prisma.module.create({
-      data: {
-        moduleKey,
-        moduleName,
-        path,
-        icon,
-        parentModuleKey,
-        description,
-        orderIndex: orderIndex || 0,
-        isActive: true,
-        isVisible: true
+        return NextResponse.json({
+          success: true,
+          data: { tenantModule }
+        });
       }
-    });
 
-    return createSuccessResponse(newModule, 'Module created successfully', 201);
+      case 'update_settings': {
+        const hasPermission = await checkTenantPermission(
+          user,
+          tenant.id,
+          MODULE_PERMISSIONS.ENABLE_DISABLE_MODULES
+        );
 
-  } catch (error: any) {
-    console.error('Error creating module:', error);
-    return createErrorResponse('Failed to create module', 500);
+        if (!hasPermission) {
+          return NextResponse.json(
+            { error: 'Insufficient permissions to update module settings' },
+            { status: 403 }
+          );
+        }
+
+        const tenantModule = await prisma.tenantModule.update({
+          where: {
+            tenantId_moduleKey: {
+              tenantId: tenant.id,
+              moduleKey
+            }
+          },
+          data: {
+            settings: JSON.stringify(settings),
+            updatedAt: new Date()
+          }
+        });
+
+        return NextResponse.json({
+          success: true,
+          data: { tenantModule }
+        });
+      }
+
+      case 'update_version': {
+        const hasPermission = await checkTenantPermission(
+          user,
+          tenant.id,
+          MODULE_PERMISSIONS.MANAGE_MODULE_VERSIONS
+        );
+
+        if (!hasPermission) {
+          return NextResponse.json(
+            { error: 'Insufficient permissions to manage module versions' },
+            { status: 403 }
+          );
+        }
+
+        // Validate version compatibility
+        const module = await prisma.module.findUnique({
+          where: { moduleKey }
+        });
+
+        if (!module) {
+          return NextResponse.json({ error: 'Module not found' }, { status: 404 });
+        }
+
+        if (module.minVersion && version < module.minVersion) {
+          return NextResponse.json(
+            { error: `Version ${version} is below minimum required version ${module.minVersion}` },
+            { status: 400 }
+          );
+        }
+
+        if (module.maxVersion && version > module.maxVersion) {
+          return NextResponse.json(
+            { error: `Version ${version} exceeds maximum supported version ${module.maxVersion}` },
+            { status: 400 }
+          );
+        }
+
+        const tenantModule = await prisma.tenantModule.update({
+          where: {
+            tenantId_moduleKey: {
+              tenantId: tenant.id,
+              moduleKey
+            }
+          },
+          data: {
+            version,
+            updatedAt: new Date()
+          }
+        });
+
+        // Log version update
+        await prisma.auditLog.create({
+          data: {
+            action: 'module_version_update',
+            details: JSON.stringify({
+              moduleKey,
+              version,
+              userId: user.id,
+              userName: user.name
+            }),
+            tenantId: tenant.id,
+            userId: user.id,
+            ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
+            userAgent: request.headers.get('user-agent')
+          }
+        });
+
+        return NextResponse.json({
+          success: true,
+          data: { tenantModule }
+        });
+      }
+
+      default:
+        return NextResponse.json(
+          { error: 'Invalid action' },
+          { status: 400 }
+        );
+    }
+
+  } catch (error) {
+    console.error('Error managing modules:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
-}); 
+} 

@@ -1,0 +1,53 @@
+{
+  "summary": {
+    "totalTests": 6,
+    "totalPassed": 2,
+    "totalFailed": 4,
+    "overallSuccessRate": "33.3",
+    "totalDuration": "182.24"
+  },
+  "modules": [
+    {
+      "module": "user-management",
+      "results": [
+        {
+          "test": "techcorp admin Login",
+          "status": "PASS",
+          "details": "Successfully logged in as admin",
+          "timestamp": "2025-08-10T21:37:04.506Z"
+        },
+        {
+          "test": "techcorp admin User Management Access",
+          "status": "FAIL",
+          "details": "User management not accessible",
+          "timestamp": "2025-08-10T21:37:41.485Z"
+        },
+        {
+          "test": "techcorp manager Login",
+          "status": "FAIL",
+          "details": "Failed to login as manager",
+          "timestamp": "2025-08-10T21:38:00.752Z"
+        },
+        {
+          "test": "globalretail admin Login",
+          "status": "FAIL",
+          "details": "Failed to login as admin",
+          "timestamp": "2025-08-10T21:38:17.514Z"
+        },
+        {
+          "test": "globalretail manager Login",
+          "status": "PASS",
+          "details": "Successfully logged in as manager",
+          "timestamp": "2025-08-10T21:38:38.473Z"
+        },
+        {
+          "test": "globalretail manager User Management Access",
+          "status": "FAIL",
+          "details": "User management not accessible",
+          "timestamp": "2025-08-10T21:39:00.082Z"
+        }
+      ]
+    }
+  ],
+  "timestamp": "2025-08-10T21:39:05.421Z"
+}

@@ -1,45 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { asyncHandler } from '@/lib/errorHandler';
-import { createErrorResponse } from '@/lib/apiResponse';
-import { verifyToken } from '@/lib/jwt';
+import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
+import { withTenantAuth, AuthenticatedRequest } from '@/lib/authMiddleware';
 
 // GET /api/tenant/[tenantSlug]/audit-logs/export - Export audit logs for specific tenant
-export const GET = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
+export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
   const { tenantSlug } = await params;
   
-  // Get authorization header
-  const authHeader = req.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return createErrorResponse('Unauthorized - No token provided', 401);
-  }
-
-  const token = authHeader.substring(7);
-  
   try {
-    // Verify JWT token
-    const decoded = verifyToken(token);
-    if (!decoded || !decoded.id || !decoded.tenantId) {
-      return createErrorResponse('Invalid token', 401);
-    }
-
-    // Verify user belongs to the tenant
-    const user = await prisma.user.findFirst({
-      where: {
-        id: decoded.id,
-        tenant: {
-          slug: tenantSlug,
-          isActive: true
-        }
-      },
-      include: {
-        tenant: true
-      }
-    });
-
-    if (!user || !user.tenant || user.tenant.slug !== tenantSlug || !user.tenant.isActive) {
-      return createErrorResponse('Access denied - Invalid tenant or user not found', 403);
-    }
+    // User is already authenticated and verified by middleware
+    const userId = req.user!.id;
+    const tenantId = req.user!.tenantId;
 
     const { searchParams } = new URL(req.url);
     const format = searchParams.get('format') || 'csv';
@@ -50,7 +22,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
 
     // Build where clause - only show logs for this tenant
     const where: any = {
-      tenantId: user.tenant.id
+      tenantId: tenantId
     };
     
     if (userEmail) {
@@ -92,16 +64,16 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
 
     if (format === 'json') {
       const jsonData = JSON.stringify({
-        tenant: user.tenant.name,
+        tenant: tenantSlug,
         exportDate: new Date().toISOString(),
         totalRecords: auditLogs.length,
-        auditLogs: auditLogs.map(log => ({
+        logs: auditLogs.map(log => ({
           id: log.id,
           action: log.action,
           details: log.details,
+          createdAt: log.createdAt,
           ipAddress: log.ipAddress,
           userAgent: log.userAgent,
-          createdAt: log.createdAt,
           user: log.user ? {
             email: log.user.email,
             name: log.user.name
@@ -126,9 +98,9 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
         'ID',
         'Action',
         'Details',
+        'Created At',
         'IP Address',
         'User Agent',
-        'Created At',
         'User Email',
         'User Name',
         'Super Admin Email',
@@ -139,9 +111,9 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
         log.id,
         log.action,
         log.details || '',
+        log.createdAt.toISOString(),
         log.ipAddress || '',
         log.userAgent || '',
-        log.createdAt.toISOString(),
         log.user?.email || '',
         log.user?.name || '',
         log.superAdmin?.email || '',
@@ -165,4 +137,4 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
     console.error('Error exporting tenant audit logs:', error);
     return createErrorResponse('Failed to export tenant audit logs', 500);
   }
-}); 
+});

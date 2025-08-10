@@ -6,57 +6,115 @@ export interface Notification {
   id: string;
   title: string;
   message: string;
-  isRead: boolean;
+  type: 'info' | 'warning' | 'alert' | 'promotional' | 'system_update';
+  priority: 'low' | 'medium' | 'high';
+  status: 'draft' | 'sent' | 'scheduled' | 'cancelled';
+  targetType: 'superadmin' | 'specific_users' | 'multiple_users' | 'entire_tenant' | 'multiple_tenants';
+  targetTenantId?: string;
+  scheduledAt?: string;
+  sentAt?: string;
   createdAt: string;
-  targetType: string;
-  priority: string;
+  updatedAt: string;
+  createdBy: string;
+  createdByType: 'superadmin' | 'tenant_admin' | 'user';
+  attachments?: Array<{
+    filename: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+    url: string;
+  }>;
+  metadata?: Record<string, any>;
+  superAdmin?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  tenant?: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  _count?: {
+    userNotifications: number;
+  };
 }
 
 export interface NotificationResponse {
   notifications: Notification[];
-  unreadCount: number;
-  totalCount: number;
+  stats: {
+    total: number;
+    draft: number;
+    sent: number;
+    scheduled: number;
+    cancelled: number;
+  };
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
-export interface SendNotificationData {
+export interface CreateNotificationData {
   title: string;
   message: string;
-  targetType: 'superadmin' | 'all_tenants' | 'specific_tenant';
-  targetTenantId?: string;
+  type: 'info' | 'warning' | 'alert' | 'promotional' | 'system_update';
   priority: 'low' | 'medium' | 'high';
+  targetType: 'superadmin' | 'specific_users' | 'multiple_users' | 'entire_tenant' | 'multiple_tenants';
+  targetTenantId?: string;
+  targetUserIds?: string[];
+  scheduledAt?: string;
+  attachments?: Array<{
+    filename: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+    url: string;
+  }>;
+  metadata?: Record<string, any>;
 }
 
-// Fetch notifications for header
-export const useNotifications = (options: { limit?: number; unreadOnly?: boolean } = {}) => {
-  const { limit = 10, unreadOnly = false } = options;
+export interface NotificationFilters {
+  search?: string;
+  type?: string[];
+  status?: string[];
+  priority?: string[];
+  targetType?: string[];
+  dateRange?: {
+    start: string;
+    end: string;
+  };
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  page?: number;
+  limit?: number;
+}
+
+// Fetch notifications for superadmin
+export const useNotifications = (filters: NotificationFilters = {}) => {
+  const queryParams = new URLSearchParams();
+  
+  if (filters.search) queryParams.append('search', filters.search);
+  if (filters.type) filters.type.forEach(t => queryParams.append('type', t));
+  if (filters.status) filters.status.forEach(s => queryParams.append('status', s));
+  if (filters.priority) filters.priority.forEach(p => queryParams.append('priority', p));
+  if (filters.targetType) filters.targetType.forEach(t => queryParams.append('targetType', t));
+  if (filters.dateRange) queryParams.append('dateRange', JSON.stringify(filters.dateRange));
+  if (filters.sortBy) queryParams.append('sortBy', filters.sortBy);
+  if (filters.sortOrder) queryParams.append('sortOrder', filters.sortOrder);
+  if (filters.page) queryParams.append('page', filters.page.toString());
+  if (filters.limit) queryParams.append('limit', filters.limit.toString());
 
   return useQuery({
-    queryKey: ['notifications', { limit, unreadOnly }],
+    queryKey: ['notifications', filters],
     queryFn: async (): Promise<NotificationResponse> => {
       try {
-        const params = new URLSearchParams();
-        params.append('limit', limit.toString());
-        if (unreadOnly) {
-          params.append('unreadOnly', 'true');
-        }
-
-        if (process.env.NODE_ENV === 'development') {
-          console.log('🔍 Fetching notifications with params:', params.toString());
-        }
-
-        const response = await api.get(`/superadmin/notifications?${params.toString()}`);
-        
-        if (process.env.NODE_ENV === 'development') {
-          console.log('✅ Notifications API response:', response.data);
-        }
-        
+        const response = await api.get(`/superadmin/notifications?${queryParams.toString()}`);
         return response.data.data;
       } catch (error: any) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('❌ Error fetching notifications:', error);
-          console.error('❌ Error response:', error.response?.data);
-          console.error('❌ Error status:', error.response?.status);
-        }
+        console.error('Error fetching notifications:', error);
         throw error;
       }
     },
@@ -66,17 +124,83 @@ export const useNotifications = (options: { limit?: number; unreadOnly?: boolean
   });
 };
 
+// Create notification
+export const useCreateNotification = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: CreateNotificationData): Promise<{ notification: Notification }> => {
+      const response = await api.post('/superadmin/notifications', data);
+      return response.data.data;
+    },
+    onSuccess: (data) => {
+      toast.success('Notification created successfully');
+      // Invalidate notifications cache to refresh the list
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.message || 'Failed to create notification';
+      toast.error(errorMessage);
+    },
+  });
+};
+
+// Update notification
+export const useUpdateNotification = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<CreateNotificationData> }): Promise<{ notification: Notification }> => {
+      const response = await api.put(`/superadmin/notifications/${id}`, data);
+      return response.data.data;
+    },
+    onSuccess: (data) => {
+      toast.success('Notification updated successfully');
+      // Invalidate notifications cache to refresh the list
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.message || 'Failed to update notification';
+      toast.error(errorMessage);
+    },
+  });
+};
+
+// Delete notification
+export const useDeleteNotification = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (notificationId: string): Promise<any> => {
+      const response = await api.delete(`/superadmin/notifications/${notificationId}`);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Notification deleted successfully');
+      // Invalidate notifications cache to refresh the list
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.message || 'Failed to delete notification';
+      toast.error(errorMessage);
+    },
+  });
+};
+
 // Send notification
 export const useSendNotification = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: SendNotificationData): Promise<any> => {
-      const response = await api.post('/superadmin/notifications', data);
-      return response.data;
+    mutationFn: async (notificationId: string): Promise<{ notification: Notification }> => {
+      const response = await api.patch(`/superadmin/notifications/${notificationId}`, {
+        action: 'send',
+        notificationId,
+      });
+      return response.data.data;
     },
     onSuccess: (data) => {
-      toast.success(data.message || 'Notification sent successfully');
+      toast.success('Notification sent successfully');
       // Invalidate notifications cache to refresh the list
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
@@ -87,43 +211,15 @@ export const useSendNotification = () => {
   });
 };
 
-// Mark notification as read
-export const useMarkNotificationAsRead = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (notificationId: string): Promise<any> => {
-      const response = await api.patch(`/superadmin/notifications/${notificationId}/read`);
-      return response.data;
+// Get single notification
+export const useNotification = (id: string) => {
+  return useQuery({
+    queryKey: ['notification', id],
+    queryFn: async (): Promise<{ notification: Notification }> => {
+      const response = await api.get(`/superadmin/notifications/${id}`);
+      return response.data.data;
     },
-    onSuccess: () => {
-      // Invalidate notifications cache to refresh the list
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-    },
-    onError: (error: any) => {
-      const errorMessage = error.response?.data?.message || 'Failed to mark notification as read';
-      toast.error(errorMessage);
-    },
-  });
-};
-
-// Mark all notifications as read
-export const useMarkAllNotificationsAsRead = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (): Promise<any> => {
-      const response = await api.patch('/superadmin/notifications/read-all');
-      return response.data;
-    },
-    onSuccess: () => {
-      toast.success('All notifications marked as read');
-      // Invalidate notifications cache to refresh the list
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-    },
-    onError: (error: any) => {
-      const errorMessage = error.response?.data?.message || 'Failed to mark notifications as read';
-      toast.error(errorMessage);
-    },
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }; 

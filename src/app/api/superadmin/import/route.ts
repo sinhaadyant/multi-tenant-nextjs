@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireSuperAdmin } from '@/middleware/auth';
 import { asyncHandler } from '@/lib/errorHandler';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
+import { withSuperAdminAuth, AuthenticatedRequest } from '@/lib/authMiddleware';
+import { requireSuperAdmin } from '@/middleware/auth';
 import { z } from 'zod';
 import { writeFile, unlink } from 'fs/promises';
 import path from 'path';

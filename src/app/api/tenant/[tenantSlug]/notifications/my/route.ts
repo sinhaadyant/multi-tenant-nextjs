@@ -1,236 +1,172 @@
 import { NextRequest } from 'next/server';
-import { asyncHandler } from '@/lib/errorHandler';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-import { createAuditLogFromRequest } from '@/lib/audit';
-import { verifyToken } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
+import { withTenantAuth, AuthenticatedRequest } from '@/lib/authMiddleware';
 
-// GET /api/tenant/[tenantSlug]/notifications/my - Get user's notifications
-export const GET = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
-  const { tenantSlug } = await params;
-  const authHeader = req.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return createErrorResponse('Unauthorized - No token provided', 401);
-  }
-
-  const token = authHeader.substring(7);
-  
+export const GET = withTenantAuth(async (
+  req: AuthenticatedRequest,
+  { params }: { params: Promise<{ tenantSlug: string }> }
+) => {
   try {
-    const decoded = verifyToken(token);
-    if (!decoded || !decoded.id || !decoded.tenantId) {
-      return createErrorResponse('Invalid token', 401);
+    const { tenantSlug } = await params;
+    const user = req.user!;
+
+    const { searchParams } = new URL(req.url);
+    const filters = {
+      status: searchParams.get('status') || 'all', // all, read, unread
+      type: searchParams.getAll('type'),
+      sortBy: searchParams.get('sortBy') || 'createdAt',
+      sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc',
+      page: parseInt(searchParams.get('page') || '1'),
+      limit: parseInt(searchParams.get('limit') || '10'),
+    };
+
+    // Build where clause for user notifications
+    const where: any = {
+      userId: user.id,
+      isActive: true,
+    };
+
+    if (filters.status === 'read') {
+      where.isRead = true;
+    } else if (filters.status === 'unread') {
+      where.isRead = false;
     }
-
-    // Verify user belongs to the tenant
-    const user = await prisma.user.findFirst({
-      where: {
-        id: decoded.id,
-        tenant: {
-          slug: tenantSlug,
-          isActive: true
-        }
-      },
-      include: {
-        tenant: true
-      }
-    });
-
-    if (!user || !user.tenant || user.tenant.slug !== tenantSlug || !user.tenant.isActive) {
-      return createErrorResponse('Access denied - Invalid tenant or user not found', 403);
-    }
-
-    // Parse query parameters
-    const url = new URL(req.url);
-    const page = parseInt(url.searchParams.get('page') || '1');
-    const limit = parseInt(url.searchParams.get('limit') || '10');
-    const sortBy = url.searchParams.get('sortBy') || 'createdAt';
-    const sortOrder = url.searchParams.get('sortOrder') || 'desc';
 
     // Calculate pagination
-    const skip = (page - 1) * limit;
+    const skip = (filters.page - 1) * filters.limit;
+    const take = filters.limit;
 
-    // Fetch user's notifications
-    const [userNotifications, totalNotifications] = await Promise.all([
-      prisma.notificationRecipient.findMany({
-        where: {
-          userId: user.id,
-          notification: {
-            tenantId: user.tenant.id
-          }
-        },
+    // Get user notifications with pagination
+    const [userNotifications, total] = await Promise.all([
+      prisma.userNotification.findMany({
+        where,
         include: {
           notification: {
             include: {
-              createdBy: {
+              superAdmin: {
                 select: {
                   id: true,
                   name: true,
-                  email: true
-                }
-              }
-            }
-          }
+                  email: true,
+                },
+              },
+              tenant: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                },
+              },
+            },
+          },
+          tenant: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+            },
+          },
         },
         orderBy: {
-          notification: {
-            [sortBy]: sortOrder
-          }
+          [filters.sortBy]: filters.sortOrder,
         },
         skip,
-        take: limit
+        take,
       }),
-      prisma.notificationRecipient.count({
-        where: {
-          userId: user.id,
-          notification: {
-            tenantId: user.tenant.id
-          }
-        }
-      })
+      prisma.userNotification.count({ where }),
     ]);
 
-    // Transform notifications data
-    const transformedNotifications = userNotifications.map(userNotification => ({
-      id: userNotification.notification.id,
-      title: userNotification.notification.title,
-      message: userNotification.notification.message,
-      type: userNotification.notification.type,
-      isRead: userNotification.isRead,
-      readAt: userNotification.readAt,
-      createdAt: userNotification.notification.createdAt,
-      sentAt: userNotification.notification.sentAt,
-      createdBy: userNotification.notification.createdBy
+    // Transform the data to match the expected format
+    const notifications = userNotifications.map((userNotif) => ({
+      id: userNotif.id,
+      notificationId: userNotif.notificationId,
+      title: userNotif.notification.title,
+      message: userNotif.notification.message,
+      type: userNotif.notification.type,
+      priority: userNotif.notification.priority,
+      status: userNotif.isRead ? 'read' : 'unread',
+      readAt: userNotif.readAt,
+      createdAt: userNotif.createdAt,
+      notificationCreatedAt: userNotif.notification.createdAt,
+      createdBy: userNotif.notification.superAdmin || {
+        id: userNotif.notification.createdBy,
+        name: 'System',
+        email: 'system@example.com',
+      },
     }));
 
-    const pagination = {
-      page,
-      limit,
-      total: totalNotifications,
-      totalPages: Math.ceil(totalNotifications / limit),
-      hasNext: page < Math.ceil(totalNotifications / limit),
-      hasPrev: page > 1
+    const response = {
+      notifications,
+      pagination: {
+        page: filters.page,
+        limit: filters.limit,
+        total,
+        totalPages: Math.ceil(total / filters.limit),
+      },
     };
 
-    await createAuditLogFromRequest(req, { id: user.id, email: user.email, role: 'user' }, 'notifications.my.list', {
-      tenantId: user.tenant.id,
-      pagination: { page, limit }
-    });
-
-    return createSuccessResponse({
-      notifications: transformedNotifications,
-      pagination
-    }, 'User notifications retrieved successfully');
-
+    return createSuccessResponse(response, 'User notifications retrieved successfully');
   } catch (error: any) {
     console.error('Error fetching user notifications:', error);
-    return createErrorResponse('Failed to fetch user notifications', 500);
+    return createErrorResponse('Internal server error', 500);
   }
 });
 
-// PATCH /api/tenant/[tenantSlug]/notifications/my - Mark notification as read
-export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
-  const { tenantSlug } = await params;
-  const authHeader = req.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return createErrorResponse('Unauthorized - No token provided', 401);
-  }
-
-  const token = authHeader.substring(7);
-  
+export const PATCH = withTenantAuth(async (
+  req: AuthenticatedRequest,
+  { params }: { params: Promise<{ tenantSlug: string }> }
+) => {
   try {
-    const decoded = verifyToken(token);
-    if (!decoded || !decoded.id || !decoded.tenantId) {
-      return createErrorResponse('Invalid token', 401);
-    }
-
-    // Verify user belongs to the tenant
-    const user = await prisma.user.findFirst({
-      where: {
-        id: decoded.id,
-        tenant: {
-          slug: tenantSlug,
-          isActive: true
-        }
-      },
-      include: {
-        tenant: true
-      }
-    });
-
-    if (!user || !user.tenant || user.tenant.slug !== tenantSlug || !user.tenant.isActive) {
-      return createErrorResponse('Access denied - Invalid tenant or user not found', 403);
-    }
+    const { tenantSlug } = await params;
+    const user = req.user!;
 
     const body = await req.json();
-    const { notificationId } = body;
+    const { notificationIds, markAllAsRead } = body;
 
-    if (!notificationId) {
-      return createErrorResponse('Notification ID is required', 400);
+    if (markAllAsRead) {
+      // Mark all user notifications as read
+      await prisma.userNotification.updateMany({
+        where: {
+          userId: user.id,
+          isActive: true,
+          isRead: false,
+        },
+        data: {
+          isRead: true,
+          readAt: new Date(),
+        },
+      });
+
+      return createSuccessResponse(
+        { message: 'All notifications marked as read' },
+        'All notifications marked as read successfully'
+      );
     }
 
-    // Check if user has access to this notification
-    const userNotification = await prisma.notificationRecipient.findFirst({
-      where: {
-        userId: user.id,
-        notificationId,
-        notification: {
-          tenantId: user.tenant.id
-        }
-      },
-      include: {
-        notification: {
-          select: {
-            id: true,
-            title: true
-          }
-        }
-      }
-    });
+    if (notificationIds && Array.isArray(notificationIds) && notificationIds.length > 0) {
+      // Mark specific notifications as read
+      await prisma.userNotification.updateMany({
+        where: {
+          id: { in: notificationIds },
+          userId: user.id,
+          isActive: true,
+        },
+        data: {
+          isRead: true,
+          readAt: new Date(),
+        },
+      });
 
-    if (!userNotification) {
-      return createErrorResponse('Notification not found or access denied', 404);
+      return createSuccessResponse(
+        { message: 'Notifications marked as read' },
+        'Notifications marked as read successfully'
+      );
     }
 
-    // Mark notification as read
-    const updatedUserNotification = await prisma.notificationRecipient.update({
-      where: {
-        id: userNotification.id
-      },
-      data: {
-        isRead: true,
-        readAt: new Date()
-      },
-      include: {
-        notification: {
-          select: {
-            id: true,
-            title: true,
-            type: true
-          }
-        }
-      }
-    });
-
-    await createAuditLogFromRequest(req, { id: user.id, email: user.email, role: 'user' }, 'notifications.my.mark-read', {
-      tenantId: user.tenant.id,
-      notificationId,
-      title: userNotification.notification.title
-    });
-
-    return createSuccessResponse({
-      notification: {
-        id: updatedUserNotification.notification.id,
-        title: updatedUserNotification.notification.title,
-        type: updatedUserNotification.notification.type,
-        isRead: updatedUserNotification.isRead,
-        readAt: updatedUserNotification.readAt
-      }
-    }, 'Notification marked as read successfully');
-
+    return createErrorResponse('Invalid request body', 400);
   } catch (error: any) {
-    console.error('Error marking notification as read:', error);
-    return createErrorResponse('Failed to mark notification as read', 500);
+    console.error('Error marking notifications as read:', error);
+    return createErrorResponse('Internal server error', 500);
   }
-}); 
+});

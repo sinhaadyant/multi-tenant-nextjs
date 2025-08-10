@@ -1,0 +1,1129 @@
+{
+  "info": {
+    "name": "Multi-Tenant NextJS API",
+    "description": "Complete API collection for Multi-Tenant NextJS application with SuperAdmin and Tenant management",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    },
+    {
+      "key": "superadminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tenantToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tenantSlug",
+      "value": "techcorp",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{superadminToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "SuperAdmin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@superadmin.com\",\n  \"password\": \"AdminPass123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["superadmin", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "TechCorp Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@techcorp.com\",\n  \"password\": \"AdminPass123\",\n  \"tenantSlug\": \"techcorp\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Global Retail Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@globalretail.com\",\n  \"password\": \"AdminPass123\",\n  \"tenantSlug\": \"globalretail\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"your-refresh-token-here\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "refresh"]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout"]
+            }
+          }
+        },
+        {
+          "name": "Verify Token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "verify"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "SuperAdmin APIs",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{superadminToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Dashboard",
+          "item": [
+            {
+              "name": "Get Dashboard Stats",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/dashboard/stats",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "dashboard", "stats"]
+                }
+              }
+            },
+            {
+              "name": "Get Recent Activity",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/dashboard/recent-activity",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "dashboard", "recent-activity"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tenants",
+          "item": [
+            {
+              "name": "Get All Tenants",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/tenants?page=1&limit=10&search=&status=",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "tenants"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    },
+                    {
+                      "key": "search",
+                      "value": ""
+                    },
+                    {
+                      "key": "status",
+                      "value": ""
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Create Tenant",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"New Tenant\",\n  \"slug\": \"new-tenant\",\n  \"domain\": \"newtenant.com\",\n  \"email\": \"admin@newtenant.com\",\n  \"password\": \"password123\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/tenants",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "tenants"]
+                }
+              }
+            },
+            {
+              "name": "Get Tenant by ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/tenants/tenant-id-here",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "tenants", "tenant-id-here"]
+                }
+              }
+            },
+            {
+              "name": "Update Tenant",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Updated Tenant Name\",\n  \"domain\": \"updatedtenant.com\",\n  \"status\": \"active\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/tenants/tenant-id-here",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "tenants", "tenant-id-here"]
+                }
+              }
+            },
+            {
+              "name": "Delete Tenant",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/tenants/tenant-id-here",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "tenants", "tenant-id-here"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Users",
+          "item": [
+            {
+              "name": "Get All Users",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/users?page=1&limit=10&search=&role=&tenantId=",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "users"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    },
+                    {
+                      "key": "search",
+                      "value": ""
+                    },
+                    {
+                      "key": "role",
+                      "value": ""
+                    },
+                    {
+                      "key": "tenantId",
+                      "value": ""
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Create User",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"newuser@example.com\",\n  \"name\": \"New User\",\n  \"password\": \"password123\",\n  \"role\": \"user\",\n  \"tenantId\": \"tenant-id-here\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/users",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "users"]
+                }
+              }
+            },
+            {
+              "name": "Update User",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Updated User Name\",\n  \"role\": \"admin\",\n  \"status\": \"active\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/users/user-id-here",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "users", "user-id-here"]
+                }
+              }
+            },
+            {
+              "name": "Delete User",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/users/user-id-here",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "users", "user-id-here"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Audit Logs",
+          "item": [
+            {
+              "name": "Get Audit Logs",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/audit-logs?page=1&limit=10&action=&entity=&userId=&tenantId=&startDate=&endDate=",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "audit-logs"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    },
+                    {
+                      "key": "action",
+                      "value": ""
+                    },
+                    {
+                      "key": "entity",
+                      "value": ""
+                    },
+                    {
+                      "key": "userId",
+                      "value": ""
+                    },
+                    {
+                      "key": "tenantId",
+                      "value": ""
+                    },
+                    {
+                      "key": "startDate",
+                      "value": ""
+                    },
+                    {
+                      "key": "endDate",
+                      "value": ""
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Audit Log by ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/audit-logs/log-id-here",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "audit-logs", "log-id-here"]
+                }
+              }
+            },
+            {
+              "name": "Export Audit Logs",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/audit-logs/export?format=csv&startDate=&endDate=",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "audit-logs", "export"],
+                  "query": [
+                    {
+                      "key": "format",
+                      "value": "csv"
+                    },
+                    {
+                      "key": "startDate",
+                      "value": ""
+                    },
+                    {
+                      "key": "endDate",
+                      "value": ""
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Support Tickets",
+          "item": [
+            {
+              "name": "Get Support Tickets",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/support-tickets?page=1&limit=10&status=&priority=&tenantId=",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "support-tickets"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    },
+                    {
+                      "key": "status",
+                      "value": ""
+                    },
+                    {
+                      "key": "priority",
+                      "value": ""
+                    },
+                    {
+                      "key": "tenantId",
+                      "value": ""
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Support Ticket by ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/support-tickets/ticket-id-here",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "support-tickets", "ticket-id-here"]
+                }
+              }
+            },
+            {
+              "name": "Update Support Ticket",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"resolved\",\n  \"priority\": \"high\",\n  \"response\": \"Issue has been resolved\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/support-tickets/ticket-id-here",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "support-tickets", "ticket-id-here"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reports",
+          "item": [
+            {
+              "name": "Get System Reports",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/reports/system?startDate=&endDate=",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "reports", "system"],
+                  "query": [
+                    {
+                      "key": "startDate",
+                      "value": ""
+                    },
+                    {
+                      "key": "endDate",
+                      "value": ""
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Tenant Reports",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/reports/tenants?startDate=&endDate=",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "reports", "tenants"],
+                  "query": [
+                    {
+                      "key": "startDate",
+                      "value": ""
+                    },
+                    {
+                      "key": "endDate",
+                      "value": ""
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Backup & Import",
+          "item": [
+            {
+              "name": "Create Backup",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/backup",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "backup"]
+                }
+              }
+            },
+            {
+              "name": "Get Backup List",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/backup",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "backup"]
+                }
+              }
+            },
+            {
+              "name": "Download Backup",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/backup/backup-id-here",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "backup", "backup-id-here"]
+                }
+              }
+            },
+            {
+              "name": "Import Data",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "multipart/form-data"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "file",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/superadmin/import",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["superadmin", "import"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tenant APIs",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{tenantToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Dashboard",
+          "item": [
+            {
+              "name": "Get Tenant Dashboard",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/tenant/dashboard",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenant", "dashboard"]
+                }
+              }
+            },
+            {
+              "name": "Get Dashboard Stats",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/tenant/dashboard/stats",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenant", "dashboard", "stats"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Users",
+          "item": [
+            {
+              "name": "Get Tenant Users",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/tenant/users?page=1&limit=10&search=&role=",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenant", "users"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    },
+                    {
+                      "key": "search",
+                      "value": ""
+                    },
+                    {
+                      "key": "role",
+                      "value": ""
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Create Tenant User",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"newuser@tenant.com\",\n  \"name\": \"New Tenant User\",\n  \"password\": \"password123\",\n  \"role\": \"user\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/tenant/users",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenant", "users"]
+                }
+              }
+            },
+            {
+              "name": "Update Tenant User",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Updated Tenant User\",\n  \"role\": \"admin\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/tenant/users/user-id-here",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenant", "users", "user-id-here"]
+                }
+              }
+            },
+            {
+              "name": "Delete Tenant User",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/tenant/users/user-id-here",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenant", "users", "user-id-here"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Audit Logs",
+          "item": [
+            {
+              "name": "Get Tenant Audit Logs",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/tenant/audit-logs?page=1&limit=10&action=&entity=&userId=&startDate=&endDate=",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenant", "audit-logs"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    },
+                    {
+                      "key": "action",
+                      "value": ""
+                    },
+                    {
+                      "key": "entity",
+                      "value": ""
+                    },
+                    {
+                      "key": "userId",
+                      "value": ""
+                    },
+                    {
+                      "key": "startDate",
+                      "value": ""
+                    },
+                    {
+                      "key": "endDate",
+                      "value": ""
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Tenant Audit Log by ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/tenant/audit-logs/log-id-here",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenant", "audit-logs", "log-id-here"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Support",
+          "item": [
+            {
+              "name": "Create Support Ticket",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"subject\": \"Technical Issue\",\n  \"description\": \"I am experiencing a technical issue\",\n  \"priority\": \"medium\",\n  \"category\": \"technical\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/tenant/support",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenant", "support"]
+                }
+              }
+            },
+            {
+              "name": "Get Tenant Support Tickets",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/tenant/support?page=1&limit=10&status=&priority=",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenant", "support"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    },
+                    {
+                      "key": "status",
+                      "value": ""
+                    },
+                    {
+                      "key": "priority",
+                      "value": ""
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Support Ticket by ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/tenant/support/ticket-id-here",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenant", "support", "ticket-id-here"]
+                }
+              }
+            },
+            {
+              "name": "Update Support Ticket",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"subject\": \"Updated Subject\",\n  \"description\": \"Updated description\",\n  \"priority\": \"high\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/tenant/support/ticket-id-here",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenant", "support", "ticket-id-here"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Settings",
+          "item": [
+            {
+              "name": "Get Tenant Settings",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/tenant/settings",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenant", "settings"]
+                }
+              }
+            },
+            {
+              "name": "Update Tenant Settings",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Updated Tenant Name\",\n  \"domain\": \"updatedtenant.com\",\n  \"settings\": {\n    \"theme\": \"dark\",\n    \"notifications\": true\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/tenant/settings",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenant", "settings"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Profile",
+          "item": [
+            {
+              "name": "Get User Profile",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/tenant/profile",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenant", "profile"]
+                }
+              }
+            },
+            {
+              "name": "Update User Profile",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Updated User Name\",\n  \"email\": \"updated@example.com\",\n  \"avatar\": \"data:image/jpeg;base64,...\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/tenant/profile",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenant", "profile"]
+                }
+              }
+            },
+            {
+              "name": "Change Password",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"currentPassword\": \"oldpassword\",\n  \"newPassword\": \"newpassword123\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/tenant/profile/password",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenant", "profile", "password"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Search",
+      "item": [
+        {
+          "name": "Global Search",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search?q=search-term&type=all&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "search-term"
+                },
+                {
+                  "key": "type",
+                  "value": "all"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-set authentication headers based on the request",
+          "if (pm.request.url.path.includes('superadmin')) {",
+          "    pm.request.headers.add({",
+          "        key: 'Authorization',",
+          "        value: 'Bearer ' + pm.collectionVariables.get('superadminToken')",
+          "    });",
+          "} else if (pm.request.url.path.includes('tenant')) {",
+          "    pm.request.headers.add({",
+          "        key: 'Authorization',",
+          "        value: 'Bearer ' + pm.collectionVariables.get('tenantToken')",
+          "    });",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-save tokens from login responses",
+          "if (pm.response.code === 200) {",
+          "    const response = pm.response.json();",
+          "    if (response.token) {",
+          "        if (pm.request.url.path.includes('superadmin')) {",
+          "            pm.collectionVariables.set('superadminToken', response.token);",
+          "        } else {",
+          "            pm.collectionVariables.set('tenantToken', response.token);",
+          "        }",
+          "    }",
+          "}",
+          "",
+          "// Log response for debugging",
+          "console.log('Response Status:', pm.response.status);",
+          "console.log('Response Time:', pm.response.responseTime + 'ms');"
+        ]
+      }
+    }
+  ]
+} 

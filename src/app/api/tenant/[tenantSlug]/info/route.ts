@@ -70,4 +70,4 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
     }
     throw error;
   }
-}); 
+});

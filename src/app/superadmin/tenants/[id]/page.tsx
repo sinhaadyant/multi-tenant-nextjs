@@ -19,7 +19,7 @@ import {
   Search
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { 
+import {
   useTenant, 
   useTenantUsers, 
   useTenantActivityLogs,

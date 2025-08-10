@@ -88,30 +88,76 @@ export const updateRoleSchema = createRoleSchema.partial();
 
 // Notification schemas
 export const createNotificationSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(100, 'Title must be less than 100 characters'),
-  message: z.string().min(1, 'Message is required').max(500, 'Message must be less than 500 characters'),
-  targetType: z.enum(['superadmin', 'all_tenants', 'specific_tenant']),
+  title: z.string().min(1, 'Title is required').max(255, 'Title must be less than 255 characters'),
+  message: z.string().min(1, 'Message is required').max(2000, 'Message must be less than 2000 characters'),
+  type: z.enum(['info', 'warning', 'alert', 'promotional', 'system_update'], {
+    required_error: 'Please select a notification type'
+  }),
+  priority: z.enum(['low', 'medium', 'high'], {
+    required_error: 'Please select a priority level'
+  }),
+  targetType: z.enum(['superadmin', 'specific_users', 'multiple_users', 'entire_tenant', 'multiple_tenants'], {
+    required_error: 'Please select a target type'
+  }),
   targetTenantId: z.string().optional(),
-  priority: z.enum(['low', 'medium', 'high']),
+  targetUserIds: z.array(z.string()).optional(),
+  scheduledAt: z.string().optional(),
+  attachments: z.array(z.object({
+    filename: z.string(),
+    originalName: z.string(),
+    mimeType: z.string(),
+    size: z.number(),
+    url: z.string()
+  })).optional(),
+  metadata: z.record(z.any()).optional(),
 }).refine((data) => {
-  if (data.targetType === 'specific_tenant' && !data.targetTenantId) {
+  if (data.targetType === 'entire_tenant' && !data.targetTenantId) {
+    return false;
+  }
+  if (data.targetType === 'specific_users' && (!data.targetUserIds || data.targetUserIds.length === 0)) {
+    return false;
+  }
+  if (data.targetType === 'multiple_users' && (!data.targetUserIds || data.targetUserIds.length === 0)) {
     return false;
   }
   return true;
 }, {
-  message: 'Please select a tenant',
+  message: 'Please provide required target information',
   path: ['targetTenantId']
 });
 
-// API notification schema
+export const updateNotificationSchema = createNotificationSchema.partial();
+
+export const sendNotificationSchema = z.object({
+  notificationId: z.string().min(1, 'Notification ID is required'),
+});
+
+export const notificationFiltersSchema = z.object({
+  search: z.string().optional(),
+  type: z.array(z.string()).optional(),
+  status: z.array(z.string()).optional(),
+  priority: z.array(z.string()).optional(),
+  targetType: z.array(z.string()).optional(),
+  dateRange: z.object({
+    start: z.string(),
+    end: z.string(),
+  }).optional(),
+  sortBy: z.string().optional(),
+  sortOrder: z.enum(['asc', 'desc']).optional(),
+  page: z.number().min(1).optional(),
+  limit: z.number().min(1).max(100).optional(),
+});
+
+// API notification schema (for backward compatibility)
 export const apiNotificationSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(100, 'Title must be less than 100 characters'),
-  message: z.string().min(1, 'Message is required').max(1000, 'Message must be less than 1000 characters'),
+  title: z.string().min(1, 'Title is required').max(255, 'Title must be less than 255 characters'),
+  message: z.string().min(1, 'Message is required').max(2000, 'Message must be less than 2000 characters'),
+  type: z.enum(['info', 'warning', 'alert', 'promotional', 'system_update']).default('info'),
   targetType: z.enum(['all', 'tenants', 'users', 'roles'], {
     required_error: 'Please select a target type'
   }),
   targetIds: z.array(z.string()).optional(),
-  priority: z.enum(['low', 'medium', 'high', 'urgent']).default('medium'),
+  priority: z.enum(['low', 'medium', 'high']).default('medium'),
   scheduledAt: z.string().optional(),
 });
 
@@ -193,6 +239,9 @@ export type UpdateUserData = z.infer<typeof updateUserSchema>;
 export type CreateRoleData = z.infer<typeof createRoleSchema>;
 export type UpdateRoleData = z.infer<typeof updateRoleSchema>;
 export type CreateNotificationData = z.infer<typeof createNotificationSchema>;
+export type UpdateNotificationData = z.infer<typeof updateNotificationSchema>;
+export type SendNotificationData = z.infer<typeof sendNotificationSchema>;
+export type NotificationFilters = z.infer<typeof notificationFiltersSchema>;
 export type ApiNotificationData = z.infer<typeof apiNotificationSchema>;
 export type CreateSupportTicketData = z.infer<typeof createSupportTicketSchema>;
 export type UpdateProfileData = z.infer<typeof updateProfileSchema>;

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireSuperAdmin } from '@/middleware/auth';
 import { comparePassword, hashPassword } from '@/lib/jwt';
-import { createAuditLogFromRequest } from '@/lib/audit';
 import { asyncHandler } from '@/lib/errorHandler';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
+import { withSuperAdminAuth, AuthenticatedRequest } from '@/lib/authMiddleware';
+import { requireSuperAdmin } from '@/middleware/auth';
+import { createAuditLogFromRequest } from '@/lib/audit';
 
 // GET /api/superadmin/profile - Get current SuperAdmin profile
 export const GET = asyncHandler(async (req: NextRequest) => {

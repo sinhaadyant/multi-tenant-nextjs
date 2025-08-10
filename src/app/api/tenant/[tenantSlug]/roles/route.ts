@@ -1,34 +1,66 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { asyncHandler } from '@/lib/errorHandler';
+import { NextRequest } from 'next/server';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-import { verifyToken } from '@/lib/jwt';
+import { verifyToken } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 import { createAuditLogFromRequest } from '@/lib/audit';
+import { z } from 'zod';
 
-// GET /api/tenant/[tenantSlug]/roles - Get all roles for the tenant
-export const GET = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
-  const { tenantSlug } = await params;
-  
-  // Get authorization header
-  const authHeader = req.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return createErrorResponse('Unauthorized - No token provided', 401);
-  }
+// Validation schemas
+const createRoleSchema = z.object({
+  name: z.string()
+    .min(1, 'Role name is required')
+    .max(100, 'Role name must be less than 100 characters')
+    .regex(/^[a-zA-Z0-9\s\-_]+$/, 'Role name can only contain letters, numbers, spaces, hyphens, and underscores'),
+  description: z.string()
+    .max(500, 'Description must be less than 500 characters')
+    .optional(),
+  isDefault: z.boolean().default(false),
+  color: z.string().optional(),
+  priority: z.number().int().min(0).max(100).default(0),
+  permissions: z.array(z.string()).optional()
+});
 
-  const token = authHeader.substring(7);
-  
+const updateRoleSchema = createRoleSchema.partial();
+
+export async function GET(req: NextRequest) {
   try {
-    // Verify JWT token
-    const decoded = verifyToken(token);
-    if (!decoded || !decoded.id || !decoded.tenantId) {
-      return createErrorResponse('Invalid token', 401);
+    const { searchParams } = new URL(req.url);
+    const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
+    
+    if (!tenantSlug) {
+      return createErrorResponse('Tenant slug is required', 400);
     }
 
-    // Fetch user with roles and permissions
+    // Verify authentication token
+    const token = req.headers.get('authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return createErrorResponse('No authentication token found', 401);
+    }
+
+    const decoded = await verifyToken(token);
+    if (!decoded || !decoded.id) {
+      return createErrorResponse('Invalid authentication token', 401);
+    }
+
+    // Get tenant
+    const tenant = await prisma.tenant.findUnique({
+      where: { slug: tenantSlug },
+      select: { id: true, name: true, slug: true, isActive: true }
+    });
+
+    if (!tenant) {
+      return createErrorResponse('Tenant not found', 404);
+    }
+
+    if (!tenant.isActive) {
+      return createErrorResponse('Tenant is inactive', 403);
+    }
+
+    // Verify user belongs to this tenant
     const user = await prisma.user.findFirst({
       where: {
         id: decoded.id,
-        tenantId: decoded.tenantId,
+        tenantId: tenant.id,
         isActive: true
       },
       include: {
@@ -44,112 +76,134 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
               }
             }
           }
-        },
-        tenant: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            isActive: true
-          }
         }
       }
     });
 
     if (!user) {
-      return createErrorResponse('User not found', 404);
-    }
-
-    if (!user.tenant || user.tenant.slug !== tenantSlug) {
-      return createErrorResponse('Tenant mismatch', 403);
-    }
-
-    if (!user.tenant.isActive) {
-      return createErrorResponse('Tenant is disabled', 403);
+      return createErrorResponse('User not found or not authorized for this tenant', 404);
     }
 
     // Check if user has permission to view roles
-    const hasRolePermission = user.userRoles.some(userRole =>
+    const hasViewPermission = user.userRoles.some(userRole =>
       userRole.role.permissions.some(rp => 
-        rp.permission.module === 'roles' && 
-        (rp.permission.action === 'read' || rp.permission.action === 'manage')
+        rp.permission.moduleKey === 'roles' && rp.permission.action === 'read'
       )
     );
 
-    if (!hasRolePermission) {
+    if (!hasViewPermission) {
       return createErrorResponse('Insufficient permissions to view roles', 403);
     }
 
-    // Get query parameters for pagination
-    const { searchParams } = new URL(req.url);
+    // Parse query parameters
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
     const search = searchParams.get('search') || '';
-    const skip = (page - 1) * limit;
+    const sortBy = searchParams.get('sortBy') || 'createdAt';
+    const sortOrder = searchParams.get('sortOrder') || 'desc';
+    const isActive = searchParams.get('isActive');
+    const type = searchParams.get('type'); // 'all', 'custom', 'system', 'template'
 
     // Build where clause
-    const whereClause: any = {
-      OR: [
-        { tenantId: user.tenant!.id }, // Tenant-specific roles
-        { isTemplate: true } // Global template roles from SuperAdmin
-      ],
-      isActive: true
+    const where: any = {
+      tenantId: tenant.id
     };
 
     if (search) {
-      whereClause.OR = [
+      where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } }
       ];
     }
 
+    if (isActive !== null && isActive !== undefined) {
+      where.isActive = isActive === 'true';
+    }
+
+    // Filter by type
+    if (type === 'custom') {
+      where.isSystem = false;
+      where.isTemplate = false;
+    } else if (type === 'system') {
+      where.isSystem = true;
+    } else if (type === 'template') {
+      where.isTemplate = true;
+    }
+
+    // Calculate pagination
+    const skip = (page - 1) * limit;
+
     // Fetch roles with pagination
-    const [roles, totalCount] = await Promise.all([
+    const [roles, totalRoles] = await Promise.all([
       prisma.role.findMany({
-        where: whereClause,
+        where,
         include: {
           permissions: {
             include: {
-              permission: true
+              permission: {
+                select: {
+                  id: true,
+                  name: true,
+                  description: true,
+                  moduleKey: true,
+                  moduleName: true,
+                  action: true,
+                  resource: true,
+                  category: true
+                }
+              }
+            }
+          },
+          userRoles: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true
+                }
+              }
             }
           },
           _count: {
-            select: { userRoles: true }
+            select: {
+              userRoles: true
+            }
           }
         },
-        orderBy: [
-          { isTemplate: 'asc' }, // Template roles first
-          { createdAt: 'desc' }
-        ],
+        orderBy: {
+          [sortBy]: sortOrder
+        },
         skip,
         take: limit
       }),
-      prisma.role.count({ where: whereClause })
+      prisma.role.count({ where })
     ]);
 
-    // Transform the data
+    // Transform data for response
     const transformedRoles = roles.map(role => ({
       id: role.id,
       name: role.name,
       description: role.description,
-      isTemplate: role.isTemplate,
-      isActive: role.isActive,
       isDefault: role.isDefault,
-      createdAt: role.createdAt.toISOString(),
-      updatedAt: role.updatedAt.toISOString(),
+      isTemplate: role.isTemplate,
+      isSystem: role.isSystem,
+      isActive: role.isActive,
+      color: role.color,
+      priority: role.priority,
+      createdAt: role.createdAt,
+      updatedAt: role.updatedAt,
       userCount: role._count.userRoles,
-      permissions: role.permissions.map(rp => ({
-        id: rp.permission.id,
-        name: rp.permission.name,
-        description: rp.permission.description,
-        module: rp.permission.module,
-        action: rp.permission.action
-      }))
+      permissions: role.permissions.map(rp => rp.permission),
+      assignedUsers: role.userRoles.map(ur => ur.user)
     }));
 
-    await createAuditLogFromRequest(req, { id: user.id, email: user.email, role: 'user' }, 'role.list', {
-      tenantId: user.tenant!.id,
-      rolesCount: transformedRoles.length
+    // Create audit log
+    await createAuditLogFromRequest(req, {
+      action: 'VIEW_ROLES',
+      details: `Viewed roles for tenant ${tenant.name}`,
+      tenantId: tenant.id,
+      userId: user.id
     });
 
     return createSuccessResponse({
@@ -157,40 +211,56 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
       pagination: {
         page,
         limit,
-        total: totalCount,
-        totalPages: Math.ceil(totalCount / limit)
+        total: totalRoles,
+        totalPages: Math.ceil(totalRoles / limit)
       }
-    }, 'Roles retrieved successfully');
-  } catch (error: any) {
+    });
+
+  } catch (error) {
     console.error('Error fetching roles:', error);
     return createErrorResponse('Failed to fetch roles', 500);
   }
-});
+}
 
-// POST /api/tenant/[tenantSlug]/roles - Create new role for the tenant
-export const POST = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
-  const { tenantSlug } = await params;
-  
-  // Get authorization header
-  const authHeader = req.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return createErrorResponse('Unauthorized - No token provided', 401);
-  }
-
-  const token = authHeader.substring(7);
-  
+export async function POST(req: NextRequest) {
   try {
-    // Verify JWT token
-    const decoded = verifyToken(token);
-    if (!decoded || !decoded.id || !decoded.tenantId) {
-      return createErrorResponse('Invalid token', 401);
+    const { searchParams } = new URL(req.url);
+    const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
+    
+    if (!tenantSlug) {
+      return createErrorResponse('Tenant slug is required', 400);
     }
 
-    // Fetch user with roles and permissions
+    // Verify authentication token
+    const token = req.headers.get('authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return createErrorResponse('No authentication token found', 401);
+    }
+
+    const decoded = await verifyToken(token);
+    if (!decoded || !decoded.id) {
+      return createErrorResponse('Invalid authentication token', 401);
+    }
+
+    // Get tenant
+    const tenant = await prisma.tenant.findUnique({
+      where: { slug: tenantSlug },
+      select: { id: true, name: true, slug: true, isActive: true }
+    });
+
+    if (!tenant) {
+      return createErrorResponse('Tenant not found', 404);
+    }
+
+    if (!tenant.isActive) {
+      return createErrorResponse('Tenant is inactive', 403);
+    }
+
+    // Verify user belongs to this tenant
     const user = await prisma.user.findFirst({
       where: {
         id: decoded.id,
-        tenantId: decoded.tenantId,
+        tenantId: tenant.id,
         isActive: true
       },
       include: {
@@ -206,35 +276,18 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
               }
             }
           }
-        },
-        tenant: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            isActive: true
-          }
         }
       }
     });
 
     if (!user) {
-      return createErrorResponse('User not found', 404);
-    }
-
-    if (!user.tenant || user.tenant.slug !== tenantSlug) {
-      return createErrorResponse('Tenant mismatch', 403);
-    }
-
-    if (!user.tenant.isActive) {
-      return createErrorResponse('Tenant is disabled', 403);
+      return createErrorResponse('User not found or not authorized for this tenant', 404);
     }
 
     // Check if user has permission to create roles
     const hasCreatePermission = user.userRoles.some(userRole =>
       userRole.role.permissions.some(rp => 
-        rp.permission.module === 'roles' && 
-        rp.permission.action === 'create'
+        rp.permission.moduleKey === 'roles' && rp.permission.action === 'create'
       )
     );
 
@@ -242,71 +295,46 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
       return createErrorResponse('Insufficient permissions to create roles', 403);
     }
 
-    const { name, description, permissions = [] } = await req.json();
+    // Parse and validate request body
+    const body = await req.json();
+    const validatedData = createRoleSchema.parse(body);
 
-    // Validation
-    if (!name || name.trim().length === 0) {
-      return createErrorResponse('Role name is required', 400, [
-        { field: 'name', message: 'Role name is required' }
-      ]);
-    }
-
-    if (name.trim().length < 3) {
-      return createErrorResponse('Role name must be at least 3 characters', 400, [
-        { field: 'name', message: 'Role name must be at least 3 characters' }
-      ]);
-    }
-
-    if (name.trim().length > 50) {
-      return createErrorResponse('Role name must be less than 50 characters', 400, [
-        { field: 'name', message: 'Role name must be less than 50 characters' }
-      ]);
-    }
-
-    // Check for duplicate role name within the tenant
+    // Check if role name already exists in this tenant
     const existingRole = await prisma.role.findFirst({
-      where: { 
-        name: name.trim(),
-        tenantId: user.tenant.id
+      where: {
+        name: validatedData.name,
+        tenantId: tenant.id
       }
     });
 
     if (existingRole) {
-      return createErrorResponse('Role name already exists in this tenant', 409, [
-        { field: 'name', message: 'Role name already exists in this tenant' }
-      ]);
+      return createErrorResponse('Role name already exists in this tenant', 409);
     }
 
-    // Create role with permissions in a transaction
-    const result = await prisma.$transaction(async (tx) => {
-      const role = await tx.role.create({
+    // If this is being set as default, unset other default roles
+    if (validatedData.isDefault) {
+      await prisma.role.updateMany({
+        where: {
+          tenantId: tenant.id,
+          isDefault: true
+        },
         data: {
-          name: name.trim(),
-          description: description?.trim() || null,
-          isTemplate: false, // Tenant-specific role
-          isActive: true,
-          tenantId: user.tenant.id
+          isDefault: false
         }
       });
+    }
 
-      // Assign permissions if provided
-      if (permissions && permissions.length > 0) {
-        const rolePermissions = permissions.map((permissionId: string) => ({
-          roleId: role.id,
-          permissionId
-        }));
-
-        await tx.rolePermission.createMany({
-          data: rolePermissions
-        });
-      }
-
-      return role;
-    });
-
-    // Fetch the created role with permissions
-    const createdRole = await prisma.role.findUnique({
-      where: { id: result.id },
+    // Create role
+    const role = await prisma.role.create({
+      data: {
+        name: validatedData.name,
+        description: validatedData.description,
+        isDefault: validatedData.isDefault,
+        color: validatedData.color,
+        priority: validatedData.priority,
+        tenantId: tenant.id,
+        createdBy: user.id
+      },
       include: {
         permissions: {
           include: {
@@ -314,45 +342,100 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
           }
         },
         _count: {
-          select: { userRoles: true }
+          select: {
+            userRoles: true
+          }
         }
       }
     });
 
-    if (!createdRole) {
-      throw new Error('Failed to fetch created role');
+    // Assign permissions if provided
+    if (validatedData.permissions && validatedData.permissions.length > 0) {
+      const permissionAssignments = validatedData.permissions.map(permissionId => ({
+        roleId: role.id,
+        permissionId
+      }));
+
+      await prisma.rolePermission.createMany({
+        data: permissionAssignments,
+        skipDuplicates: true
+      });
+
+      // Refresh role data with permissions
+      const roleWithPermissions = await prisma.role.findUnique({
+        where: { id: role.id },
+        include: {
+          permissions: {
+            include: {
+              permission: true
+            }
+          },
+          _count: {
+            select: {
+              userRoles: true
+            }
+          }
+        }
+      });
+
+      // Create audit log
+      await createAuditLogFromRequest(req, {
+        action: 'CREATE_ROLE',
+        details: `Created role "${role.name}" with ${validatedData.permissions.length} permissions`,
+        tenantId: tenant.id,
+        userId: user.id
+      });
+
+      return createSuccessResponse({
+        role: {
+          id: roleWithPermissions!.id,
+          name: roleWithPermissions!.name,
+          description: roleWithPermissions!.description,
+          isDefault: roleWithPermissions!.isDefault,
+          isTemplate: roleWithPermissions!.isTemplate,
+          isSystem: roleWithPermissions!.isSystem,
+          isActive: roleWithPermissions!.isActive,
+          color: roleWithPermissions!.color,
+          priority: roleWithPermissions!.priority,
+          createdAt: roleWithPermissions!.createdAt,
+          updatedAt: roleWithPermissions!.updatedAt,
+          userCount: roleWithPermissions!._count.userRoles,
+          permissions: roleWithPermissions!.permissions.map(rp => rp.permission)
+        }
+      });
     }
 
-    // Transform the data
-    const transformedRole = {
-      id: createdRole.id,
-      name: createdRole.name,
-      description: createdRole.description,
-      isTemplate: createdRole.isTemplate,
-      isActive: createdRole.isActive,
-      isDefault: createdRole.isDefault,
-      createdAt: createdRole.createdAt.toISOString(),
-      updatedAt: createdRole.updatedAt.toISOString(),
-      userCount: createdRole._count.userRoles,
-      permissions: createdRole.permissions.map(rp => ({
-        id: rp.permission.id,
-        name: rp.permission.name,
-        description: rp.permission.description,
-        module: rp.permission.module,
-        action: rp.permission.action
-      }))
-    };
-
-    await createAuditLogFromRequest(req, { id: user.id, email: user.email, role: 'user' }, 'role.create', {
-      roleId: result.id,
-      roleName: result.name,
-      tenantId: user.tenant!.id,
-      permissionsCount: permissions.length
+    // Create audit log
+    await createAuditLogFromRequest(req, {
+      action: 'CREATE_ROLE',
+      details: `Created role "${role.name}"`,
+      tenantId: tenant.id,
+      userId: user.id
     });
 
-    return createSuccessResponse({ role: transformedRole }, 'Role created successfully', 201);
-  } catch (error: any) {
+    return createSuccessResponse({
+      role: {
+        id: role.id,
+        name: role.name,
+        description: role.description,
+        isDefault: role.isDefault,
+        isTemplate: role.isTemplate,
+        isSystem: role.isSystem,
+        isActive: role.isActive,
+        color: role.color,
+        priority: role.priority,
+        createdAt: role.createdAt,
+        updatedAt: role.updatedAt,
+        userCount: role._count.userRoles,
+        permissions: role.permissions.map(rp => rp.permission)
+      }
+    });
+
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return createErrorResponse('Validation error: ' + error.errors.map(e => e.message).join(', '), 400);
+    }
     console.error('Error creating role:', error);
     return createErrorResponse('Failed to create role', 500);
   }
-}); 
+}

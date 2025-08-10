@@ -11,6 +11,7 @@ import { setLogin } from '@/store/slices/authSlice';
 import { login } from '@/services/authService';
 import { validateToken } from '@/lib/tokenValidation';
 import toast from 'react-hot-toast';
+import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 
 // Login form validation schema
 const loginSchema = z.object({
@@ -23,6 +24,11 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export default function SuperAdminLogin() {
   const router = useRouter();
   const dispatch = useAppDispatch();
+  
+  // Check if user is already authenticated and redirect if needed
+  const { shouldRedirect, isLoading: authLoading } = useAuthRedirect({
+    redirectTo: '/superadmin/dashboard'
+  });
   
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -166,6 +172,30 @@ export default function SuperAdminLogin() {
       setIsLoading(false);
     }
   };
+
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="mx-auto w-full max-w-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render the login form if user should be redirected
+  if (shouldRedirect) {
+    return (
+      <div className="mx-auto w-full max-w-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Redirecting to dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-[400px]">

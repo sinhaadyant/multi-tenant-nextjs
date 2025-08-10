@@ -68,7 +68,7 @@ export const useAuth = () => {
       
       if (response.data.success) {
         setState({
-          user: response.data.user,
+          user: response.data.data,
           isAuthenticated: true,
           isLoading: false,
           error: null
@@ -98,7 +98,7 @@ export const useAuth = () => {
       setState(prev => ({ ...prev, isLoading: true, error: null }));
 
       const endpoint = credentials.tenantSlug 
-        ? `/tenant/${credentials.tenantSlug}/auth/login`
+        ? `/tenant/auth/login`
         : '/superadmin/auth/login';
 
       const response = await api.post(endpoint, credentials);

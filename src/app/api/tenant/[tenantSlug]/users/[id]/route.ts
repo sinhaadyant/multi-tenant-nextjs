@@ -1,50 +1,32 @@
 import { NextRequest } from 'next/server';
-import { asyncHandler } from '@/lib/errorHandler';
+import { withTenantAuth, AuthenticatedRequest } from '@/lib/authMiddleware';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 import { createAuditLogFromRequest } from '@/lib/audit';
-import { verifyToken } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
+import { z } from 'zod';
 
-// GET /api/tenant/[tenantSlug]/users/[id] - Get specific user details
-export const GET = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ tenantSlug: string; id: string }> }) => {
+// Validation schemas
+const updateUserSchema = z.object({
+  name: z.string().min(1, 'Name is required').optional(),
+  email: z.string().email('Invalid email address').optional(),
+  contactNumber: z.string().optional(),
+  roleIds: z.array(z.string()).optional(),
+  isActive: z.boolean().optional()
+});
+
+// GET /api/tenant/[tenantSlug]/users/[id] - Get specific user
+export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string; id: string }> }) => {
   const { tenantSlug, id } = await params;
-  const authHeader = req.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return createErrorResponse('Unauthorized - No token provided', 401);
-  }
-
-  const token = authHeader.substring(7);
   
   try {
-    const decoded = verifyToken(token);
-    if (!decoded || !decoded.id || !decoded.tenantId) {
-      return createErrorResponse('Invalid token', 401);
-    }
+    const userId = req.user!.id;
+    const tenantId = req.user!.tenantId;
 
-    // Verify user belongs to the tenant
-    const currentUser = await prisma.user.findFirst({
-      where: {
-        id: decoded.id,
-        tenant: {
-          slug: tenantSlug,
-          isActive: true
-        }
-      },
-      include: {
-        tenant: true
-      }
-    });
-
-    if (!currentUser || !currentUser.tenant || currentUser.tenant.slug !== tenantSlug || !currentUser.tenant.isActive) {
-      return createErrorResponse('Access denied - Invalid tenant or user not found', 403);
-    }
-
-    // Fetch the requested user
+    // Find the user
     const user = await prisma.user.findFirst({
       where: {
         id,
-        tenantId: currentUser.tenant.id
+        tenantId
       },
       include: {
         userRoles: {
@@ -53,7 +35,12 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
               select: {
                 id: true,
                 name: true,
-                description: true
+                description: true,
+                permissions: {
+                  include: {
+                    module: true
+                  }
+                }
               }
             }
           }
@@ -65,109 +52,75 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
       return createErrorResponse('User not found', 404);
     }
 
-    await createAuditLogFromRequest(req, { id: currentUser.id, email: currentUser.email, role: 'user' }, 'users.view', {
-      tenantId: currentUser.tenant.id,
+    // Create audit log
+    await createAuditLogFromRequest(req, {
+      id: req.user!.id,
+      email: req.user!.email,
+      role: req.user!.role as 'user' | 'superadmin',
+      tenantId: req.user!.tenantId
+    }, 'users.view', {
       userId: user.id,
-      userEmail: user.email
+      email: user.email
     });
 
-    return createSuccessResponse({
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        isActive: user.isActive,
-        lastLogin: user.lastLogin,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-        roles: user.userRoles.map(ur => ur.role)
-      }
-    }, 'User details retrieved successfully');
+    const userData = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      isActive: user.isActive,
+      contactNumber: user.contactNumber,
+      lastLogin: user.lastLogin,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      roles: user.userRoles.map(ur => ({
+        id: ur.role.id,
+        name: ur.role.name,
+        description: ur.role.description,
+        permissions: ur.role.permissions.map(p => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          module: p.module.name,
+          action: p.action
+        }))
+      })),
+      rolesCount: user.userRoles.length
+    };
 
+    return createSuccessResponse({ user: userData }, 'User retrieved successfully');
   } catch (error: any) {
     console.error('Error fetching user:', error);
-    return createErrorResponse('Failed to fetch user details', 500);
+    return createErrorResponse('Failed to fetch user', 500);
   }
 });
 
 // PUT /api/tenant/[tenantSlug]/users/[id] - Update user
-export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ tenantSlug: string; id: string }> }) => {
+export const PUT = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string; id: string }> }) => {
   const { tenantSlug, id } = await params;
-  const authHeader = req.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return createErrorResponse('Unauthorized - No token provided', 401);
-  }
-
-  const token = authHeader.substring(7);
   
   try {
-    const decoded = verifyToken(token);
-    if (!decoded || !decoded.id || !decoded.tenantId) {
-      return createErrorResponse('Invalid token', 401);
-    }
-
-    // Verify user belongs to the tenant and has admin permissions
-    const currentUser = await prisma.user.findFirst({
-      where: {
-        id: decoded.id,
-        tenant: {
-          slug: tenantSlug,
-          isActive: true
-        }
-      },
-      include: {
-        tenant: true,
-        userRoles: {
-          include: {
-            role: {
-              include: {
-                permissions: {
-                  include: {
-                    permission: true
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    });
-
-    if (!currentUser || !currentUser.tenant || currentUser.tenant.slug !== tenantSlug || !currentUser.tenant.isActive) {
-      return createErrorResponse('Access denied - Invalid tenant or user not found', 403);
-    }
-
-    // Check if user has permission to update users
-    const canUpdateUsers = currentUser.userRoles.some(userRole =>
-      userRole.role.permissions.some(rp => 
-        rp.permission.module === 'users' && 
-        (rp.permission.action === 'update' || rp.permission.action === 'manage')
-      )
-    );
-
-    if (!canUpdateUsers) {
-      return createErrorResponse('Access denied - Insufficient permissions', 403);
-    }
-
+    const userId = req.user!.id;
+    const tenantId = req.user!.tenantId;
     const body = await req.json();
-    const { name, email, isActive, roleIds } = body;
 
-    // Check if user exists
+    // Validate request body
+    const validationResult = updateUserSchema.safeParse(body);
+    if (!validationResult.success) {
+      return createErrorResponse('Validation failed', 400, validationResult.error.errors);
+    }
+
+    const { name, email, contactNumber, roleIds, isActive } = validationResult.data;
+
+    // Find the user
     const existingUser = await prisma.user.findFirst({
       where: {
         id,
-        tenantId: currentUser.tenant.id
+        tenantId
       },
       include: {
         userRoles: {
           include: {
-            role: {
-              select: {
-                id: true,
-                name: true
-              }
-            }
+            role: true
           }
         }
       }
@@ -177,30 +130,57 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: P
       return createErrorResponse('User not found', 404);
     }
 
-    // Check if email is being changed and if it already exists
+    // Check if email is being changed and if it's already taken
     if (email && email !== existingUser.email) {
       const emailExists = await prisma.user.findFirst({
         where: {
           email,
-          tenantId: currentUser.tenant.id,
+          tenantId,
           id: { not: id }
         }
       });
 
       if (emailExists) {
-        return createErrorResponse('User with this email already exists', 409);
+        return createErrorResponse('Email already exists in this tenant', 400);
+      }
+    }
+
+    // Prevent deactivating the last admin user
+    if (isActive === false) {
+      const isAdmin = existingUser.userRoles.some(ur => 
+        ur.role.name.toLowerCase().includes('admin')
+      );
+
+      if (isAdmin) {
+        const adminCount = await prisma.user.count({
+          where: {
+            tenantId,
+            isActive: true,
+            userRoles: {
+              some: {
+                role: {
+                  name: { contains: 'Admin', mode: 'insensitive' }
+                }
+              }
+            }
+          }
+        });
+
+        if (adminCount <= 1) {
+          return createErrorResponse('Cannot deactivate the last admin user', 400);
+        }
       }
     }
 
     // Update user
-    const updateData: any = {};
-    if (name !== undefined) updateData.name = name;
-    if (email !== undefined) updateData.email = email;
-    if (isActive !== undefined) updateData.isActive = isActive;
-
     const updatedUser = await prisma.user.update({
       where: { id },
-      data: updateData,
+      data: {
+        name,
+        email,
+        contactNumber,
+        isActive
+      },
       include: {
         userRoles: {
           include: {
@@ -218,82 +198,37 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: P
 
     // Update roles if provided
     if (roleIds !== undefined) {
-      // Remove existing roles
+      // Remove existing role assignments
       await prisma.userRole.deleteMany({
         where: { userId: id }
       });
 
-      // Add new roles
+      // Assign new roles
       if (roleIds.length > 0) {
-        const userRoles = roleIds.map((roleId: string) => ({
+        const roleAssignments = roleIds.map((roleId: string) => ({
           userId: id,
           roleId
         }));
 
         await prisma.userRole.createMany({
-          data: userRoles
+          data: roleAssignments
         });
-
-        // Fetch updated user with new roles
-        const userWithRoles = await prisma.user.findUnique({
-          where: { id },
-          include: {
-            userRoles: {
-              include: {
-                role: {
-                  select: {
-                    id: true,
-                    name: true,
-                    description: true
-                  }
-                }
-              }
-            }
-          }
-        });
-
-        await createAuditLogFromRequest(req, { id: currentUser.id, email: currentUser.email, role: 'user' }, 'users.update', {
-          tenantId: currentUser.tenant.id,
-          userId: id,
-          userEmail: updatedUser.email,
-          changes: { name, email, isActive, roleIds }
-        });
-
-        return createSuccessResponse({
-          user: {
-            id: userWithRoles!.id,
-            name: userWithRoles!.name,
-            email: userWithRoles!.email,
-            isActive: userWithRoles!.isActive,
-            lastLogin: userWithRoles!.lastLogin,
-            createdAt: userWithRoles!.createdAt,
-            updatedAt: userWithRoles!.updatedAt,
-            roles: userWithRoles!.userRoles.map(ur => ur.role)
-          }
-        }, 'User updated successfully');
       }
     }
 
-    await createAuditLogFromRequest(req, { id: currentUser.id, email: currentUser.email, role: 'user' }, 'users.update', {
-      tenantId: currentUser.tenant.id,
-      userId: id,
-      userEmail: updatedUser.email,
-      changes: { name, email, isActive }
+    // Create audit log
+    await createAuditLogFromRequest(req, {
+      id: req.user!.id,
+      email: req.user!.email,
+      role: req.user!.role as 'user' | 'superadmin',
+      tenantId: req.user!.tenantId
+    }, 'users.update', {
+      userId: updatedUser.id,
+      email: updatedUser.email,
+      changes: validationResult.data
     });
 
-    return createSuccessResponse({
-      user: {
-        id: updatedUser.id,
-        name: updatedUser.name,
-        email: updatedUser.email,
-        isActive: updatedUser.isActive,
-        lastLogin: updatedUser.lastLogin,
-        createdAt: updatedUser.createdAt,
-        updatedAt: updatedUser.updatedAt,
-        roles: updatedUser.userRoles.map(ur => ur.role)
-      }
-    }, 'User updated successfully');
-
+    return createSuccessResponse({ user: updatedUser }, 'User updated successfully');
   } catch (error: any) {
     console.error('Error updating user:', error);
     return createErrorResponse('Failed to update user', 500);
@@ -301,102 +236,74 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: P
 });
 
 // DELETE /api/tenant/[tenantSlug]/users/[id] - Delete user
-export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ tenantSlug: string; id: string }> }) => {
+export const DELETE = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string; id: string }> }) => {
   const { tenantSlug, id } = await params;
-  const authHeader = req.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return createErrorResponse('Unauthorized - No token provided', 401);
-  }
-
-  const token = authHeader.substring(7);
   
   try {
-    const decoded = verifyToken(token);
-    if (!decoded || !decoded.id || !decoded.tenantId) {
-      return createErrorResponse('Invalid token', 401);
-    }
+    const userId = req.user!.id;
+    const tenantId = req.user!.tenantId;
 
-    // Verify user belongs to the tenant and has admin permissions
-    const currentUser = await prisma.user.findFirst({
+    // Find the user
+    const user = await prisma.user.findFirst({
       where: {
-        id: decoded.id,
-        tenant: {
-          slug: tenantSlug,
-          isActive: true
-        }
+        id,
+        tenantId
       },
       include: {
-        tenant: true,
         userRoles: {
           include: {
-            role: {
-              include: {
-                permissions: {
-                  include: {
-                    permission: true
-                  }
-                }
-              }
-            }
+            role: true
           }
         }
       }
     });
 
-    if (!currentUser || !currentUser.tenant || currentUser.tenant.slug !== tenantSlug || !currentUser.tenant.isActive) {
-      return createErrorResponse('Access denied - Invalid tenant or user not found', 403);
-    }
-
-    // Check if user has permission to delete users
-    const canDeleteUsers = currentUser.userRoles.some(userRole =>
-      userRole.role.permissions.some(rp => 
-        rp.permission.module === 'users' && 
-        (rp.permission.action === 'delete' || rp.permission.action === 'manage')
-      )
-    );
-
-    if (!canDeleteUsers) {
-      return createErrorResponse('Access denied - Insufficient permissions', 403);
-    }
-
-    // Prevent self-deletion
-    if (id === currentUser.id) {
-      return createErrorResponse('Cannot delete your own account', 400);
-    }
-
-    // Check if user exists
-    const userToDelete = await prisma.user.findFirst({
-      where: {
-        id,
-        tenantId: currentUser.tenant.id
-      }
-    });
-
-    if (!userToDelete) {
+    if (!user) {
       return createErrorResponse('User not found', 404);
     }
 
-    // Delete user roles first
-    await prisma.userRole.deleteMany({
+    // Prevent deleting admin users
+    const isAdmin = user.userRoles.some(ur => 
+      ur.role.name.toLowerCase().includes('admin')
+    );
+
+    if (isAdmin) {
+      return createErrorResponse('Cannot delete admin users', 400);
+    }
+
+    // Check if user has any associated data that needs to be handled
+    const hasAuditLogs = await prisma.auditLog.findFirst({
       where: { userId: id }
     });
+
+    const hasNotifications = await prisma.notification.findFirst({
+      where: { userId: id }
+    });
+
+    // For now, we'll allow deletion but log a warning if there's associated data
+    if (hasAuditLogs || hasNotifications) {
+      console.warn(`Deleting user ${id} with associated data`);
+    }
 
     // Delete user
     await prisma.user.delete({
       where: { id }
     });
 
-    await createAuditLogFromRequest(req, { id: currentUser.id, email: currentUser.email, role: 'user' }, 'users.delete', {
-      tenantId: currentUser.tenant.id,
-      userId: id,
-      userEmail: userToDelete.email
+    // Create audit log
+    await createAuditLogFromRequest(req, {
+      id: req.user!.id,
+      email: req.user!.email,
+      role: req.user!.role as 'user' | 'superadmin',
+      tenantId: req.user!.tenantId
+    }, 'users.delete', {
+      userId: user.id,
+      email: user.email
     });
 
-    return createSuccessResponse({}, 'User deleted successfully');
-
+    return createSuccessResponse({ message: 'User deleted successfully' }, 'User deleted successfully');
   } catch (error: any) {
     console.error('Error deleting user:', error);
     return createErrorResponse('Failed to delete user', 500);
   }
-}); 
+});

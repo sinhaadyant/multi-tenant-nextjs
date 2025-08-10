@@ -13,7 +13,7 @@ import {
   Building2,
   ExternalLink
 } from 'lucide-react';
-import { Tenant } from '@/hooks/useTenantsManagement';
+import { Tenant } from '@/hooks/useTenantsAPI';
 
 interface TenantCardProps {
   tenant: Tenant;
@@ -135,19 +135,19 @@ const TenantCard: React.FC<TenantCardProps> = ({
 
       {/* Content */}
       <div className="p-4 space-y-4">
-        {/* Owner Info */}
+        {/* Owner Info - Show tenant info instead since owner data is not available */}
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
             <span className="text-sm font-medium text-blue-600 dark:text-blue-300">
-              {tenant.owner.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+              {tenant.name.split(' ').map(n => n[0]).join('').toUpperCase()}
             </span>
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-              {highlightText(tenant.owner.name, searchTerm)}
+              {highlightText(tenant.name, searchTerm)}
             </p>
             <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
-              {highlightText(tenant.owner.email, searchTerm)}
+              {tenant.domain || tenant.slug}
             </p>
           </div>
         </div>
@@ -166,13 +166,13 @@ const TenantCard: React.FC<TenantCardProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <CheckCircle className="w-4 h-4 text-green-500" />
+            <Building2 className="w-4 h-4 text-blue-500" />
             <div>
               <p className="text-sm font-medium text-gray-900 dark:text-white">
-                {tenant.activeUsers}
+                {tenant.plan}
               </p>
               <p className="text-xs text-gray-600 dark:text-gray-400">
-                Active Users
+                Plan
               </p>
             </div>
           </div>

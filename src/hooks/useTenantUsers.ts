@@ -110,6 +110,21 @@ const toggleUserStatus = async (tenantSlug: string, userId: string, isActive: bo
   return response.data;
 };
 
+const exportUsers = async (tenantSlug: string, filters: any): Promise<Blob> => {
+  const searchParams = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      searchParams.append(key, value.toString());
+    }
+  });
+  searchParams.append('format', 'csv');
+
+  const response = await api.get(`/tenant/${tenantSlug}/users/export?${searchParams.toString()}`, {
+    responseType: 'blob'
+  });
+  return response.data;
+};
+
 // React Query hooks
 export const useTenantUsers = (
   tenantSlug: string,
@@ -234,6 +249,26 @@ export const useToggleUserStatus = (tenantSlug: string) => {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to update user status');
+    }
+  });
+};
+
+export const useExportUsers = (tenantSlug: string) => {
+  return useMutation({
+    mutationFn: (filters: any) => exportUsers(tenantSlug, filters),
+    onSuccess: (blob) => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `users-${tenantSlug}-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('Users exported successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to export users');
     }
   });
 }; 

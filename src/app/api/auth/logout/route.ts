@@ -1,32 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { asyncHandler } from '@/lib/errorHandler';
-import { createSuccessResponse } from '@/lib/apiResponse';
-import { withAuth, AuthenticatedRequest } from '@/lib/authMiddleware';
 
-// POST /api/auth/logout - Logout current user
-export const POST = withAuth(async (req: AuthenticatedRequest) => {
+export async function POST(request: NextRequest) {
   try {
-    // In a real application, you might want to:
-    // 1. Add the token to a blacklist
-    // 2. Update user's last logout time
-    // 3. Clear refresh tokens
-    // 4. Log the logout event
-    
-    if (req.user) {
-      // Log logout event (optional)
-      console.log(`User ${req.user.email} logged out`);
-    }
+    // Clear all authentication data
+    const response = NextResponse.json(
+      { success: true, message: 'Logged out successfully' },
+      { status: 200 }
+    );
 
-    return createSuccessResponse({
-      message: 'Logged out successfully'
-    }, 'Logout successful');
+    // Clear cookies
+    response.cookies.delete('auth_token');
+    response.cookies.delete('refresh_token');
+    response.cookies.delete('superadmin_token');
+    response.cookies.delete('tenant_token');
 
-  } catch (error: any) {
-    console.error('Error during logout:', error);
-    // Even if there's an error, we still return success
-    // because the client will clear local data anyway
-    return createSuccessResponse({
-      message: 'Logged out successfully'
-    }, 'Logout successful');
+    return response;
+  } catch (error) {
+    console.error('Logout error:', error);
+    return NextResponse.json(
+      { success: false, message: 'Logout failed' },
+      { status: 500 }
+    );
   }
-}, { requireAuth: false }); // Allow logout even without valid token 
+}
+
+export async function GET(request: NextRequest) {
+  return POST(request);
+} 

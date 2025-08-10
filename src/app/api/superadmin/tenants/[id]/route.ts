@@ -60,6 +60,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
         domain: tenant.domain,
         description: tenant.description,
         isActive: tenant.isActive,
+        status: tenant.isActive ? 'active' : 'suspended', // Transform isActive to status
         plan: tenant.plan,
         region: tenant.region,
         features: tenant.features ? JSON.parse(tenant.features) : [],
@@ -100,7 +101,7 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: P
 
     if (!existingTenant) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Tenant not found for update:', params.id);
+        console.log('❌ Tenant not found:', id);
       }
       return createErrorResponse(
         'Tenant not found',
@@ -108,58 +109,37 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: P
       );
     }
 
-    // Check if slug is being updated and if it already exists
-    if (updateData.slug && updateData.slug !== existingTenant.slug) {
-      const slugExists = await prisma.tenant.findUnique({
-        where: { slug: updateData.slug }
-      });
-
-      if (slugExists) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('❌ Tenant slug already exists:', updateData.slug);
-        }
-        return createErrorResponse(
-          'Tenant slug already exists',
-          409,
-          [{ field: 'slug', message: 'Tenant slug already exists' }]
-        );
-      }
-    }
+    // Prepare update data
+    const dataToUpdate: any = {};
+    
+    if (updateData.name !== undefined) dataToUpdate.name = updateData.name;
+    if (updateData.slug !== undefined) dataToUpdate.slug = updateData.slug;
+    if (updateData.domain !== undefined) dataToUpdate.domain = updateData.domain;
+    if (updateData.description !== undefined) dataToUpdate.description = updateData.description;
+    if (updateData.plan !== undefined) dataToUpdate.plan = updateData.plan;
+    if (updateData.region !== undefined) dataToUpdate.region = updateData.region;
+    if (updateData.features !== undefined) dataToUpdate.features = JSON.stringify(updateData.features);
 
     // Update tenant
     const updatedTenant = await prisma.tenant.update({
-      where: { id: params.id },
-      data: {
-        name: updateData.name,
-        slug: updateData.slug,
-        domain: updateData.domain,
-        description: updateData.description,
-        isActive: updateData.isActive,
-        plan: updateData.plan,
-        region: updateData.region,
-        features: Array.isArray(updateData.features) ? JSON.stringify(updateData.features) : updateData.features
-      },
-      include: {
-        _count: {
-          select: { users: true }
-        }
-      }
+      where: { id },
+      data: dataToUpdate
     });
 
     // Create audit log
     await createAuditLogFromRequest(
       req,
       authResult,
-      'tenant.update',
+      'tenant.updated',
       {
-        tenantId: params.id,
-        tenantName: updatedTenant.name,
-        changes: updateData
+        tenantId: id,
+        tenantName: existingTenant.name,
+        changes: dataToUpdate
       }
     );
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('✅ Tenant updated successfully');
+      console.log('✅ Tenant updated successfully:', updatedTenant.name);
     }
 
     return createSuccessResponse({
@@ -170,12 +150,12 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: P
         domain: updatedTenant.domain,
         description: updatedTenant.description,
         isActive: updatedTenant.isActive,
+        status: updatedTenant.isActive ? 'active' : 'suspended', // Transform isActive to status
         plan: updatedTenant.plan,
         region: updatedTenant.region,
         features: updatedTenant.features ? JSON.parse(updatedTenant.features) : [],
         createdAt: updatedTenant.createdAt,
-        updatedAt: updatedTenant.updatedAt,
-        userCount: updatedTenant._count.users
+        updatedAt: updatedTenant.updatedAt
       }
     }, 'Tenant updated successfully');
   } catch (error) {
@@ -186,10 +166,11 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: P
   }
 });
 
-// DELETE /api/superadmin/tenants/[id] - Soft delete tenant
-export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+// DELETE /api/superadmin/tenants/[id] - Delete tenant
+export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+  const { id } = await params;
   if (process.env.NODE_ENV === 'development') {
-    console.log('🏢 Soft deleting tenant:', params.id);
+    console.log('🏢 Deleting tenant:', id);
   }
 
   // Authenticate SuperAdmin
@@ -201,12 +182,12 @@ export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params
   try {
     // Check if tenant exists
     const existingTenant = await prisma.tenant.findUnique({
-      where: { id: params.id }
+      where: { id }
     });
 
     if (!existingTenant) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Tenant not found for deletion:', params.id);
+        console.log('❌ Tenant not found:', id);
       }
       return createErrorResponse(
         'Tenant not found',
@@ -214,39 +195,39 @@ export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params
       );
     }
 
-    // Soft delete tenant (set isActive to false)
-    const deletedTenant = await prisma.tenant.update({
-      where: { id: params.id },
-      data: { isActive: false }
+    // Delete tenant and all related data in a transaction
+    await prisma.$transaction(async (tx) => {
+      // Delete all users in the tenant
+      await tx.user.deleteMany({
+        where: { tenantId: id }
+      });
+
+      // Delete the tenant
+      await tx.tenant.delete({
+        where: { id }
+      });
     });
 
     // Create audit log
     await createAuditLogFromRequest(
       req,
       authResult,
-      'tenant.delete',
+      'tenant.deleted',
       {
-        tenantId: params.id,
-        tenantName: deletedTenant.name
+        tenantId: id,
+        tenantName: existingTenant.name
       }
     );
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('✅ Tenant soft deleted successfully');
+      console.log('✅ Tenant deleted successfully:', existingTenant.name);
     }
 
-    return createSuccessResponse({
-      tenant: {
-        id: deletedTenant.id,
-        name: deletedTenant.name,
-        slug: deletedTenant.slug,
-        isActive: deletedTenant.isActive
-      }
-    }, 'Tenant deleted successfully');
+    return createSuccessResponse({}, 'Tenant deleted successfully');
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
       console.error('❌ Error deleting tenant:', error);
     }
     throw error;
   }
-}); 
+});

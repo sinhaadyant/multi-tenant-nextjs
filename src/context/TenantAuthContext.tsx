@@ -86,7 +86,9 @@ export const TenantAuthProvider: React.FC<TenantAuthProviderProps> = ({ children
 
       const token = localStorage.getItem('auth_token') || sessionStorage.getItem('access_token');
       if (!token) {
-        throw new Error('No authentication token found');
+        // Don't throw error if no token - just set loading to false
+        setIsLoading(false);
+        return;
       }
 
       const response = await axios.get(`/api/tenant/${tenantSlug}/me`, {
@@ -105,7 +107,10 @@ export const TenantAuthProvider: React.FC<TenantAuthProviderProps> = ({ children
         throw new Error(response.data.message || 'Failed to fetch user profile');
       }
     } catch (err: any) {
-      console.error('Error fetching user profile:', err);
+      // Only log error in development and if it's not a 401 (which is expected when not logged in)
+      if (process.env.NODE_ENV === 'development' && err.response?.status !== 401) {
+        console.error('Error fetching user profile:', err);
+      }
       setError(err.response?.data?.message || err.message || 'Failed to fetch user profile');
       
       // If unauthorized, redirect to login

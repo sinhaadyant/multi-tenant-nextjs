@@ -78,10 +78,12 @@ export async function POST(req: NextRequest) {
         tenantId: tenant.id,
       });
 
-      // Return success message even if user not found (security best practice)
-      return createSuccessResponse({
-        message: 'If an account with this email exists, password reset instructions have been sent.'
-      });
+      // Return error for user not found (matching superadmin behavior)
+      return createErrorResponse(
+        'User not found. Please check your email address.',
+        404,
+        [{ field: 'email', message: 'User not found. Please check your email address.' }]
+      );
     }
 
     const successMessage = 'Password reset instructions have been sent to your email.';

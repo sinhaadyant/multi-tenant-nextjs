@@ -12,6 +12,18 @@ export const setStore = (storeInstance: { dispatch: (action: { type: string }) =
 const getAuthToken = (): string | null => {
   try {
     if (typeof window !== 'undefined') {
+      // Check for tenant auth token first
+      const tenantToken = localStorage.getItem('tenant_auth_token');
+      if (tenantToken && isValidToken(tenantToken)) {
+        return tenantToken;
+      }
+      
+      // Check for superadmin token
+      const superadminToken = localStorage.getItem('superadmin_token');
+      if (superadminToken && isValidToken(superadminToken)) {
+        return superadminToken;
+      }
+      
       // Primary: Get from localStorage (where simpleStorage stores it)
       const localToken = localStorage.getItem('auth_token');
       if (localToken && isValidToken(localToken)) {
@@ -30,8 +42,14 @@ const getAuthToken = (): string | null => {
         try {
           const parsed = JSON.parse(persistedState);
           const authData = parsed.auth ? JSON.parse(parsed.auth) : null;
+          const tenantAuthData = parsed.tenantAuth ? JSON.parse(parsed.tenantAuth) : null;
+          
           if (authData?.token && isValidToken(authData.token)) {
             return authData.token;
+          }
+          
+          if (tenantAuthData?.token && isValidToken(tenantAuthData.token)) {
+            return tenantAuthData.token;
           }
         } catch (parseError) {
           if (process.env.NODE_ENV === 'development') {
@@ -211,7 +229,10 @@ api.interceptors.request.use(
           console.log('🔐 Adding auth token to request:', config.url);
         }
       } else {
-        if (process.env.NODE_ENV === 'development') {
+        // Only log in development and only for non-public endpoints
+        if (process.env.NODE_ENV === 'development' && 
+            !config.url?.includes('/public') && 
+            !config.url?.includes('/auth/login')) {
           console.log('⚠️ No auth token found for request:', config.url);
         }
       }
@@ -273,7 +294,7 @@ api.interceptors.response.use(
     }
     
     // Handle server errors
-    if (error.response?.status >= 500) {
+    if (error.response?.status && error.response.status >= 500) {
       toast.error('Server error. Please try again later.');
     }
     
