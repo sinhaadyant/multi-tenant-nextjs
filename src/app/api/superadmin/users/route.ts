@@ -54,7 +54,29 @@ export const GET = asyncHandler(async (req: NextRequest) => {
 
   // Build order by clause
   const orderBy: any = {};
-  orderBy[sortBy] = sortOrder;
+  
+  // Map frontend field names to database field names
+  const fieldMapping: Record<string, string> = {
+    status: 'isActive',
+    name: 'name',
+    email: 'email',
+    tenant: 'tenantId',
+    role: 'id', // Can't sort by role directly, use id as fallback
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt',
+    lastLogin: 'lastLogin'
+  };
+  
+  // Handle special sorting cases
+  if (sortBy === 'role') {
+    // For role sorting, we need to sort by the first role name
+    // This is a complex case that might need a different approach
+    console.warn('Role sorting is not fully supported - using user ID as fallback');
+    orderBy.id = sortOrder;
+  } else {
+    const dbField = fieldMapping[sortBy] || sortBy;
+    orderBy[dbField] = sortOrder;
+  }
 
   try {
     // Get users with pagination and statistics in parallel
@@ -66,7 +88,11 @@ export const GET = asyncHandler(async (req: NextRequest) => {
         orderBy,
         include: {
           tenant: { select: { name: true, slug: true } },
-          role: { select: { name: true, description: true } }
+          userRoles: {
+            include: {
+              role: { select: { name: true, description: true } }
+            }
+          }
         }
       }),
       prisma.user.count({ where }),
@@ -97,11 +123,11 @@ export const GET = asyncHandler(async (req: NextRequest) => {
           name: user.tenant.name,
           slug: user.tenant.slug
         } : null,
-        role: user.role ? {
-          id: user.roleId,
-          name: user.role.name,
-          description: user.role.description
-        } : null
+        roles: user.userRoles.map(userRole => ({
+          id: userRole.role.id,
+          name: userRole.role.name,
+          description: userRole.role.description
+        }))
       })),
       stats: {
         total: totalCount,

@@ -87,7 +87,7 @@ export const GET = asyncHandler(async (req: NextRequest) => {
     const roleStats = await prisma.role.findMany({
       include: {
         _count: {
-          select: { users: true }
+          select: { userRoles: true }
         }
       },
       where: {
@@ -194,8 +194,8 @@ export const GET = asyncHandler(async (req: NextRequest) => {
       })),
       roleDistribution: roleStats.map(role => ({
         role: role.name,
-        count: role._count.users,
-        percentage: Math.round((role._count.users / totalUsers) * 100)
+        count: role._count.userRoles,
+        percentage: Math.round((role._count.userRoles / totalUsers) * 100)
       })),
       activityBreakdown: recentActivityBreakdown.map(activity => ({
         action: activity.action,

@@ -2,7 +2,8 @@
 
 import type React from "react";
 import { createContext, useState, useContext, useEffect, useCallback } from "react";
-import { storage } from "@/lib/localStorage";
+import { simpleStorage } from "@/lib/simpleStorage";
+
 
 type Theme = "light" | "dark";
 
@@ -44,7 +45,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
     if (typeof window !== 'undefined') {
       try {
         // First check localStorage
-        const savedTheme = storage.getTheme() as Theme;
+        const savedTheme = localStorage.getItem('theme') as Theme || null;
         
         let initialTheme: Theme;
         
@@ -70,7 +71,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   // Save theme to localStorage and apply to DOM when theme changes
   useEffect(() => {
     if (isInitialized) {
-      storage.setTheme(theme);
+      localStorage.setItem('theme', theme);
       applyThemeToDOM(theme);
       
       // Sync with user preferences API if authenticated
@@ -85,7 +86,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
       
       const handleSystemThemeChange = (e: MediaQueryListEvent) => {
         // Only apply system theme if user hasn't explicitly set a preference
-        const userHasPreference = storage.getTheme();
+        const userHasPreference = localStorage.getItem('theme') || null;
         if (!userHasPreference) {
           const systemTheme: Theme = e.matches ? "dark" : "light";
           setThemeState(systemTheme);
@@ -100,14 +101,14 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   // Function to sync theme with server-side user preferences
   const syncThemeWithServer = async (newTheme: Theme) => {
     try {
-      const authUser = storage.getAuthUser();
+      const authUser = simpleStorage.getAuthUser();
       if (authUser?.id) {
         // Update user preferences on the server
         await fetch('/api/user/preferences', {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${storage.getAuthToken()}`,
+            'Authorization': `Bearer ${simpleStorage.getAuthToken()}`,
           },
           body: JSON.stringify({ theme: newTheme }),
         });
@@ -130,7 +131,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   const syncWithUserPreferences = useCallback((userTheme?: Theme) => {
     if (userTheme && (userTheme === "light" || userTheme === "dark")) {
       setThemeState(userTheme);
-      storage.setTheme(userTheme);
+      simpleStorage.setTheme(userTheme);
       applyThemeToDOM(userTheme);
     }
   }, [applyThemeToDOM]);

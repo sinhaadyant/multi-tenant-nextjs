@@ -67,31 +67,6 @@ const TenantCard: React.FC<TenantCardProps> = ({
     }
   };
 
-  const getPlanConfig = (plan: string) => {
-    switch (plan) {
-      case 'enterprise':
-        return {
-          className: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
-          label: 'Enterprise'
-        };
-      case 'professional':
-        return {
-          className: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-          label: 'Professional'
-        };
-      case 'starter':
-        return {
-          className: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300',
-          label: 'Starter'
-        };
-      default:
-        return {
-          className: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300',
-          label: plan
-        };
-    }
-  };
-
   const highlightText = (text: string, searchTerm: string) => {
     if (!searchTerm) return text;
     
@@ -116,7 +91,6 @@ const TenantCard: React.FC<TenantCardProps> = ({
   };
 
   const statusConfig = getStatusConfig(tenant.status);
-  const planConfig = getPlanConfig(tenant.plan);
 
   return (
     <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border transition-all duration-200 hover:shadow-md ${
@@ -154,9 +128,6 @@ const TenantCard: React.FC<TenantCardProps> = ({
             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusConfig.className}`}>
               {statusConfig.icon}
               <span className="ml-1">{statusConfig.label}</span>
-            </span>
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${planConfig.className}`}>
-              {planConfig.label}
             </span>
           </div>
         </div>

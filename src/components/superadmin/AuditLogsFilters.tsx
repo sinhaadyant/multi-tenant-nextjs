@@ -8,13 +8,15 @@ interface AuditLogsFiltersProps {
   onFiltersChange: (filters: Partial<AuditLogFilters>) => void;
   onClearFilters: () => void;
   loading?: boolean;
+  hideTenantFilter?: boolean;
 }
 
 const AuditLogsFilters: React.FC<AuditLogsFiltersProps> = ({
   filters,
   onFiltersChange,
   onClearFilters,
-  loading = false
+  loading = false,
+  hideTenantFilter = false
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [localFilters, setLocalFilters] = useState<Partial<AuditLogFilters>>({});
@@ -180,27 +182,29 @@ const AuditLogsFilters: React.FC<AuditLogsFiltersProps> = ({
             </div>
 
             {/* Tenant Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                <Building2 className="w-4 h-4 inline mr-1" />
-                Tenant
-              </label>
-              <select
-                value={localFilters.tenantName || ''}
-                onChange={(e) => handleFilterChange('tenantName', e.target.value)}
-                disabled={tenantsLoading}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value="">
-                  {tenantsLoading ? 'Loading tenants...' : tenantsError ? 'Error loading tenants' : `All Tenants (${tenants.length})`}
-                </option>
-                {!tenantsError && tenants.map((tenant) => (
-                  <option key={tenant.id} value={tenant.name}>
-                    {tenant.name}
+            {!hideTenantFilter && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <Building2 className="w-4 h-4 inline mr-1" />
+                  Tenant
+                </label>
+                <select
+                  value={localFilters.tenantName || ''}
+                  onChange={(e) => handleFilterChange('tenantName', e.target.value)}
+                  disabled={tenantsLoading}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">
+                    {tenantsLoading ? 'Loading tenants...' : tenantsError ? 'Error loading tenants' : `All Tenants (${tenants.length})`}
                   </option>
-                ))}
-              </select>
-            </div>
+                  {!tenantsError && tenants.map((tenant) => (
+                    <option key={tenant.id} value={tenant.name}>
+                      {tenant.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Custom Date Range */}
             {(localFilters.startDate || localFilters.endDate) && (
@@ -302,7 +306,7 @@ const AuditLogsFilters: React.FC<AuditLogsFiltersProps> = ({
                     </button>
                   </span>
                 )}
-                {localFilters.tenantName && (
+                {!hideTenantFilter && localFilters.tenantName && (
                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400">
                     Tenant: {localFilters.tenantName}
                     <button

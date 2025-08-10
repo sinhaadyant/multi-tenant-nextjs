@@ -27,9 +27,6 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    // Always return success message for security (don't reveal if email exists)
-    const successMessage = 'If an account with this email exists, password reset instructions have been sent.';
-
     if (!superAdmin) {
       // Create audit log for failed attempt
       await createAuditLog({
@@ -39,8 +36,15 @@ export async function POST(req: NextRequest) {
         userAgent: req.headers.get('user-agent') || 'unknown',
       });
 
-      return createSuccessResponse({ message: successMessage });
+      // Return error for user not found
+      return createErrorResponse(
+        'User not found. Please check your email address.',
+        404,
+        [{ field: 'email', message: 'User not found. Please check your email address.' }]
+      );
     }
+
+    const successMessage = 'Password reset instructions have been sent to your email.';
 
     // Generate secure reset token
     const resetToken = crypto.randomBytes(32).toString('hex');

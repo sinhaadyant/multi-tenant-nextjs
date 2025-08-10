@@ -6,9 +6,10 @@ import { asyncHandler } from '@/lib/errorHandler';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 
 // GET /api/superadmin/tenants/[id] - Get specific tenant
-export const GET = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+export const GET = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+  const { id } = await params;
   if (process.env.NODE_ENV === 'development') {
-    console.log('🏢 Fetching tenant details:', params.id);
+    console.log('🏢 Fetching tenant details:', id);
   }
 
   // Authenticate SuperAdmin
@@ -19,7 +20,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
 
   try {
     const tenant = await prisma.tenant.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         users: {
           select: {
@@ -39,7 +40,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
 
     if (!tenant) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Tenant not found:', params.id);
+        console.log('❌ Tenant not found:', id);
       }
       return createErrorResponse(
         'Tenant not found',
@@ -77,9 +78,10 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
 });
 
 // PUT /api/superadmin/tenants/[id] - Update tenant
-export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+  const { id } = await params;
   if (process.env.NODE_ENV === 'development') {
-    console.log('🏢 Updating tenant:', params.id);
+    console.log('🏢 Updating tenant:', id);
   }
 
   // Authenticate SuperAdmin
@@ -93,7 +95,7 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: {
   try {
     // Check if tenant exists
     const existingTenant = await prisma.tenant.findUnique({
-      where: { id: params.id }
+      where: { id }
     });
 
     if (!existingTenant) {

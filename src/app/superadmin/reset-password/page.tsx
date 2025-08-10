@@ -2,284 +2,141 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
-import { Shield, Eye, EyeOff, Loader2, CheckCircle } from 'lucide-react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { resetPassword } from '@/services/authService';
+import { notFound } from 'next/navigation';
+import ResetPasswordClient from './ResetPasswordClient';
+import axios from 'axios';
 
-// Reset password form validation schema
-const resetPasswordSchema = z.object({
-  newPassword: z
-    .string()
-    .min(8, 'Password must be at least 8 characters long')
-    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-    .regex(/\d/, 'Password must contain at least one number'),
-  confirmPassword: z.string(),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
+interface TokenValidation {
+  isValid: boolean;
+  email?: string;
+  error?: string;
+}
 
-type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
-
-export default function ResetPassword() {
+export default function ResetPasswordPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [token, setToken] = useState<string | null>(null);
+  const [tokenValidation, setTokenValidation] = useState<TokenValidation | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    watch,
-  } = useForm<ResetPasswordFormData>({
-    resolver: zodResolver(resetPasswordSchema),
-  });
-
-  const newPassword = watch('newPassword');
+  const token = searchParams.get('token');
 
   useEffect(() => {
-    const urlToken = searchParams.get('token');
-    if (!urlToken) {
-      setError('Invalid reset link. Please request a new password reset.');
-      return;
-    }
-    setToken(urlToken);
-  }, [searchParams]);
-
-  const onSubmit = async (data: ResetPasswordFormData) => {
     if (!token) {
-      setError('Invalid reset token');
+      setTokenValidation({ isValid: false, error: 'No token provided' });
+      setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
+    validateToken(token);
+  }, [token]);
 
+  const validateToken = async (token: string) => {
     try {
-      const response = await resetPassword(token, data.newPassword, data.confirmPassword);
+      console.log('🔍 Validating token with axios:', token);
+      
+      const response = await axios.get(`/api/superadmin/auth/verify-reset-token`, {
+        params: { token },
+        timeout: 10000 // 10 second timeout
+      });
 
-      if (response.success) {
-        setSuccess(true);
-        setTimeout(() => {
-          router.push('/superadmin/login?message=password-reset-success');
-        }, 2000);
+      console.log('🔍 Axios response:', response.data);
+
+      if (response.data.success) {
+        console.log('✅ Token is valid');
+        setTokenValidation({
+          isValid: true,
+          email: response.data.data.email
+        });
       } else {
-        setError(response.message);
+        console.log('❌ Token is invalid:', response.data.message);
+        setTokenValidation({
+          isValid: false,
+          error: response.data.message || 'Invalid or expired reset token'
+        });
       }
-    } catch (err) {
-      setError('Network error. Please check your connection and try again.');
+    } catch (error: any) {
+      console.log('❌ Token validation error:', error);
+      
+      let errorMessage = 'Failed to verify reset token';
+      if (error.response) {
+        // Server responded with error status
+        errorMessage = error.response.data?.message || errorMessage;
+      } else if (error.request) {
+        // Request was made but no response received
+        errorMessage = 'Network error - no response from server';
+      } else {
+        // Something else happened
+        errorMessage = error.message || errorMessage;
+      }
+      
+      setTokenValidation({
+        isValid: false,
+        error: errorMessage
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (success) {
+  // Debug logging
+  console.log('🔍 Current state:', {
+    isLoading,
+    tokenValidation,
+    token,
+    shouldRenderClient: tokenValidation?.isValid && tokenValidation.email && token
+  });
+
+  if (isLoading) {
+    console.log('🔄 Rendering loading state');
     return (
       <div className="flex flex-col flex-1 w-full">
         <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto space-y-8">
           <div className="text-center">
-            <div className="mt-6 flex justify-center">
-              <CheckCircle className="h-16 w-16 text-green-500" />
-            </div>
-            <h2 className="mt-4 text-3xl font-bold text-gray-900 dark:text-white">
-              Password Updated Successfully
-            </h2>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Your password has been successfully updated. You can now log in with your new password.
-            </p>
-            <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-              Redirecting to login page...
-            </p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600 dark:text-gray-400">Verifying reset token...</p>
           </div>
         </div>
       </div>
     );
   }
 
-  if (!token && error) {
+  // Only render ResetPasswordClient if token is valid and we have an email
+  if (tokenValidation?.isValid && tokenValidation.email && token) {
+    console.log('✅ Rendering ResetPasswordClient - token is valid');
     return (
-      <div className="flex flex-col flex-1 w-full">
-        <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto space-y-8">
-          <div className="text-center">
-            <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-full mb-4 shadow-sm">
-              <Shield className="w-6 h-6 text-white" />
-            </div>
-            <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90 sm:text-3xl">
-              Invalid Reset Link
-            </h1>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              {error}
-            </p>
-            <div className="mt-6">
-              <Link
-                href="/superadmin/forgot-password"
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Request New Reset Link
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
+      <ResetPasswordClient 
+        token={token} 
+        email={tokenValidation.email} 
+      />
     );
   }
 
+  // Show error for invalid token
+  console.log('❌ Rendering error page - token is invalid or missing');
   return (
     <div className="flex flex-col flex-1 w-full">
-      <div className="w-full max-w-md sm:pt-10 mx-auto mb-5">
-        <Link
-          href="/superadmin/login"
-          className="inline-flex items-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-        >
-          ← Back to login
-        </Link>
-      </div>
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto space-y-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full mb-4 shadow-sm">
-            <Shield className="w-6 h-6 text-white" />
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-full mb-4 shadow-sm">
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
           </div>
-          
           <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90 sm:text-3xl">
-            Reset Your Password
+            Invalid Reset URL
           </h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Enter your new password to secure your account
+            {tokenValidation?.error || 'This reset link is invalid or has expired.'}
           </p>
+          <div className="mt-6">
+            <button
+              onClick={() => router.push('/superadmin/forgot-password')}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Request New Reset Link
+            </button>
+          </div>
         </div>
-
-        {/* Reset Password Form */}
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
-          <div>
-            <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              New Password
-            </label>
-            <div className="relative mt-1">
-              <input
-                {...register('newPassword')}
-                type={showPassword ? 'text' : 'password'}
-                id="newPassword"
-                className={`block w-full px-3 py-2 pr-10 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white ${
-                  errors.newPassword ? 'border-red-300' : 'border-gray-300'
-                }`}
-                placeholder="Enter your new password"
-                disabled={isLoading}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
-              >
-                {showPassword ? (
-                  <EyeOff className="h-5 w-5 text-gray-400" />
-                ) : (
-                  <Eye className="h-5 w-5 text-gray-400" />
-                )}
-              </button>
-            </div>
-            {errors.newPassword && (
-              <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                {errors.newPassword.message}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Confirm New Password
-            </label>
-            <div className="relative mt-1">
-              <input
-                {...register('confirmPassword')}
-                type={showConfirmPassword ? 'text' : 'password'}
-                id="confirmPassword"
-                className={`block w-full px-3 py-2 pr-10 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white ${
-                  errors.confirmPassword ? 'border-red-300' : 'border-gray-300'
-                }`}
-                placeholder="Confirm your new password"
-                disabled={isLoading}
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
-              >
-                {showConfirmPassword ? (
-                  <EyeOff className="h-5 w-5 text-gray-400" />
-                ) : (
-                  <Eye className="h-5 w-5 text-gray-400" />
-                )}
-              </button>
-            </div>
-            {errors.confirmPassword && (
-              <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                {errors.confirmPassword.message}
-              </p>
-            )}
-          </div>
-
-          {/* Password Strength Indicator */}
-          {newPassword && (
-            <div className="space-y-2">
-              <div className="text-sm text-gray-600 dark:text-gray-400">Password strength:</div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className={`${newPassword.length >= 8 ? 'text-green-600' : 'text-red-600'}`}>
-                  ✓ At least 8 characters
-                </div>
-                <div className={`${/[A-Z]/.test(newPassword) ? 'text-green-600' : 'text-red-600'}`}>
-                  ✓ One uppercase letter
-                </div>
-                <div className={`${/\d/.test(newPassword) ? 'text-green-600' : 'text-red-600'}`}>
-                  ✓ One number
-                </div>
-                <div className={`${/[a-z]/.test(newPassword) ? 'text-green-600' : 'text-red-600'}`}>
-                  ✓ One lowercase letter
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Error Message */}
-          {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={isLoading || !token}
-            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-blue-600 dark:hover:bg-blue-700"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5" />
-                Updating Password...
-              </>
-            ) : (
-              'Update Password'
-            )}
-          </button>
-        </form>
       </div>
     </div>
   );

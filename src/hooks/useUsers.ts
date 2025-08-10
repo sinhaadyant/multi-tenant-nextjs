@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { toast } from 'react-hot-toast';
-import localStorageUtil from '@/lib/localStorage';
+
 
 export interface User {
   id: string;
@@ -78,23 +78,10 @@ export const useUsers = (filters: UserFilters = {}) => {
         }
       });
 
-      const cacheKey = `users_${params.toString()}`;
-      
-      // Check cache first
-      const cachedData = localStorageUtil.getCached(cacheKey);
-      if (cachedData) {
-        return cachedData;
-      }
-
       const response = await api.get(`/superadmin/users?${params.toString()}`);
-      const data = response.data;
-      
-      // Cache the response
-      localStorageUtil.cache(cacheKey, data, 2 * 60 * 1000); // 2 minutes
-      
-      return data;
+      return response.data;
     },
-    staleTime: 2 * 60 * 1000, // 2 minutes
+
     retry: (failureCount, error: any) => {
       // Don't retry on 401/403 errors
       if (error?.response?.status === 401 || error?.response?.status === 403) {
@@ -110,24 +97,10 @@ export const useUser = (id: string) => {
   return useQuery({
     queryKey: ['user', id],
     queryFn: async () => {
-      const cacheKey = `user_${id}`;
-      
-      // Check cache first
-      const cachedData = localStorageUtil.getCached(cacheKey);
-      if (cachedData) {
-        return cachedData;
-      }
-
       const response = await api.get(`/superadmin/users/${id}`);
-      const user = response.data.data.user;
-      
-      // Cache the user data
-      localStorageUtil.cache(cacheKey, user, 5 * 60 * 1000); // 5 minutes
-      
-      return user;
+      return response.data.data.user;
     },
     enabled: !!id,
-    staleTime: 5 * 60 * 1000,
   });
 };
 

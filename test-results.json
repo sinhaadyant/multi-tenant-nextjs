@@ -1,0 +1,203 @@
+{
+  "summary": {
+    "total": 32,
+    "passed": 16,
+    "failed": 16,
+    "successRate": "50.0"
+  },
+  "results": [
+    {
+      "test": "TechCorp admin - Login",
+      "status": "PASS",
+      "details": "Successfully logged in to http://localhost:3000/techcorp/dashboard",
+      "timestamp": "2025-08-10T12:49:41.104Z"
+    },
+    {
+      "test": "TechCorp admin - Dashboard Access",
+      "status": "FAIL",
+      "details": "Dashboard title not found",
+      "timestamp": "2025-08-10T12:49:41.161Z"
+    },
+    {
+      "test": "TechCorp admin - Module Access",
+      "status": "FAIL",
+      "details": "Missing modules: Notifications",
+      "timestamp": "2025-08-10T12:49:47.530Z"
+    },
+    {
+      "test": "TechCorp admin - Permissions",
+      "status": "FAIL",
+      "details": "1/3 permission tests passed",
+      "timestamp": "2025-08-10T12:50:02.629Z"
+    },
+    {
+      "test": "TechCorp manager - Login",
+      "status": "PASS",
+      "details": "Successfully logged in to http://localhost:3000/techcorp/dashboard",
+      "timestamp": "2025-08-10T12:50:18.929Z"
+    },
+    {
+      "test": "TechCorp manager - Dashboard Access",
+      "status": "FAIL",
+      "details": "Error: Waiting for selector `h1, .dashboard, main, [data-testid=\"dashboard\"]` failed: Waiting failed: 15000ms exceeded",
+      "timestamp": "2025-08-10T12:50:33.980Z"
+    },
+    {
+      "test": "TechCorp manager - Module Navigation",
+      "status": "FAIL",
+      "details": "Navigation menu not found",
+      "timestamp": "2025-08-10T12:50:39.102Z"
+    },
+    {
+      "test": "TechCorp manager - Permissions",
+      "status": "FAIL",
+      "details": "0/2 permission tests passed",
+      "timestamp": "2025-08-10T12:50:39.113Z"
+    },
+    {
+      "test": "TechCorp user - Login",
+      "status": "PASS",
+      "details": "Successfully logged in to http://localhost:3000/techcorp/dashboard",
+      "timestamp": "2025-08-10T12:50:51.147Z"
+    },
+    {
+      "test": "TechCorp user - Dashboard Access",
+      "status": "FAIL",
+      "details": "Dashboard title not found",
+      "timestamp": "2025-08-10T12:50:51.466Z"
+    },
+    {
+      "test": "TechCorp user - Module Access",
+      "status": "PASS",
+      "details": "All expected modules found: Dashboard, Reports & Analytics, Analytics, Content Management, Notifications",
+      "timestamp": "2025-08-10T12:50:57.730Z"
+    },
+    {
+      "test": "TechCorp user - Permissions",
+      "status": "PASS",
+      "details": "1/1 permission tests passed",
+      "timestamp": "2025-08-10T12:50:57.774Z"
+    },
+    {
+      "test": "TechCorp viewer - Login",
+      "status": "PASS",
+      "details": "Successfully logged in to http://localhost:3000/techcorp/dashboard",
+      "timestamp": "2025-08-10T12:51:06.840Z"
+    },
+    {
+      "test": "TechCorp viewer - Dashboard Access",
+      "status": "FAIL",
+      "details": "Dashboard title not found",
+      "timestamp": "2025-08-10T12:51:06.881Z"
+    },
+    {
+      "test": "TechCorp viewer - Module Access",
+      "status": "PASS",
+      "details": "All expected modules found: Dashboard, Reports & Analytics, Analytics, Content Management, Notifications",
+      "timestamp": "2025-08-10T12:51:13.041Z"
+    },
+    {
+      "test": "TechCorp viewer - Permissions",
+      "status": "PASS",
+      "details": "1/1 permission tests passed",
+      "timestamp": "2025-08-10T12:51:13.074Z"
+    },
+    {
+      "test": "GlobalRetail admin - Login",
+      "status": "PASS",
+      "details": "Successfully logged in to http://localhost:3000/globalretail/dashboard",
+      "timestamp": "2025-08-10T12:51:29.220Z"
+    },
+    {
+      "test": "GlobalRetail admin - Dashboard Access",
+      "status": "FAIL",
+      "details": "Dashboard title not found",
+      "timestamp": "2025-08-10T12:51:29.830Z"
+    },
+    {
+      "test": "GlobalRetail admin - Module Access",
+      "status": "FAIL",
+      "details": "Missing modules: Settings",
+      "timestamp": "2025-08-10T12:51:35.916Z"
+    },
+    {
+      "test": "GlobalRetail admin - Permissions",
+      "status": "FAIL",
+      "details": "1/3 permission tests passed",
+      "timestamp": "2025-08-10T12:51:39.896Z"
+    },
+    {
+      "test": "GlobalRetail manager - Login",
+      "status": "PASS",
+      "details": "Successfully logged in to http://localhost:3000/globalretail/dashboard",
+      "timestamp": "2025-08-10T12:51:51.255Z"
+    },
+    {
+      "test": "GlobalRetail manager - Dashboard Access",
+      "status": "FAIL",
+      "details": "Dashboard title not found",
+      "timestamp": "2025-08-10T12:51:51.384Z"
+    },
+    {
+      "test": "GlobalRetail manager - Module Access",
+      "status": "FAIL",
+      "details": "Missing modules: Settings",
+      "timestamp": "2025-08-10T12:51:57.778Z"
+    },
+    {
+      "test": "GlobalRetail manager - Permissions",
+      "status": "FAIL",
+      "details": "1/2 permission tests passed",
+      "timestamp": "2025-08-10T12:52:02.488Z"
+    },
+    {
+      "test": "GlobalRetail user - Login",
+      "status": "PASS",
+      "details": "Successfully logged in to http://localhost:3000/globalretail/dashboard",
+      "timestamp": "2025-08-10T12:52:10.732Z"
+    },
+    {
+      "test": "GlobalRetail user - Dashboard Access",
+      "status": "FAIL",
+      "details": "Dashboard title not found",
+      "timestamp": "2025-08-10T12:52:10.827Z"
+    },
+    {
+      "test": "GlobalRetail user - Module Access",
+      "status": "PASS",
+      "details": "All expected modules found: Dashboard, Reports & Analytics, Analytics, Content Management, Notifications",
+      "timestamp": "2025-08-10T12:52:17.323Z"
+    },
+    {
+      "test": "GlobalRetail user - Permissions",
+      "status": "PASS",
+      "details": "1/1 permission tests passed",
+      "timestamp": "2025-08-10T12:52:17.345Z"
+    },
+    {
+      "test": "GlobalRetail viewer - Login",
+      "status": "PASS",
+      "details": "Successfully logged in to http://localhost:3000/globalretail/dashboard",
+      "timestamp": "2025-08-10T12:52:24.383Z"
+    },
+    {
+      "test": "GlobalRetail viewer - Dashboard Access",
+      "status": "FAIL",
+      "details": "Dashboard title not found",
+      "timestamp": "2025-08-10T12:52:24.436Z"
+    },
+    {
+      "test": "GlobalRetail viewer - Module Access",
+      "status": "PASS",
+      "details": "All expected modules found: Dashboard, Reports & Analytics, Analytics, Content Management, Notifications",
+      "timestamp": "2025-08-10T12:52:30.065Z"
+    },
+    {
+      "test": "GlobalRetail viewer - Permissions",
+      "status": "PASS",
+      "details": "1/1 permission tests passed",
+      "timestamp": "2025-08-10T12:52:30.072Z"
+    }
+  ],
+  "timestamp": "2025-08-10T12:52:31.718Z"
+}

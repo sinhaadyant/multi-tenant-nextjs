@@ -10,6 +10,7 @@ import { Eye, EyeOff, Check, X, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
 
 import { createTenantSchema, CreateTenantData } from '@/lib/validations/superadmin';
+import { useCheckEmail } from '@/hooks/useTenantsAPI';
 
 type CreateTenantFormData = CreateTenantData;
 
@@ -65,6 +66,10 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [subdomainChecking, setSubdomainChecking] = useState(false);
   const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null);
+  const [emailChecking, setEmailChecking] = useState(false);
+  const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     control,
@@ -87,6 +92,77 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
   });
 
   const watchedSubdomain = watch('subdomain');
+  const watchedEmail = watch('adminEmail');
+
+  // Email validation hook
+  const checkEmailMutation = useCheckEmail();
+
+  // Clear form error when user starts making changes
+  useEffect(() => {
+    if (formError) {
+      setFormError(null);
+    }
+  }, [watchedSubdomain, watchedEmail, formError]);
+
+  // Check email availability
+  useEffect(() => {
+    const checkEmail = async () => {
+      if (!watchedEmail || watchedEmail.length < 5 || !watchedEmail.includes('@')) {
+        setEmailAvailable(null);
+        setEmailError(null);
+        return;
+      }
+
+      setEmailChecking(true);
+      setEmailError(null);
+      
+      try {
+        const result = await checkEmailMutation.mutateAsync({ email: watchedEmail });
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('📧 Email validation response:', {
+            email: watchedEmail,
+            result,
+            available: result.data.available,
+            existsIn: result.data.existsIn,
+            details: result.data.details,
+            tenantName: result.data.details?.tenantName
+          });
+        }
+        
+        if (result.data.available) {
+          setEmailAvailable(true);
+          setEmailError(null);
+          clearErrors('adminEmail');
+        } else {
+          setEmailAvailable(false);
+          let errorMessage = 'Email is not available';
+          
+          if (result.data.existsIn === 'tenant') {
+            errorMessage = `Email is already registered in tenant: ${result.data.details.tenantName || 'Unknown'}`;
+          } else if (result.data.existsIn === 'superadmin') {
+            errorMessage = 'Email is already registered as a SuperAdmin';
+          }
+          
+          setEmailError(errorMessage);
+          setError('adminEmail', { message: errorMessage });
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log('📧 Email validation error set:', errorMessage);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking email:', error);
+        setEmailAvailable(false);
+        setEmailError('Error checking email availability');
+      } finally {
+        setEmailChecking(false);
+      }
+    };
+
+    const debounceTimer = setTimeout(checkEmail, 500);
+    return () => clearTimeout(debounceTimer);
+  }, [watchedEmail, setError, clearErrors, checkEmailMutation]);
 
   // Check subdomain availability
   useEffect(() => {
@@ -158,20 +234,60 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
       return response.data;
     },
     onSuccess: (data) => {
+      setFormError(null); // Clear any previous form errors
       toast.success('Tenant and Admin User created successfully!');
       onSuccess(data);
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.message || 'Failed to create tenant';
-      toast.error(errorMessage);
+      // Log detailed error in development
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Tenant creation error:', error);
+        console.error('Error response:', error.response?.data);
+      }
+      
+      // Show user-friendly error message in form
+      let errorMessage = 'Failed to create tenant. Please try again.';
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.status === 409) {
+        errorMessage = 'A tenant with this subdomain already exists.';
+      } else if (error.response?.status === 400) {
+        errorMessage = 'Please check your input and try again.';
+      } else if (error.response?.status >= 500) {
+        errorMessage = 'Server error. Please try again later.';
+      }
+      
+      setFormError(errorMessage);
     }
   });
 
   const onSubmit = (data: any) => {
+    // Custom validation for subdomain and email availability
+    let hasErrors = false;
+    
     if (subdomainAvailable !== true) {
-      toast.error('Please ensure subdomain is available before submitting');
+      setError('subdomain', { 
+        message: subdomainAvailable === false 
+          ? 'This subdomain is already taken' 
+          : 'Please check subdomain availability' 
+      });
+      hasErrors = true;
+    }
+    
+    if (emailAvailable !== true) {
+      setError('adminEmail', { 
+        message: emailAvailable === false 
+          ? emailError || 'Email is not available'
+          : 'Please check email availability' 
+      });
+      hasErrors = true;
+    }
+    
+    if (hasErrors) {
       return;
     }
+    
     createTenantMutation.mutate(data);
   };
 
@@ -200,6 +316,16 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
       <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-8">
+        {/* Form Error Display */}
+        {formError && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <div className="flex items-center">
+              <X className="w-5 h-5 text-red-500 mr-2" />
+              <p className="text-sm text-red-700 dark:text-red-300">{formError}</p>
+            </div>
+          </div>
+        )}
+        
         {/* Tenant Information Section */}
         <div className="space-y-6">
           <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
@@ -285,27 +411,26 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
                     </div>
                   )}
                 />
-                {subdomainChecking && (
-                  <div className="absolute right-2 top-2">
+                <div className="absolute right-16 top-2">
+                  {subdomainChecking && (
                     <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                  </div>
-                )}
-                {subdomainAvailable === true && (
-                  <div className="absolute right-2 top-2">
+                  )}
+                  {subdomainAvailable === true && (
                     <Check className="w-4 h-4 text-green-500" />
-                  </div>
-                )}
-                {subdomainAvailable === false && (
-                  <div className="absolute right-2 top-2">
+                  )}
+                  {subdomainAvailable === false && (
                     <X className="w-4 h-4 text-red-500" />
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
               {errors.subdomain && (
                 <p className="mt-1 text-sm text-red-500">{errors.subdomain.message}</p>
               )}
               {subdomainAvailable === true && (
                 <p className="mt-1 text-sm text-green-500">Subdomain is available</p>
+              )}
+              {subdomainAvailable === false && (
+                <p className="mt-1 text-sm text-red-500">Subdomain is not available</p>
               )}
             </div>
 
@@ -482,22 +607,41 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Email <span className="text-red-500">*</span>
               </label>
-              <Controller
-                name="adminEmail"
-                control={control}
-                render={({ field }) => (
-                  <input
-                    {...field}
-                    type="email"
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
-                      errors.adminEmail ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="Enter email address"
-                  />
-                )}
-              />
+              <div className="relative">
+                <Controller
+                  name="adminEmail"
+                  control={control}
+                  render={({ field }) => (
+                    <input
+                      {...field}
+                      type="email"
+                      className={`w-full px-3 py-2 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
+                        errors.adminEmail ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Enter email address"
+                    />
+                  )}
+                />
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  {emailChecking && (
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                  )}
+                  {emailAvailable === true && !emailChecking && (
+                    <Check className="w-4 h-4 text-green-500" />
+                  )}
+                  {emailAvailable === false && !emailChecking && (
+                    <X className="w-4 h-4 text-red-500" />
+                  )}
+                </div>
+              </div>
               {errors.adminEmail && (
                 <p className="mt-1 text-sm text-red-500">{errors.adminEmail.message}</p>
+              )}
+              {emailError && !errors.adminEmail && (
+                <p className="mt-1 text-sm text-red-500">{emailError}</p>
+              )}
+              {emailAvailable === true && !emailChecking && !errors.adminEmail && !emailError && (
+                <p className="mt-1 text-sm text-green-500">Email is available</p>
               )}
             </div>
 
@@ -634,7 +778,7 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
           </button>
           <button
             type="submit"
-            disabled={isSubmitting || createTenantMutation.isPending || subdomainAvailable !== true}
+            disabled={isSubmitting || createTenantMutation.isPending || subdomainAvailable !== true || emailAvailable !== true}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
           >
             {(isSubmitting || createTenantMutation.isPending) && (

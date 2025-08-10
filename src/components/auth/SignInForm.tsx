@@ -10,10 +10,10 @@ import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons";
 import { loginSchema, LoginFormData } from '@/lib/validations';
-import { authService } from '@/services/authService';
+import { login, LoginResponse } from '@/services/authService';
 import { useAppDispatch } from '@/store/hooks';
-import { loginSuccess } from '@/store/slices/authSlice';
-import { storage } from '@/lib/localStorage';
+import { setLogin } from '@/store/slices/authSlice';
+import { simpleStorage } from '@/lib/simpleStorage';
 import toast from 'react-hot-toast';
 import Link from "next/link";
 
@@ -33,46 +33,41 @@ export default function SignInForm({ superAdmin }: { superAdmin?: boolean }) {
 
   // Login mutation
   const loginMutation = useMutation({
-    mutationFn: (data: LoginFormData) => {
-      console.log('🔐 Attempting login with:', { email: data.email, password: data.password ? '[HIDDEN]' : 'undefined' });
-      return authService.login(data);
+    mutationFn: (data: LoginFormData): Promise<LoginResponse> => {
+      return login(data);
     },
-    onSuccess: (response) => {
-      console.log('✅ Login successful:', response);
-      if (response.success) {
+    onSuccess: (response: LoginResponse) => {
+      if (response.success && response.data) {
         try {
-          console.log('🔐 Storing auth data...');
           // Store auth data using storage utility
-          const tokenStored = storage.setAuthToken(response.data.token);
-          const userStored = storage.setAuthUser(response.data.user);
-          
-          console.log('🔐 Auth data stored:', { tokenStored, userStored });
+          simpleStorage.setAuthToken(response.data.token);
+          simpleStorage.setAuthUser(response.data.user);
           
           // Update Redux state
-          dispatch(loginSuccess({
+          dispatch(setLogin({
             user: response.data.user,
             token: response.data.token,
+            refreshToken: response.data.refreshToken || '',
+            email: response.data.user.email,
           }));
 
-          console.log('🔐 Redux state updated');
           toast.success('Login successful!');
           
           // Redirect based on user role
           if (response.data.user.role === 'superadmin') {
-            console.log('🔐 Redirecting to superadmin dashboard');
             router.push('/superadmin/dashboard');
           } else {
-            console.log('🔐 Redirecting to regular dashboard');
             router.push('/dashboard');
           }
         } catch (error) {
-          console.error('❌ Error storing auth data:', error);
+          if (process.env.NODE_ENV === 'development') {
+            console.error('❌ Error storing auth data:', error);
+          }
           toast.error('Login successful but failed to save session. Please try again.');
         }
       }
     },
     onError: (error: any) => {
-      console.error('❌ Login error:', error);
       const errorMessage = error.response?.data?.message || 'Login failed';
       toast.error(errorMessage);
     },

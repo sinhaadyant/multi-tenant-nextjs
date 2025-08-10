@@ -52,8 +52,10 @@ export const GET = asyncHandler(async (req: NextRequest) => {
         tenant: {
           select: { name: true, slug: true }
         },
-        role: {
-          select: { name: true, description: true }
+        userRoles: {
+          include: {
+            role: { select: { name: true, description: true } }
+          }
         }
       },
       orderBy: { createdAt: 'desc' }
@@ -78,7 +80,7 @@ export const GET = asyncHandler(async (req: NextRequest) => {
       user.email,
       user.isActive ? 'Active' : 'Inactive',
       user.tenant?.name || 'No Tenant',
-      user.role?.name || 'No Role',
+      user.userRoles.length > 0 ? user.userRoles[0].role.name : 'No Role',
       user.lastLogin ? new Date(user.lastLogin).toISOString() : 'Never',
       new Date(user.createdAt).toISOString(),
       new Date(user.updatedAt).toISOString()

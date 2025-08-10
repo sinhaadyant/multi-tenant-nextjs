@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback } from 'react';
 import { useTheme } from '@/context/ThemeContext';
-import { storage } from '@/lib/localStorage';
+import { simpleStorage } from '@/lib/simpleStorage';
 
 /**
  * Hook to sync theme preferences with server-side user preferences
@@ -13,8 +13,8 @@ export const useThemeSync = () => {
   // Load user preferences from server on login
   const loadUserPreferences = useCallback(async () => {
     try {
-      const authToken = storage.getAuthToken();
-      const authUser = storage.getAuthUser();
+      const authToken = simpleStorage.getAuthToken();
+      const authUser = simpleStorage.getAuthUser();
       
       if (!authToken || !authUser?.id) {
         return;
@@ -32,8 +32,8 @@ export const useThemeSync = () => {
         const userTheme = data.data?.preferences?.theme;
         
         if (userTheme && (userTheme === 'light' || userTheme === 'dark')) {
-          // Only sync if the server theme is different from local theme
-          const localTheme = storage.getTheme();
+                  // Only sync if the server theme is different from local theme
+        const localTheme = simpleStorage.getTheme();
           if (localTheme !== userTheme) {
             syncWithUserPreferences(userTheme);
           }
@@ -47,8 +47,8 @@ export const useThemeSync = () => {
   // Save theme to server
   const saveThemeToServer = useCallback(async (themeToSave: string) => {
     try {
-      const authToken = storage.getAuthToken();
-      const authUser = storage.getAuthUser();
+      const authToken = simpleStorage.getAuthToken();
+      const authUser = simpleStorage.getAuthUser();
       
       if (!authToken || !authUser?.id) {
         return;
@@ -70,7 +70,7 @@ export const useThemeSync = () => {
   // Load preferences when component mounts and user is authenticated
   useEffect(() => {
     if (isInitialized) {
-      const authUser = storage.getAuthUser();
+      const authUser = simpleStorage.getAuthUser();
       if (authUser?.id) {
         loadUserPreferences();
       }

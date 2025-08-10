@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { storage } from '@/lib/localStorage';
+import { simpleStorage } from '@/lib/simpleStorage';
 
 export interface SupportTicket {
   id: string;
@@ -80,7 +80,7 @@ export const useSupportTickets = (filters: SupportTicketFilters) => {
   return useQuery({
     queryKey: ['support-tickets', filters],
     queryFn: async (): Promise<SupportTicketResponse> => {
-      const token = storage.getToken();
+      const token = simpleStorage.getAuthToken();
       const params = new URLSearchParams();
       
       Object.entries(filters).forEach(([key, value]) => {

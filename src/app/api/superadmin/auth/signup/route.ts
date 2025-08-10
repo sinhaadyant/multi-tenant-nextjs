@@ -74,40 +74,40 @@ export const POST = asyncHandler(async (req: NextRequest) => {
       );
     }
 
-                  // Normalize email
-              const normalizedEmail = email.toLowerCase().trim();
+    // Normalize email
+    const normalizedEmail = email.toLowerCase().trim();
 
-              // Check if SuperAdmin already exists
-              const existingSuperAdmin = await prisma.superAdmin.findUnique({
-                where: { email: normalizedEmail }
-              });
+    // Check if SuperAdmin already exists
+    const existingSuperAdmin = await prisma.superAdmin.findUnique({
+      where: { email: normalizedEmail }
+    });
 
-              if (existingSuperAdmin) {
-                if (process.env.NODE_ENV === 'development') {
-                  console.log('❌ SuperAdmin already exists:', normalizedEmail);
-                }
-                return createErrorResponse(
-                  'SuperAdmin account already exists',
-                  409,
-                  [{ field: 'email', message: 'SuperAdmin account already exists' }]
-                );
-              }
+    if (existingSuperAdmin) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('❌ SuperAdmin already exists:', normalizedEmail);
+      }
+      return createErrorResponse(
+        'SuperAdmin account already exists',
+        409,
+        [{ field: 'email', message: 'SuperAdmin account already exists' }]
+      );
+    }
 
-              // Hash password
-              const hashedPassword = await hashPassword(password);
+    // Hash password
+    const hashedPassword = await hashPassword(password);
 
-              // Create SuperAdmin and mark token as used in a transaction
-              const result = await prisma.$transaction(async (tx) => {
-                // Create SuperAdmin
-                const superAdmin = await tx.superAdmin.create({
-                  data: {
-                    name: name.trim(),
-                    email: normalizedEmail,
-                    password: hashedPassword,
-                    contactNumber: contactNumber.trim(),
-                    isActive: true
-                  }
-                });
+    // Create SuperAdmin and mark token as used in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Create SuperAdmin
+      const superAdmin = await tx.superAdmin.create({
+        data: {
+          name: name.trim(),
+          email: normalizedEmail,
+          password: hashedPassword,
+          contactNumber: contactNumber.trim(),
+          isActive: true
+        }
+      });
 
       // Mark invite token as used
       await tx.inviteToken.update({

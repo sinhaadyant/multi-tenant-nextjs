@@ -57,26 +57,84 @@ export const GET = asyncHandler(async (req: NextRequest) => {
 
   // Build order by clause
   const orderBy: any = {};
-  orderBy[sortBy] = sortOrder;
+  
+  // Map frontend field names to database field names
+  const fieldMapping: Record<string, string> = {
+    status: 'isActive',
+    name: 'name',
+    slug: 'slug',
+    domain: 'domain',
+    plan: 'plan',
+    region: 'region',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+  
+  // Handle special cases for computed fields
+  if (sortBy === 'userCount') {
+    // For userCount, we need to sort by the count of related users
+    // Use a different approach with aggregation
+    const dbField = 'createdAt'; // Default fallback for initial query
+    orderBy[dbField] = 'desc';
+  } else {
+    const dbField = fieldMapping[sortBy] || sortBy;
+    orderBy[dbField] = sortOrder;
+  }
 
   try {
-    // Get tenants with pagination and statistics in parallel
-    const [tenants, totalCount, stats] = await Promise.all([
-      prisma.tenant.findMany({
+    let tenants;
+    let totalCount;
+    let stats;
+
+    // Handle userCount sorting differently
+    if (sortBy === 'userCount') {
+      // Get all tenants with user counts for sorting
+      const allTenants = await prisma.tenant.findMany({
         where,
-        skip,
-        take: limit,
-        orderBy,
         include: {
           _count: { select: { users: true } }
         }
-      }),
-      prisma.tenant.count({ where }),
-      prisma.tenant.groupBy({
+      });
+
+      // Sort by userCount in memory
+      allTenants.sort((a, b) => {
+        const aCount = a._count.users;
+        const bCount = b._count.users;
+        return sortOrder === 'asc' ? aCount - bCount : bCount - aCount;
+      });
+
+      // Apply pagination
+      const startIndex = skip;
+      const endIndex = skip + limit;
+      tenants = allTenants.slice(startIndex, endIndex);
+      totalCount = allTenants.length;
+    } else {
+      // Regular sorting for database fields
+      [tenants, totalCount, stats] = await Promise.all([
+        prisma.tenant.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy,
+          include: {
+            _count: { select: { users: true } }
+          }
+        }),
+        prisma.tenant.count({ where }),
+        prisma.tenant.groupBy({
+          by: ['isActive'],
+          _count: { id: true }
+        })
+      ]);
+    }
+
+    // Get stats if not already computed
+    if (!stats) {
+      stats = await prisma.tenant.groupBy({
         by: ['isActive'],
         _count: { id: true }
-      })
-    ]);
+      });
+    }
 
     const activeCount = stats.find(s => s.isActive)?._count.id || 0;
     const inactiveCount = stats.find(s => !s.isActive)?._count.id || 0;
@@ -182,6 +240,43 @@ export const POST = asyncHandler(async (req: NextRequest) => {
       );
     }
 
+    // Check if admin email already exists in users table
+    const existingUser = await prisma.user.findFirst({
+      where: { email: adminEmail.toLowerCase() },
+      include: {
+        tenant: {
+          select: { name: true, slug: true }
+        }
+      }
+    });
+
+    if (existingUser) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('❌ Admin email already exists in tenant:', existingUser.tenant?.name);
+      }
+      return createErrorResponse(
+        `Email is already registered in tenant: ${existingUser.tenant?.name || 'Unknown'}`,
+        409,
+        [{ field: 'admin.email', message: `Email is already registered in tenant: ${existingUser.tenant?.name || 'Unknown'}` }]
+      );
+    }
+
+    // Check if admin email already exists in superadmin table
+    const existingSuperAdmin = await prisma.superAdmin.findFirst({
+      where: { email: adminEmail.toLowerCase() }
+    });
+
+    if (existingSuperAdmin) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('❌ Admin email already exists as SuperAdmin');
+      }
+      return createErrorResponse(
+        'Email is already registered as a SuperAdmin',
+        409,
+        [{ field: 'admin.email', message: 'Email is already registered as a SuperAdmin' }]
+      );
+    }
+
     // Create tenant and admin user in a transaction
     const result = await prisma.$transaction(async (tx) => {
       // Create tenant
@@ -195,7 +290,7 @@ export const POST = asyncHandler(async (req: NextRequest) => {
           region: region || 'US East',
           features: Array.isArray(features) ? JSON.stringify(features) : JSON.stringify(features || ['analytics', 'api', 'sso']),
           isActive: isActive !== undefined ? isActive : true,
-          metadata: metadata || {}
+          metadata: typeof metadata === 'object' ? JSON.stringify(metadata) : (metadata || '{}')
         }
       });
 

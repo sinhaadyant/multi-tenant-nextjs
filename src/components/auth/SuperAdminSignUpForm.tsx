@@ -11,7 +11,7 @@ import Button from '@/components/ui/button/Button';
 import { signupSchema, SignupFormData, passwordStrength } from '@/lib/validations';
 import { authService } from '@/services/authService';
 import { useAppDispatch } from '@/store/hooks';
-import { loginSuccess } from '@/store/slices/authSlice';
+import { setLogin } from '@/store/slices/authSlice';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
@@ -65,9 +65,11 @@ export default function SuperAdminSignUpForm({ token, inviteEmail }: SuperAdminS
         localStorage.setItem('auth_user', JSON.stringify(response.data.user));
         
         // Update Redux state
-        dispatch(loginSuccess({
+        dispatch(setLogin({
           user: response.data.user,
           token: response.data.token,
+          refreshToken: response.data.refreshToken || '',
+          email: response.data.user.email,
         }));
 
         toast.success('Account created successfully!');

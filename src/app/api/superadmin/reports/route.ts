@@ -20,10 +20,9 @@ const listReportsSchema = z.object({
   limit: z.string().transform(Number).pipe(z.number().min(1).max(100)).optional(),
   search: z.string().optional(),
   reportType: z.string().optional(),
-  status: z.enum(['generating', 'ready', 'failed']).optional(),
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
-  sortBy: z.enum(['createdAt', 'reportType', 'status', 'generatedBy']).optional(),
+  sortBy: z.enum(['createdAt', 'name', 'type']).optional(),
   sortOrder: z.enum(['asc', 'desc']).optional()
 });
 
@@ -51,7 +50,6 @@ export const GET = asyncHandler(async (req: NextRequest) => {
     limit = 10,
     search,
     reportType,
-    status,
     dateFrom,
     dateTo,
     sortBy = 'createdAt',
@@ -60,23 +58,19 @@ export const GET = asyncHandler(async (req: NextRequest) => {
 
   // Build where clause
   const where: any = {
-    generatedBy: superAdmin.id
+    superAdminId: superAdmin.id
   };
 
   if (search) {
     where.OR = [
-      { reportType: { contains: search } },
-      { fileName: { contains: search } },
-      { generatedBy: { name: { contains: search } } }
+      { name: { contains: search } },
+      { type: { contains: search } },
+      { superAdmin: { name: { contains: search } } }
     ];
   }
 
   if (reportType) {
-    where.reportType = reportType;
-  }
-
-  if (status) {
-    where.status = status;
+    where.type = reportType;
   }
 
   if (dateFrom || dateTo) {
@@ -95,11 +89,13 @@ export const GET = asyncHandler(async (req: NextRequest) => {
       prisma.report.findMany({
         where,
         include: {
-          generatedBy: {
+          superAdmin: {
             select: { name: true, email: true }
           }
         },
-        orderBy: { [sortBy]: sortOrder },
+        orderBy: { 
+          [sortBy === 'reportType' ? 'type' : sortBy]: sortOrder 
+        },
         skip: (page - 1) * limit,
         take: limit
       }),
@@ -157,20 +153,21 @@ export const POST = asyncHandler(async (req: NextRequest) => {
     // Create report record
     const report = await prisma.report.create({
       data: {
-        reportType: validatedData.reportType,
-        dateFrom: new Date(validatedData.dateFrom),
-        dateTo: new Date(validatedData.dateTo),
+        name: `${validatedData.reportType}_${new Date().toISOString().split('T')[0]}`,
+        type: validatedData.reportType,
+        data: JSON.stringify({
+          dateFrom: validatedData.dateFrom,
+          dateTo: validatedData.dateTo,
+          format: validatedData.format,
+          filters: validatedData.filters || {}
+        }),
         tenantId: validatedData.tenantId,
-        format: validatedData.format,
-        filters: validatedData.filters || {},
-        status: 'generating',
-        fileName: `${validatedData.reportType}_${new Date().toISOString().split('T')[0]}.${validatedData.format}`,
-        generatedBy: {
+        superAdmin: {
           connect: { id: superAdmin.id }
         }
       },
       include: {
-        generatedBy: {
+        superAdmin: {
           select: { name: true, email: true }
         }
       }

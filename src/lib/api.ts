@@ -1,6 +1,5 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
 import toast from 'react-hot-toast';
-import { storage } from './localStorage';
 
 // We'll need to access the store for logout action
 let store: { dispatch: (action: { type: string }) => void } | null = null;
@@ -12,27 +11,43 @@ export const setStore = (storeInstance: { dispatch: (action: { type: string }) =
 // Token management utilities
 const getAuthToken = (): string | null => {
   try {
-    // First try to get from sessionStorage (where we store it)
     if (typeof window !== 'undefined') {
-      const sessionToken = sessionStorage.getItem('access_token');
-      if (sessionToken) {
-        return sessionToken;
-      }
-      
-      // Fallback to localStorage
-      const localToken = storage.getAuthToken();
-      if (localToken) {
+      // Primary: Get from localStorage (where simpleStorage stores it)
+      const localToken = localStorage.getItem('auth_token');
+      if (localToken && isValidToken(localToken)) {
         return localToken;
       }
       
-      // Check Redux persist state
+      // Fallback: Check sessionStorage
+      const sessionToken = sessionStorage.getItem('access_token');
+      if (sessionToken && isValidToken(sessionToken)) {
+        return sessionToken;
+      }
+      
+      // Fallback: Check Redux persist state
       const persistedState = localStorage.getItem('persist:superadmin-root');
       if (persistedState) {
-        const parsed = JSON.parse(persistedState);
-        const authData = parsed.auth ? JSON.parse(parsed.auth) : null;
-        if (authData?.token) {
-          return authData.token;
+        try {
+          const parsed = JSON.parse(persistedState);
+          const authData = parsed.auth ? JSON.parse(parsed.auth) : null;
+          if (authData?.token && isValidToken(authData.token)) {
+            return authData.token;
+          }
+        } catch (parseError) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('Error parsing Redux persist state:', parseError);
+          }
+          // Clear corrupted persisted state
+          localStorage.removeItem('persist:superadmin-root');
         }
+      }
+      
+      // If we found invalid tokens, clear them
+      if (localToken && !isValidToken(localToken)) {
+        localStorage.removeItem('auth_token');
+      }
+      if (sessionToken && !isValidToken(sessionToken)) {
+        sessionStorage.removeItem('access_token');
       }
     }
     
@@ -47,7 +62,6 @@ const getAuthToken = (): string | null => {
 
 const clearAuthData = () => {
   try {
-    storage.clearAuth();
     if (typeof window !== 'undefined') {
       // Clear all possible token locations
       sessionStorage.removeItem('access_token');
@@ -74,6 +88,53 @@ const isTokenExpired = (token: string): boolean => {
     return payload.exp < currentTime;
   } catch (error) {
     return true;
+  }
+};
+
+const isValidToken = (token: string): boolean => {
+  try {
+    // Check if token has the correct format (3 parts separated by dots)
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return false;
+    }
+    
+    // Try to decode the payload
+    const payload = JSON.parse(atob(parts[1]));
+    
+    // Check if payload has required fields
+    return !!(payload.id && payload.email && payload.role);
+  } catch (error) {
+    return false;
+  }
+};
+
+// Redirect to appropriate login page based on current route
+const redirectToLogin = () => {
+  if (typeof window !== 'undefined') {
+    const currentPath = window.location.pathname;
+    
+    // Determine which login page to redirect to
+    let loginUrl = '/login';
+    
+    if (currentPath.startsWith('/superadmin')) {
+      loginUrl = '/superadmin/login';
+    } else if (currentPath.includes('/[tenantSlug]') || currentPath.includes('/tenant')) {
+      // Extract tenant slug from path
+      const pathParts = currentPath.split('/');
+      const tenantIndex = pathParts.findIndex(part => part && part !== 'tenant');
+      if (tenantIndex !== -1 && pathParts[tenantIndex]) {
+        loginUrl = `/${pathParts[tenantIndex]}/login`;
+      } else {
+        loginUrl = '/login'; // Fallback
+      }
+    }
+    
+    // Store the current path for redirect after login
+    sessionStorage.setItem('redirectAfterLogin', currentPath);
+    
+    // Redirect to login page
+    window.location.href = loginUrl;
   }
 };
 
@@ -120,59 +181,46 @@ const api: AxiosInstance = axios.create({
   timeout: 30000, // 30 seconds timeout
 });
 
-// Request interceptor to add auth token
+// Request interceptor
 api.interceptors.request.use(
-  (config) => {
-    if (typeof window !== 'undefined') {
-      try {
-        const token = getAuthToken();
-        
-        if (token) {
-          // Check if token is expired
-          if (isTokenExpired(token)) {
+  async (config) => {
+    try {
+      const token = await getAuthToken();
+      
+      if (token) {
+        // Check if token is expired
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          const currentTime = Date.now() / 1000;
+          
+          if (payload.exp && payload.exp < currentTime) {
             if (process.env.NODE_ENV === 'development') {
               console.log('⚠️ Token expired, clearing auth data');
             }
-            clearAuthData();
-            
-            // Redirect to login if not already there
-            if (!window.location.pathname.includes('/signin')) {
-              toast.error('Session expired. Please log in again.');
-              window.location.href = '/superadmin/login';
-            }
+            await clearAuthData();
+            redirectToLogin();
             return Promise.reject(new Error('Token expired'));
           }
-          
-          config.headers.Authorization = `Bearer ${token}`;
-          if (process.env.NODE_ENV === 'development') {
-            console.log('🔐 Adding auth token to request:', config.url);
-            try {
-              console.log('🔐 Token payload:', JSON.parse(atob(token.split('.')[1])));
-            } catch (error) {
-              console.log('🔐 Token payload: Unable to decode');
-            }
-          }
-        } else {
-          if (process.env.NODE_ENV === 'development') {
-            console.log('⚠️ No auth token found for request:', config.url);
-          }
-          
-          // For protected routes, redirect to login
-          if (config.url?.includes('/superadmin/') && !config.url?.includes('/auth/')) {
-            if (!window.location.pathname.includes('/signin')) {
-              toast.error('Authentication required. Please log in.');
-              window.location.href = '/superadmin/login';
-            }
-            return Promise.reject(new Error('Authentication required'));
-          }
+        } catch (error) {
+          // Token is malformed, continue without it
         }
-      } catch (error) {
+        
+        config.headers.Authorization = `Bearer ${token}`;
+        
         if (process.env.NODE_ENV === 'development') {
-          console.warn('Error in request interceptor:', error);
+          console.log('🔐 Adding auth token to request:', config.url);
         }
-        // Don't block the request, just continue without auth
+      } else {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('⚠️ No auth token found for request:', config.url);
+        }
+      }
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Error in request interceptor:', error);
       }
     }
+    
     return config;
   },
   (error) => {
@@ -183,57 +231,52 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle errors
+// Response interceptor
 api.interceptors.response.use(
-  (response: AxiosResponse) => {
+  (response) => {
     if (process.env.NODE_ENV === 'development') {
       console.log('✅ API response success:', response.config.url);
     }
     return response;
   },
-  (error: AxiosError) => {
+  async (error: AxiosError) => {
     if (process.env.NODE_ENV === 'development') {
       console.log('❌ API response error:', error.config?.url, error.response?.status);
     }
-
+    
+    // Handle authentication errors
     if (error.response?.status === 401) {
-      // Clear auth data and redirect to login
-      if (typeof window !== 'undefined') {
-        console.log('🔐 Authentication failed, clearing session');
-        try {
-          clearAuthData();
-          
-          // Dispatch logout action if store is available
-          if (store) {
-            store.dispatch({ type: 'auth/logout' });
-          }
-          
-          // Only redirect if we're not already on the login page
-          if (!window.location.pathname.includes('/signin')) {
-            toast.error('Session expired. Please log in again.');
-            window.location.href = '/superadmin/login';
-          }
-        } catch (error) {
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('Error clearing auth data:', error);
-          }
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔐 Authentication failed, clearing session and redirecting to login');
+      }
+      
+      try {
+        // Clear all auth data
+        await clearAuthData();
+        
+        // Show toast notification
+        toast.error('Session expired. Please log in again.');
+        
+        // Redirect to appropriate login page
+        redirectToLogin();
+        
+      } catch (clearError) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Error clearing auth data:', clearError);
         }
       }
-    } else if (error.response?.status === 403) {
-      toast.error('Access denied. You do not have permission to perform this action.');
-    } else if (error.response?.status && error.response.status >= 500) {
-      toast.error('Server error. Please try again later.');
-    } else if (error.response?.status === 404) {
-      toast.error('Resource not found.');
-    } else if (error.response?.status === 422) {
-      const errorMessage = (error.response?.data as { message?: string })?.message || 'Validation error';
-      toast.error(errorMessage);
-    } else {
-      // Show error toast for other API errors
-      const errorMessage = (error.response?.data as { message?: string })?.message || 'An error occurred';
-      toast.error(errorMessage);
     }
-
+    
+    // Handle forbidden errors
+    if (error.response?.status === 403) {
+      toast.error('Access denied. You do not have permission to perform this action.');
+    }
+    
+    // Handle server errors
+    if (error.response?.status >= 500) {
+      toast.error('Server error. Please try again later.');
+    }
+    
     return Promise.reject(error);
   }
 );

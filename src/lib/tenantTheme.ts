@@ -1,4 +1,4 @@
-import { storage } from './localStorage';
+
 
 // Tenant-specific theme configuration
 export interface TenantThemeConfig {
@@ -185,14 +185,17 @@ export class TenantThemeManager {
    * Get tenant theme from cache
    */
   private getCachedTenantTheme(tenantSlug: string): TenantThemeConfig | null {
-    return storage.get(`tenant_theme_${tenantSlug}`);
+    if (typeof window === 'undefined') return null;
+    const cached = localStorage.getItem(`tenant_theme_${tenantSlug}`);
+    return cached ? JSON.parse(cached) : null;
   }
 
   /**
    * Cache tenant theme
    */
   private cacheTenantTheme(tenantSlug: string, config: TenantThemeConfig) {
-    storage.set(`tenant_theme_${tenantSlug}`, config, 24 * 60 * 60 * 1000); // 24 hours
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(`tenant_theme_${tenantSlug}`, JSON.stringify(config));
   }
 
   /**

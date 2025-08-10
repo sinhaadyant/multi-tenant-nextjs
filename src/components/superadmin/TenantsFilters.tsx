@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Filter, 
   X, 
@@ -30,15 +30,30 @@ const TenantsFilters: React.FC<TenantsFiltersProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
+  const isUpdatingRef = useRef(false);
 
-  // Debounced search
+  // Sync localSearchTerm with searchTerm prop (but not from our own updates)
+  useEffect(() => {
+    if (!isUpdatingRef.current && searchTerm !== localSearchTerm) {
+      setLocalSearchTerm(searchTerm);
+    }
+  }, [searchTerm, localSearchTerm]);
+
+  // Debounced search to prevent excessive API calls
   React.useEffect(() => {
     const timer = setTimeout(() => {
-      onSearchChange(localSearchTerm);
+      if (localSearchTerm !== searchTerm) {
+        isUpdatingRef.current = true;
+        onSearchChange(localSearchTerm);
+        // Reset the flag after a short delay
+        setTimeout(() => {
+          isUpdatingRef.current = false;
+        }, 100);
+      }
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [localSearchTerm, onSearchChange]);
+  }, [localSearchTerm, searchTerm, onSearchChange]);
 
   const statusOptions = [
     { value: 'active', label: 'Active', color: 'green' },

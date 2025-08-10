@@ -70,15 +70,7 @@ const superAdminNavElements: NavItem[] = [
       { id: "roleAssignment", label: "Role Assignment", path: "/superadmin/roles?tab=assignment" }
     ]
   },
-  {
-    id: "notifications",
-    label: "Notifications",
-    icon: "bell",
-    children: [
-      { id: "allNotifications", label: "All Notifications", path: "/superadmin/notifications" },
-      { id: "sendNotification", label: "Send Notification", path: "/superadmin/notifications/send" }
-    ]
-  },
+
   {
     id: "backup",
     label: "Backup & Import",
@@ -101,12 +93,7 @@ const superAdminNavElements: NavItem[] = [
     icon: "chart-bar",
     path: "/superadmin/reports"
   },
-  {
-    id: "settings",
-    label: "Settings",
-    icon: "cog",
-    path: "/superadmin/settings"
-  },
+
   {
     id: "support",
     label: "Support / Logs",

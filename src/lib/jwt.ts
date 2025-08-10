@@ -3,8 +3,8 @@ import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 
 const JWT_SECRET = (process.env.JWT_SECRET || 'your-secret-key') as string;
-const JWT_ACCESS_EXPIRES_IN = (process.env.JWT_ACCESS_EXPIRES_IN || '15m') as string; // Short-lived access token
-const JWT_REFRESH_EXPIRES_IN = (process.env.JWT_REFRESH_EXPIRES_IN || '7d') as string; // Long-lived refresh token
+const JWT_ACCESS_EXPIRES_IN = (process.env.JWT_ACCESS_EXPIRES_IN || '1h') as string; // Medium-lived access token
+const JWT_REFRESH_EXPIRES_IN = (process.env.JWT_REFRESH_EXPIRES_IN || '90d') as string; // 3-month refresh token
 const REFRESH_TOKEN_SECRET = (process.env.REFRESH_TOKEN_SECRET || 'your-refresh-secret-key') as string;
 
 export interface JWTPayload {
@@ -99,7 +99,18 @@ export const verifyAccessToken = (token: string): JWTPayload => {
     console.log('🔍 Verifying access token');
   }
   
-  return jwt.verify(token, JWT_SECRET) as JWTPayload;
+  try {
+    return jwt.verify(token, JWT_SECRET) as JWTPayload;
+  } catch (error: any) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('❌ JWT verification failed:', {
+        error: error.message,
+        tokenLength: token?.length || 0,
+        tokenPreview: token ? `${token.substring(0, 20)}...` : 'undefined'
+      });
+    }
+    throw error;
+  }
 };
 
 // Verify refresh token

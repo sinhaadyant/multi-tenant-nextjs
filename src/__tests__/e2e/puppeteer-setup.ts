@@ -24,22 +24,51 @@ export class PuppeteerTestHelper {
   }
 
   async setup(): Promise<void> {
-    this.browser = await puppeteer.launch({
-      headless: this.config.headless,
-      slowMo: this.config.slowMo,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-    this.page = await this.browser.newPage();
-    await this.page.setViewport({ width: 1280, height: 720 });
-    await this.page.setDefaultTimeout(this.config.timeout);
+    try {
+      this.browser = await puppeteer.launch({
+        headless: this.config.headless,
+        slowMo: this.config.slowMo,
+        args: [
+          '--no-sandbox', 
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--disable-gpu'
+        ],
+        ignoreDefaultArgs: ['--disable-extensions'],
+      });
+      this.page = await this.browser.newPage();
+      await this.page.setViewport({ width: 1280, height: 720 });
+      await this.page.setDefaultTimeout(this.config.timeout);
+      
+      // Enable console log capture
+      this.page.on('console', msg => {
+        console.log(`📱 Browser Console: ${msg.text()}`);
+      });
+      
+      // Enable error capture
+      this.page.on('pageerror', error => {
+        console.error(`❌ Page Error: ${error.message}`);
+      });
+      
+    } catch (error) {
+      console.error('Failed to setup Puppeteer:', error);
+      throw error;
+    }
   }
 
   async teardown(): Promise<void> {
-    if (this.page) {
-      await this.page.close();
-    }
-    if (this.browser) {
-      await this.browser.close();
+    try {
+      if (this.page) {
+        await this.page.close();
+      }
+      if (this.browser) {
+        await this.browser.close();
+      }
+    } catch (error) {
+      console.error('Failed to teardown Puppeteer:', error);
     }
   }
 
@@ -52,10 +81,12 @@ export class PuppeteerTestHelper {
 
   async navigateTo(path: string): Promise<void> {
     const url = `${this.config.baseUrl}${path}`;
+    console.log(`🌐 Navigating to: ${url}`);
     await this.getPage().goto(url, { waitUntil: 'networkidle0' });
   }
 
   async login(email: string, password: string): Promise<void> {
+    console.log(`🔐 Logging in with: ${email}`);
     await this.navigateTo('/superadmin/login');
     
     await this.getPage().waitForSelector('input[type="email"]');
@@ -65,17 +96,21 @@ export class PuppeteerTestHelper {
     
     // Wait for redirect to dashboard
     await this.getPage().waitForNavigation({ waitUntil: 'networkidle0' });
+    console.log('✅ Login successful');
   }
 
   async waitForElement(selector: string, timeout?: number): Promise<void> {
+    console.log(`⏳ Waiting for element: ${selector}`);
     await this.getPage().waitForSelector(selector, { timeout });
   }
 
   async clickElement(selector: string): Promise<void> {
+    console.log(`🖱️ Clicking element: ${selector}`);
     await this.getPage().click(selector);
   }
 
   async typeText(selector: string, text: string): Promise<void> {
+    console.log(`⌨️ Typing text in: ${selector}`);
     await this.getPage().type(selector, text);
   }
 
@@ -93,8 +128,11 @@ export class PuppeteerTestHelper {
   }
 
   async takeScreenshot(name: string): Promise<void> {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `./test-screenshots/${name}-${timestamp}.png`;
+    console.log(`📸 Taking screenshot: ${filename}`);
     await this.getPage().screenshot({ 
-      path: `./test-screenshots/${name}-${Date.now()}.png`,
+      path: filename,
       fullPage: true 
     });
   }
@@ -132,8 +170,8 @@ export class PuppeteerTestHelper {
 // Common test data
 export const testData = {
   superAdmin: {
-    email: 'admin@example.com',
-    password: 'Password123!',
+    email: 'admin@superadmin.com',
+    password: 'SuperAdmin123!',
   },
   testTenant: {
     name: 'Test Tenant',

@@ -515,7 +515,7 @@ Test the SuperAdmin login functionality at /superadmin/login. Check if the login
 
 **Prompt 2: Test Forgot Password Flow and Fix Issues**
 ```
-Test the forgot password functionality at /superadmin/forgot-password. Verify the form sends reset emails correctly, handles invalid emails, shows proper success/error messages, and the reset password page works. Fix any issues with email sending, token validation, or UI components.
+Test the forgot password functionality at /superadmin/forgot-password. Verify the form sends reset emails correctly, handles invalid emails, shows proper success/error messages, and the reset password page works. Fix any issues with forgot, token validation, or UI components.
 ```
 
 **Prompt 3: Test Password Reset and Fix Issues**

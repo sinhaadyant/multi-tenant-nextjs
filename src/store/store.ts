@@ -2,20 +2,78 @@ import { configureStore, combineReducers } from '@reduxjs/toolkit';
 import { persistReducer, persistStore } from 'redux-persist';
 import storage from 'redux-persist/lib/storage'; // defaults to localStorage for web
 import authReducer, { setHydrated } from './slices/authSlice';
+import { FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
+
+// Custom middleware to handle unexpected state keys
+const unexpectedKeysMiddleware = (store: any) => (next: any) => (action: any) => {
+  // Check if the action is a rehydration action
+  if (action.type === REHYDRATE && action.payload) {
+    // Clean up any unexpected keys from the payload
+    const { value, expiry, ...cleanPayload } = action.payload;
+    if (Object.keys(cleanPayload).length !== Object.keys(action.payload).length) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('🧹 Redux: Removed unexpected keys from rehydration payload:', { value, expiry });
+      }
+      action.payload = cleanPayload;
+    }
+    
+    // Also clean up any nested unexpected keys in the auth state
+    if (action.payload.auth && typeof action.payload.auth === 'object') {
+      const { value: authValue, expiry: authExpiry, ...cleanAuth } = action.payload.auth;
+      if (Object.keys(cleanAuth).length !== Object.keys(action.payload.auth).length) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('🧹 Redux: Removed unexpected keys from auth state:', { authValue, authExpiry });
+        }
+        action.payload.auth = cleanAuth;
+      }
+    }
+  }
+  return next(action);
+};
+
+// Use standard storage to avoid wrapper object issues
+const customStorage = storage;
 
 // Root reducer
 const rootReducer = combineReducers({
   auth: authReducer,
 });
 
-// Redux Persist configuration
+// Configure persist
 const persistConfig = {
   key: 'superadmin-root',
-  version: 1,
-  storage,
-  whitelist: ['auth'], // Only persist auth slice
-  // Persist all auth data including tokens for now
-  // In production, you might want to exclude sensitive data
+  storage: customStorage,
+  whitelist: ['auth'], // Only persist auth state
+  migrate: (state: any) => {
+    // Migration function to handle any state format changes
+    if (state && typeof state === 'object') {
+      // Remove any unexpected keys that might cause reducer warnings
+      const { value, expiry, ...cleanState } = state;
+      
+      // Also clean up nested auth state if it exists
+      if (cleanState.auth && typeof cleanState.auth === 'object') {
+        const { value: authValue, expiry: authExpiry, ...cleanAuth } = cleanState.auth;
+        cleanState.auth = cleanAuth;
+      }
+      
+      // Ensure we only have expected keys
+      const expectedKeys = ['auth'];
+      const finalState: any = {};
+      
+      expectedKeys.forEach(key => {
+        if (cleanState[key] !== undefined) {
+          finalState[key] = cleanState[key];
+        }
+      });
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔄 Redux Persist: Migrated state to clean format', finalState);
+      }
+      
+      return Promise.resolve(finalState);
+    }
+    return Promise.resolve(state);
+  },
 };
 
 // Create persisted reducer
@@ -27,29 +85,38 @@ export const store = configureStore({
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
+        ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
-    }),
-  devTools: process.env.NODE_ENV !== 'production',
+      // Add custom middleware to handle unexpected state keys
+      immutableCheck: {
+        warnAfter: 128,
+      },
+    }).concat(unexpectedKeysMiddleware),
+  devTools: process.env.NODE_ENV === 'development',
 });
 
 // Create persistor
 export const persistor = persistStore(store, {}, () => {
-  // Callback fired when rehydration is complete
-  console.log('🔄 Redux Persist: Rehydration complete');
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔄 Redux Persist: Rehydration complete');
+  }
+  // Dispatch hydration action after rehydration is complete
   store.dispatch(setHydrated());
-  
-  // Debug: Check what's in the store after rehydration
-  const state = store.getState();
-  console.log('🔄 Redux Persist: Store state after rehydration:', {
-    isLoggedIn: state.auth.isLoggedIn,
-    hasUser: !!state.auth.user,
-    hasToken: !!state.auth.token,
-    hasRefreshToken: !!state.auth.refreshToken,
-    isHydrated: state.auth.isHydrated,
-    isInitialized: state.auth.isInitialized,
-  });
 });
+
+// Add debugging for rehydration issues
+if (process.env.NODE_ENV === 'development') {
+  persistor.subscribe(() => {
+    const { bootstrapped } = persistor.getState();
+    if (bootstrapped) {
+      const state = store.getState();
+      console.log('🔄 Redux Persist: Store state after rehydration:', {
+        auth: state.auth,
+        hasUnexpectedKeys: Object.keys(state).some(key => !['auth'].includes(key)),
+      });
+    }
+  });
+}
 
 // Types
 export type RootState = ReturnType<typeof store.getState>;

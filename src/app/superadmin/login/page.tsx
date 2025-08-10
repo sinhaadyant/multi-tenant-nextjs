@@ -54,6 +54,7 @@ export default function SuperAdminLogin() {
         user: result.data.user,
         token: result.data.token,
         refreshToken: result.data.refreshToken,
+        email: result.data.user.email, // Add the missing email field
         expiresAt: result.data.expiresAt,
       };
       
@@ -72,14 +73,21 @@ export default function SuperAdminLogin() {
         // We can't access store directly here, but we can check localStorage
         const persistedState = localStorage.getItem('persist:superadmin-root');
         if (persistedState) {
-          const parsed = JSON.parse(persistedState);
-          const authData = parsed.auth ? JSON.parse(parsed.auth) : null;
-          console.log('📊 Redux persisted state:', {
-            isLoggedIn: authData?.isLoggedIn,
-            hasUser: !!authData?.user,
-            hasToken: !!authData?.token,
-            hasRefreshToken: !!authData?.refreshToken,
-          });
+          try {
+            const parsed = JSON.parse(persistedState);
+            const authData = parsed.auth ? JSON.parse(parsed.auth) : null;
+            console.log('📊 Redux persisted state:', {
+              isLoggedIn: authData?.isLoggedIn,
+              hasUser: !!authData?.user,
+              hasToken: !!authData?.token,
+              hasRefreshToken: !!authData?.refreshToken,
+            });
+          } catch (parseError) {
+            console.error('❌ Error parsing persisted state:', parseError);
+            // Clear corrupted persisted state
+            localStorage.removeItem('persist:superadmin-root');
+            console.log('🧹 Cleared corrupted persisted state');
+          }
         }
       }, 100);
 
@@ -115,52 +123,19 @@ export default function SuperAdminLogin() {
 
       toast.success('Login successful!');
       
-      // Wait for Redux state to update and persist, then redirect
-      console.log('🔄 Waiting for Redux state to update and persist...');
-      setTimeout(() => {
-        console.log('🔄 Checking Redux state before redirect...');
-        
-        // Check if Redux state is properly set
-        const persistedState = localStorage.getItem('persist:superadmin-root');
-        if (persistedState) {
-          const parsed = JSON.parse(persistedState);
-          const authData = parsed.auth ? JSON.parse(parsed.auth) : null;
-          
-          if (authData?.isLoggedIn && authData?.token) {
-            console.log('✅ Redux state is ready, attempting redirect...');
-            console.log('📍 Current pathname:', window.location.pathname);
-            console.log('🎯 Target pathname: /superadmin/dashboard');
-            
-            try {
-              router.push('/superadmin/dashboard');
-              console.log('✅ Router.push called successfully');
-              
-              // Add a fallback redirect after a longer delay
-              setTimeout(() => {
-                console.log('🔄 Checking if redirect worked...');
-                if (window.location.pathname !== '/superadmin/dashboard') {
-                  console.log('❌ Router.push didn\'t work, using window.location.href');
-                  window.location.href = '/superadmin/dashboard';
-                }
-              }, 2000);
-              
-            } catch (error) {
-              console.error('❌ Router.push failed:', error);
-              // Fallback to window.location
-              window.location.href = '/superadmin/dashboard';
-            }
-          } else {
-            console.log('❌ Redux state not ready, retrying...');
-            // Retry after another delay
-            setTimeout(() => {
-              window.location.href = '/superadmin/dashboard';
-            }, 500);
-          }
-        } else {
-          console.log('❌ No persisted Redux state found, using fallback redirect');
-          window.location.href = '/superadmin/dashboard';
-        }
-      }, 500);
+      // Redirect immediately after successful login
+      console.log('🔄 Redirecting to dashboard...');
+      console.log('📍 Current pathname:', window.location.pathname);
+      console.log('🎯 Target pathname: /superadmin/dashboard');
+      
+      try {
+        router.replace('/superadmin/dashboard');
+        console.log('✅ Router.replace called successfully');
+      } catch (error) {
+        console.error('❌ Router.replace failed:', error);
+        // Fallback to window.location
+        window.location.href = '/superadmin/dashboard';
+      }
 
     } catch (error: any) {
       console.error('❌ Error processing login success:', error);
@@ -214,6 +189,7 @@ export default function SuperAdminLogin() {
               {...register('email')}
               type="email"
               placeholder="Enter your email"
+              autoComplete="email"
               className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder:text-gray-500 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-400 dark:focus:border-brand-500"
             />
           </div>
@@ -232,6 +208,7 @@ export default function SuperAdminLogin() {
               {...register('password')}
               type={showPassword ? 'text' : 'password'}
               placeholder="Enter your password"
+              autoComplete="current-password"
               className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 pr-12 text-gray-900 placeholder:text-gray-500 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-400 dark:focus:border-brand-500"
             />
             <button

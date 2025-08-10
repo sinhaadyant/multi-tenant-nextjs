@@ -1,13 +1,13 @@
-import { storage } from './localStorage';
-
 /**
  * Fast authentication check that doesn't rely on Redux state
  * Used for immediate redirects and quick auth status checks
  */
 export const fastAuthCheck = () => {
   try {
-    const token = storage.getAuthToken();
-    const user = storage.getAuthUser();
+    // Direct localStorage access for auth tokens
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    const userStr = typeof window !== 'undefined' ? localStorage.getItem('auth_user') : null;
+    const user = userStr ? JSON.parse(userStr) : null;
     
     return {
       isAuthenticated: !!(token && user && typeof user === 'object' && user.id && user.email),

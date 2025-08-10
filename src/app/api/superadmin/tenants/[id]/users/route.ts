@@ -5,9 +5,10 @@ import { asyncHandler } from '@/lib/errorHandler';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 
 // GET /api/superadmin/tenants/[id]/users - Get tenant users
-export const GET = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+export const GET = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+  const { id } = await params;
   if (process.env.NODE_ENV === 'development') {
-    console.log('👥 Fetching tenant users:', params.id);
+    console.log('👥 Fetching tenant users:', id);
   }
 
   // Authenticate SuperAdmin
@@ -16,15 +17,25 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
     return authResult;
   }
 
+  const { searchParams } = new URL(req.url);
+  const page = parseInt(searchParams.get('page') || '1');
+  const limit = parseInt(searchParams.get('limit') || '10');
+  const search = searchParams.get('search') || '';
+  const status = searchParams.get('status') || '';
+  const sortBy = searchParams.get('sortBy') || 'createdAt';
+  const sortOrder = searchParams.get('sortOrder') || 'desc';
+
+  const skip = (page - 1) * limit;
+
   try {
     // Check if tenant exists
     const tenant = await prisma.tenant.findUnique({
-      where: { id: params.id }
+      where: { id }
     });
 
     if (!tenant) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Tenant not found:', params.id);
+        console.log('❌ Tenant not found:', id);
       }
       return createErrorResponse(
         'Tenant not found',
@@ -32,19 +43,54 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
       );
     }
 
-    // Get users for this tenant
-    const users = await prisma.user.findMany({
-      where: { tenantId: params.id },
-      include: {
-        role: {
-          select: {
-            id: true,
-            name: true
+    // Build where clause
+    const where: any = { tenantId: id };
+    
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+
+    if (status) {
+      where.isActive = status === 'active';
+    }
+
+    // Build order by clause
+    const orderBy: any = {};
+    orderBy[sortBy] = sortOrder;
+
+    // Get users with pagination and statistics in parallel
+    const [users, totalCount, stats] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy,
+        include: {
+          userRoles: {
+            include: {
+              role: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            }
           }
         }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+      }),
+      prisma.user.count({ where }),
+      prisma.user.groupBy({
+        by: ['isActive'],
+        where: { tenantId: id },
+        _count: { id: true }
+      })
+    ]);
+
+    const activeCount = stats.find(s => s.isActive)?._count.id || 0;
+    const inactiveCount = stats.find(s => !s.isActive)?._count.id || 0;
 
     if (process.env.NODE_ENV === 'development') {
       console.log(`✅ Tenant users fetched successfully: ${users.length} users found`);
@@ -58,8 +104,19 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
         isActive: user.isActive,
         lastLogin: user.lastLogin,
         createdAt: user.createdAt,
-        role: user.role
-      }))
+        roles: user.userRoles.map(userRole => userRole.role)
+      })),
+      stats: {
+        total: totalCount,
+        active: activeCount,
+        inactive: inactiveCount
+      },
+      pagination: {
+        page,
+        limit,
+        totalPages: Math.ceil(totalCount / limit),
+        totalRecords: totalCount
+      }
     }, 'Tenant users fetched successfully');
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {

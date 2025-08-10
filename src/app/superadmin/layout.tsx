@@ -42,6 +42,7 @@ export default function SuperAdminLayout({
                   src="/images/logo/logo.svg"
                   alt="Logo"
                   className="brightness-0 invert"
+                  style={{ width: 'auto', height: 'auto' }}
                 />
               </Link>
             </div>

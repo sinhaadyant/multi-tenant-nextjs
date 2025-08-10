@@ -78,10 +78,29 @@ interface DashboardOverviewCardsProps {
 }
 
 export const DashboardOverviewCards: React.FC<DashboardOverviewCardsProps> = ({ summary }) => {
+  // Add null checks to prevent errors
+  if (!summary) {
+    return (
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {[1, 2, 3, 4].map((index) => (
+          <div key={index} className="p-6 bg-white rounded-lg shadow-sm border border-gray-200 dark:bg-gray-800 dark:border-gray-700 animate-pulse">
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-gray-200 rounded-lg dark:bg-gray-700"></div>
+              <div className="ml-4">
+                <div className="h-4 bg-gray-200 rounded w-20 dark:bg-gray-700"></div>
+                <div className="h-6 bg-gray-200 rounded w-16 mt-2 dark:bg-gray-700"></div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   const cards = [
     {
       title: 'Total Tenants',
-      value: summary.totalTenants,
+      value: summary.totalTenants || 0,
       icon: <Building2 className="w-6 h-6" />,
       growth: summary.growthMetrics?.tenantGrowth,
       growthLabel: 'from last month',
@@ -90,7 +109,7 @@ export const DashboardOverviewCards: React.FC<DashboardOverviewCardsProps> = ({ 
     },
     {
       title: 'Active Users',
-      value: summary.totalUsers,
+      value: summary.totalUsers || 0,
       icon: <Users className="w-6 h-6" />,
       growth: summary.growthMetrics?.userGrowth,
       growthLabel: 'from last month',
@@ -99,14 +118,14 @@ export const DashboardOverviewCards: React.FC<DashboardOverviewCardsProps> = ({ 
     },
     {
       title: 'Super Admins',
-      value: summary.totalSuperAdmins,
+      value: summary.totalSuperAdmins || 0,
       icon: <Shield className="w-6 h-6" />,
       bgColor: 'bg-purple-100 dark:bg-purple-900',
       iconColor: 'text-purple-600 dark:text-purple-400'
     },
     {
       title: 'Active Tenants',
-      value: summary.activeTenants,
+      value: summary.activeTenants || 0,
       icon: <Activity className="w-6 h-6" />,
       bgColor: 'bg-yellow-100 dark:bg-yellow-900',
       iconColor: 'text-yellow-600 dark:text-yellow-400'
