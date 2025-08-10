@@ -221,9 +221,16 @@ const AppHeader = () => {
                   <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
                     <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   </div>
-                  <span className="hidden md:block text-sm font-medium">
-                    {user?.name || 'User'}
-                  </span>
+                  <div className="hidden md:block text-left">
+                    <div className="text-sm font-medium">
+                      {user?.name || 'User'}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      {user?.roles && user.roles.length > 0 
+                        ? user.roles[0].name 
+                        : 'User'}
+                    </div>
+                  </div>
                   <ChevronDown className="w-4 h-4" />
                 </button>
 

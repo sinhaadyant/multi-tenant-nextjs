@@ -5,6 +5,8 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
 import { useDynamicPermissions, MenuItem } from "../context/DynamicPermissionsContext";
+import { useTenantAuth } from "../context/TenantAuthContext";
+import { useParams } from "next/navigation";
 import {
   LayoutDashboard,
   ChevronDown,
@@ -63,12 +65,12 @@ const iconMap: { [key: string]: React.ReactNode } = {
 };
 
 // Fallback menu items when permissions API fails or returns empty
-const fallbackMenuItems: MenuItem[] = [
+const getFallbackMenuItems = (tenantSlug: string): MenuItem[] => [
   {
     id: "dashboard",
     label: "Dashboard",
     icon: "LayoutDashboard",
-    path: "/dashboard",
+    path: `/${tenantSlug}/dashboard`,
     description: "Main dashboard with overview and analytics",
     permissions: ["dashboard:view"],
     hasChildren: false
@@ -77,7 +79,7 @@ const fallbackMenuItems: MenuItem[] = [
     id: "users",
     label: "User Management",
     icon: "Users",
-    path: "/users",
+    path: `/${tenantSlug}/users`,
     description: "Manage tenant users, roles, and permissions",
     permissions: ["users:view"],
     hasChildren: false
@@ -86,25 +88,25 @@ const fallbackMenuItems: MenuItem[] = [
     id: "roles",
     label: "Roles & Permissions",
     icon: "Shield",
-    path: "/roles",
+    path: `/${tenantSlug}/roles`,
     description: "Manage roles and assign permissions",
     permissions: ["roles:view"],
     hasChildren: false
   },
   {
-    id: "reports",
-    label: "Reports & Analytics",
-    icon: "BarChart3",
-    path: "/reports",
-    description: "Generate and view reports and analytics",
-    permissions: ["reports:view"],
+    id: "modules",
+    label: "Module Management",
+    icon: "Cog",
+    path: `/${tenantSlug}/modules`,
+    description: "Manage tenant modules and features",
+    permissions: ["modules:view"],
     hasChildren: false
   },
   {
     id: "audit",
     label: "Audit Logs",
     icon: "ClipboardList",
-    path: "/audit",
+    path: `/${tenantSlug}/audit`,
     description: "View system audit logs and activity",
     permissions: ["audit:view"],
     hasChildren: false
@@ -113,7 +115,7 @@ const fallbackMenuItems: MenuItem[] = [
     id: "support",
     label: "Support",
     icon: "LifeBuoy",
-    path: "/support",
+    path: `/${tenantSlug}/support`,
     description: "Support tickets and help",
     permissions: ["support:view"],
     hasChildren: false
@@ -122,38 +124,72 @@ const fallbackMenuItems: MenuItem[] = [
     id: "content",
     label: "Content Management",
     icon: "FileText",
-    path: "/content",
+    path: `/${tenantSlug}/content`,
     description: "Manage content and documents",
     permissions: ["content:view"],
     hasChildren: false
   },
   {
-    id: "utilities",
+    id: "notifications",
+    label: "Notifications",
+    icon: "Bell",
+    path: `/${tenantSlug}/notifications`,
+    description: "Manage notifications and alerts",
+    permissions: ["notifications:view"],
+    hasChildren: false
+  },
+  {
+    id: "settings",
     label: "Settings",
     icon: "Settings",
-    path: "/utilities",
+    path: `/${tenantSlug}/settings`,
     description: "System and tenant settings",
     permissions: ["settings:view"],
     hasChildren: false
   }
 ];
 
-const DynamicSidebar: React.FC = () => {
+interface DynamicSidebarProps {
+  isAuthPage?: boolean;
+}
+
+const DynamicSidebar: React.FC<DynamicSidebarProps> = ({ isAuthPage = false }) => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
   const { getMenuItems, isLoading, error, hasAccess } = useDynamicPermissions();
+  const { tenant, user } = useTenantAuth();
+  const params = useParams();
+  const tenantSlug = params.tenantSlug as string;
   
   const [openSubmenu, setOpenSubmenu] = useState<number | null>(null);
   const [subMenuHeights, setSubMenuHeight] = useState<{ [key: number]: number }>({});
   const subMenuRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
 
+  // Move useEffect to the top, before any conditional logic
+  useEffect(() => {
+    // Set the height of the submenu items when the submenu is opened
+    if (openSubmenu !== null) {
+      if (subMenuRefs.current[openSubmenu]) {
+        setSubMenuHeight((prevHeights) => ({
+          ...prevHeights,
+          [openSubmenu]: subMenuRefs.current[openSubmenu]?.scrollHeight || 0,
+        }));
+      }
+    }
+  }, [openSubmenu]);
+
   const menuItems = getMenuItems();
   
   // Use fallback menu items if the API returns empty or fails
-  const displayMenuItems = menuItems.length > 0 ? menuItems : fallbackMenuItems;
+  const displayMenuItems = menuItems.length > 0 ? menuItems : getFallbackMenuItems(tenantSlug);
+
+  // If it's an auth page, don't render the sidebar
+  if (isAuthPage) {
+    return null;
+  }
 
   // Define renderMenuItem function before it's used
-  const renderMenuItem = (item: MenuItem, index: number, level: number = 0) => {
+  const renderMenuItem = (item: MenuItem, index: number, level: number = 0): React.ReactNode => {
     const isActive = pathname === item.path;
     const hasChildren = item.children && item.children.length > 0;
     const isSubmenuOpen = openSubmenu === index;
@@ -234,7 +270,7 @@ const DynamicSidebar: React.FC = () => {
         </div>
         <div className="flex-1 overflow-y-auto">
           <nav className="space-y-2">
-            {fallbackMenuItems.map((item, index) => renderMenuItem(item, index))}
+            {getFallbackMenuItems(tenantSlug).map((item: MenuItem, index: number) => renderMenuItem(item, index))}
           </nav>
         </div>
         {(isExpanded || isHovered || isMobileOpen) && (
@@ -287,7 +323,7 @@ const DynamicSidebar: React.FC = () => {
         </div>
         <div className="flex-1 overflow-y-auto">
           <nav className="space-y-2">
-            {fallbackMenuItems.map((item, index) => renderMenuItem(item, index))}
+            {getFallbackMenuItems(tenantSlug).map((item: MenuItem, index: number) => renderMenuItem(item, index))}
           </nav>
         </div>
         {(isExpanded || isHovered || isMobileOpen) && (
@@ -298,18 +334,6 @@ const DynamicSidebar: React.FC = () => {
       </aside>
     );
   }
-
-  useEffect(() => {
-    // Set the height of the submenu items when the submenu is opened
-    if (openSubmenu !== null) {
-      if (subMenuRefs.current[openSubmenu]) {
-        setSubMenuHeight((prevHeights) => ({
-          ...prevHeights,
-          [openSubmenu]: subMenuRefs.current[openSubmenu]?.scrollHeight || 0,
-        }));
-      }
-    }
-  }, [openSubmenu]);
 
   return (
     <aside
@@ -327,42 +351,68 @@ const DynamicSidebar: React.FC = () => {
       onMouseLeave={() => setIsHovered(false)}
     >
       <div
-        className={`py-8 flex  ${
+        className={`py-6 flex ${
           !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
         }`}
       >
-        <Link href="/dashboard">
+        <Link href={`/${tenantSlug}/dashboard`}>
           {isExpanded || isHovered || isMobileOpen ? (
-            <>
-              <Image
-                className="dark:hidden"
-                src="/images/logo/logo.svg"
-                alt="Logo"
-                width={150}
-                height={40}
-              />
-              <Image
-                className="hidden dark:block"
-                src="/images/logo/logo-dark.svg"
-                alt="Logo"
-                width={150}
-                height={40}
-              />
-            </>
+            <div className="flex items-center space-x-3">
+              {/* Tenant Logo */}
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-xl">
+                  {tenant?.name ? tenant.name.charAt(0).toUpperCase() : 
+                   tenantSlug ? tenantSlug.charAt(0).toUpperCase() : 'T'}
+                </span>
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                  {tenant?.name || (tenantSlug ? tenantSlug.charAt(0).toUpperCase() + tenantSlug.slice(1) : 'Admin')}
+                </h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {user?.roles && user.roles.length > 0 
+                    ? user.roles[0].name 
+                    : 'User'}
+                </p>
+              </div>
+            </div>
           ) : (
-            <Image
-              src="/images/logo/logo-icon.svg"
-              alt="Logo"
-              width={40}
-              height={40}
-            />
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-xl">
+                {tenant?.name ? tenant.name.charAt(0).toUpperCase() : 
+                 tenantSlug ? tenantSlug.charAt(0).toUpperCase() : 'T'}
+              </span>
+            </div>
           )}
         </Link>
       </div>
 
+      {/* User Info Section */}
+      {user && (isExpanded || isHovered || isMobileOpen) && (
+        <div className="px-3 py-4 mb-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+              <span className="text-blue-600 dark:text-blue-400 text-xs font-medium">
+                {user.name.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                {user.name}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {user.roles && user.roles.length > 0 
+                  ? user.roles[0].name 
+                  : 'User'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto">
         <nav className="space-y-2">
-          {displayMenuItems.map((item, index) => renderMenuItem(item, index))}
+          {displayMenuItems.map((item: MenuItem, index: number) => renderMenuItem(item, index))}
         </nav>
       </div>
 

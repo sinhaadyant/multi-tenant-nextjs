@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 import { verifyAccessToken } from '@/lib/jwt';
 
-export async function GET(req: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization');
     
@@ -21,14 +21,16 @@ export async function GET(req: NextRequest) {
       return createErrorResponse('Invalid or expired token', 401);
     }
 
-    // Verify user still exists and is active
+    // Get user details from database
     const superAdmin = await prisma.superAdmin.findUnique({
-      where: { id: userPayload.id },
+      where: { 
+        id: userPayload.id,
+        isActive: true
+      },
       select: {
         id: true,
         email: true,
         name: true,
-        isActive: true,
         avatar: true,
       }
     });
@@ -37,43 +39,22 @@ export async function GET(req: NextRequest) {
       return createErrorResponse('User not found', 401);
     }
 
-    if (!superAdmin.isActive) {
-      return createErrorResponse('Account is inactive', 401);
-    }
-
-    // Check if user has any active refresh tokens (session exists)
-    const hasActiveSession = await prisma.refreshToken.findFirst({
-      where: {
-        superAdminId: userPayload.id,
-        isRevoked: false,
-        expiresAt: {
-          gt: new Date()
-        }
-      }
-    });
-
-    if (!hasActiveSession) {
-      return createErrorResponse('No active session found', 401);
-    }
-
-    if (process.env.NODE_ENV === 'development') {
-      console.log('✅ Token validation successful for:', superAdmin.email);
-    }
-
     return createSuccessResponse({
       user: {
         id: superAdmin.id,
         email: superAdmin.email,
         name: superAdmin.name,
-        role: 'superadmin',
         avatar: superAdmin.avatar,
+        role: 'superadmin'
       },
-      tokenValid: true,
-      hasActiveSession: true,
+      token: {
+        valid: true,
+        expiresAt: userPayload.exp ? userPayload.exp * 1000 : null
+      }
     }, 'Token is valid');
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Token validation error:', error);
-    return createErrorResponse('Internal server error', 500);
+    return createErrorResponse('Token validation failed', 500);
   }
 }

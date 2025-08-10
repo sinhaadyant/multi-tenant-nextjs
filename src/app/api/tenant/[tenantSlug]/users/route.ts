@@ -1,44 +1,43 @@
 import { NextRequest } from 'next/server';
-import { asyncHandler } from '@/lib/errorHandler';
+import { withTenantAuth, AuthenticatedRequest } from '@/lib/authMiddleware';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 import { createAuditLogFromRequest } from '@/lib/audit';
-import { verifyToken } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
+import { hashPassword } from '@/lib/jwt';
+import { z } from 'zod';
+
+// Validation schemas
+const createUserSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  contactNumber: z.string().optional(),
+  roleIds: z.array(z.string()).optional(),
+  sendInvitation: z.boolean().optional().default(false)
+});
+
+const updateUserSchema = z.object({
+  name: z.string().min(1, 'Name is required').optional(),
+  email: z.string().email('Invalid email address').optional(),
+  contactNumber: z.string().optional(),
+  roleIds: z.array(z.string()).optional(),
+  isActive: z.boolean().optional()
+});
+
+const bulkActionSchema = z.object({
+  userIds: z.array(z.string()),
+  action: z.enum(['activate', 'deactivate', 'delete', 'assignRoles']),
+  roleIds: z.array(z.string()).optional()
+});
 
 // GET /api/tenant/[tenantSlug]/users - Get users list with filters and pagination
-export const GET = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
+export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
   const { tenantSlug } = await params;
-  const authHeader = req.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return createErrorResponse('Unauthorized - No token provided', 401);
-  }
-
-  const token = authHeader.substring(7);
   
   try {
-    const decoded = verifyToken(token);
-    if (!decoded || !decoded.id || !decoded.tenantId) {
-      return createErrorResponse('Invalid token', 401);
-    }
-
-    // Verify user belongs to the tenant
-    const user = await prisma.user.findFirst({
-      where: {
-        id: decoded.id,
-        tenant: {
-          slug: tenantSlug,
-          isActive: true
-        }
-      },
-      include: {
-        tenant: true
-      }
-    });
-
-    if (!user || !user.tenant || user.tenant.slug !== tenantSlug || !user.tenant.isActive) {
-      return createErrorResponse('Access denied - Invalid tenant or user not found', 403);
-    }
+    // User is already authenticated and verified by middleware
+    const userId = req.user!.id;
+    const tenantId = req.user!.tenantId;
 
     // Parse query parameters
     const url = new URL(req.url);
@@ -52,7 +51,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
 
     // Build where clause
     const where: any = {
-      tenantId: user.tenant.id
+      tenantId: tenantId
     };
 
     // Add search filter
@@ -85,8 +84,8 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
     // Calculate pagination
     const skip = (page - 1) * limit;
 
-    // Fetch users with pagination
-    const [users, totalUsers] = await Promise.all([
+    // Fetch users with pagination and stats
+    const [users, totalUsers, stats] = await Promise.all([
       prisma.user.findMany({
         where,
         include: {
@@ -108,169 +107,123 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
         skip,
         take: limit
       }),
-      prisma.user.count({ where })
-    ]);
-
-    // Transform users data
-    const transformedUsers = users.map(user => ({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      isActive: user.isActive,
-      lastLogin: user.lastLogin,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-      roles: user.userRoles.map(ur => ur.role)
-    }));
-
-    // Calculate stats
-    const now = new Date();
-    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-
-    const [total, active, inactive, newThisMonth] = await Promise.all([
-      prisma.user.count({ where: { tenantId: user.tenant.id } }),
-      prisma.user.count({
-        where: {
-          tenantId: user.tenant.id,
-          isActive: true
-        }
-      }),
-      prisma.user.count({
-        where: {
-          tenantId: user.tenant.id,
-          isActive: false
-        }
-      }),
-      prisma.user.count({
-        where: {
-          tenantId: user.tenant.id,
-          createdAt: { gte: lastMonth }
+      prisma.user.count({ where }),
+      prisma.user.aggregate({
+        where: { tenantId },
+        _count: {
+          id: true
+        },
+        _sum: {
+          isActive: true ? 1 : 0
         }
       })
     ]);
 
-    const stats = {
-      total,
-      active,
-      inactive,
-      newThisMonth
-    };
-
-    const pagination = {
-      page,
-      limit,
-      total: totalUsers,
-      totalPages: Math.ceil(totalUsers / limit),
-      hasNext: page < Math.ceil(totalUsers / limit),
-      hasPrev: page > 1
-    };
-
-    await createAuditLogFromRequest(req, { id: user.id, email: user.email, role: 'user' }, 'users.list', {
-      tenantId: user.tenant.id,
-      filters: { search, status, role },
-      pagination: { page, limit }
+    // Calculate stats
+    const activeUsers = await prisma.user.count({
+      where: { ...where, isActive: true }
     });
 
-    return createSuccessResponse({
-      users: transformedUsers,
-      stats,
-      pagination
-    }, 'Users retrieved successfully');
+    const inactiveUsers = await prisma.user.count({
+      where: { ...where, isActive: false }
+    });
 
+    const newThisMonth = await prisma.user.count({
+      where: {
+        ...where,
+        createdAt: {
+          gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+        }
+      }
+    });
+
+    const data = {
+      users: users.map(user => ({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        isActive: user.isActive,
+        contactNumber: user.contactNumber,
+        lastLogin: user.lastLogin,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        roles: user.userRoles.map(ur => ur.role),
+        rolesCount: user.userRoles.length
+      })),
+      stats: {
+        total: totalUsers,
+        active: activeUsers,
+        inactive: inactiveUsers,
+        newThisMonth
+      },
+      pagination: {
+        page,
+        limit,
+        total: totalUsers,
+        totalPages: Math.ceil(totalUsers / limit)
+      }
+    };
+
+    // Create audit log
+    await createAuditLogFromRequest(req, {
+      id: req.user!.id,
+      email: req.user!.email,
+      role: req.user!.role as 'user' | 'superadmin',
+      tenantId: req.user!.tenantId
+    }, 'users.list', {
+      page,
+      totalUsers,
+      filters: { search, status, role }
+    });
+
+    return createSuccessResponse(data, 'Users retrieved successfully');
   } catch (error: any) {
     console.error('Error fetching users:', error);
     return createErrorResponse('Failed to fetch users', 500);
   }
 });
 
-// POST /api/tenant/[tenantSlug]/users - Create new user
-export const POST = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
+// POST /api/tenant/[tenantSlug]/users - Create a new user
+export const POST = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
   const { tenantSlug } = await params;
-  const authHeader = req.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return createErrorResponse('Unauthorized - No token provided', 401);
-  }
-
-  const token = authHeader.substring(7);
   
   try {
-    const decoded = verifyToken(token);
-    if (!decoded || !decoded.id || !decoded.tenantId) {
-      return createErrorResponse('Invalid token', 401);
-    }
-
-    // Verify user belongs to the tenant and has admin permissions
-    const user = await prisma.user.findFirst({
-      where: {
-        id: decoded.id,
-        tenant: {
-          slug: tenantSlug,
-          isActive: true
-        }
-      },
-      include: {
-        tenant: true,
-        userRoles: {
-          include: {
-            role: {
-              include: {
-                permissions: {
-                  include: {
-                    permission: true
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    });
-
-    if (!user || !user.tenant || user.tenant.slug !== tenantSlug || !user.tenant.isActive) {
-      return createErrorResponse('Access denied - Invalid tenant or user not found', 403);
-    }
-
-    // Check if user has permission to create users
-    const canCreateUsers = user.userRoles.some(userRole =>
-      userRole.role.permissions.some(rp => 
-        rp.permission.module === 'users' && 
-        (rp.permission.action === 'create' || rp.permission.action === 'manage')
-      )
-    );
-
-    if (!canCreateUsers) {
-      return createErrorResponse('Access denied - Insufficient permissions', 403);
-    }
-
+    const userId = req.user!.id;
+    const tenantId = req.user!.tenantId;
     const body = await req.json();
-    const { name, email, password, roleIds, isActive = true } = body;
 
-    // Validate required fields
-    if (!name || !email || !password) {
-      return createErrorResponse('Missing required fields: name, email, password', 400);
+    // Validate request body
+    const validationResult = createUserSchema.safeParse(body);
+    if (!validationResult.success) {
+      return createErrorResponse('Validation failed', 400, validationResult.error.errors);
     }
 
-    // Check if email already exists in tenant
+    const { name, email, password, contactNumber, roleIds, sendInvitation } = validationResult.data;
+
+    // Check if user already exists
     const existingUser = await prisma.user.findFirst({
       where: {
         email,
-        tenantId: user.tenant.id
+        tenantId
       }
     });
 
     if (existingUser) {
-      return createErrorResponse('User with this email already exists', 409);
+      return createErrorResponse('User with this email already exists', 400);
     }
 
+    // Hash password
+    const hashedPassword = await hashPassword(password);
+
     // Create user
-    const newUser = await prisma.user.create({
+    const user = await prisma.user.create({
       data: {
         name,
         email,
-        password: await Bun.password.hash(password),
-        isActive,
-        tenantId: user.tenant.id
+        password: hashedPassword,
+        contactNumber,
+        tenantId,
+        isActive: true
       },
       include: {
         userRoles: {
@@ -289,70 +242,165 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
 
     // Assign roles if provided
     if (roleIds && roleIds.length > 0) {
-      const userRoles = roleIds.map((roleId: string) => ({
-        userId: newUser.id,
+      const roleAssignments = roleIds.map((roleId: string) => ({
+        userId: user.id,
         roleId
       }));
 
       await prisma.userRole.createMany({
-        data: userRoles
+        data: roleAssignments
       });
+    }
 
-      // Fetch updated user with roles
-      const updatedUser = await prisma.user.findUnique({
-        where: { id: newUser.id },
-        include: {
-          userRoles: {
-            include: {
-              role: {
-                select: {
-                  id: true,
-                  name: true,
-                  description: true
+    // Create audit log
+    await createAuditLogFromRequest(req, {
+      id: req.user!.id,
+      email: req.user!.email,
+      role: req.user!.role as 'user' | 'superadmin',
+      tenantId: req.user!.tenantId
+    }, 'users.create', {
+      userId: user.id,
+      email: user.email
+    });
+
+    return createSuccessResponse(user, 'User created successfully');
+  } catch (error: any) {
+    console.error('Error creating user:', error);
+    return createErrorResponse('Failed to create user', 500);
+  }
+});
+
+// PATCH /api/tenant/[tenantSlug]/users - Bulk actions
+export const PATCH = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
+  const { tenantSlug } = await params;
+  
+  try {
+    const userId = req.user!.id;
+    const tenantId = req.user!.tenantId;
+    const body = await req.json();
+
+    // Validate request body
+    const validationResult = bulkActionSchema.safeParse(body);
+    if (!validationResult.success) {
+      return createErrorResponse('Validation failed', 400, validationResult.error.errors);
+    }
+
+    const { userIds, action, roleIds } = validationResult.data;
+
+    // Verify all users belong to this tenant
+    const users = await prisma.user.findMany({
+      where: {
+        id: { in: userIds },
+        tenantId
+      }
+    });
+
+    if (users.length !== userIds.length) {
+      return createErrorResponse('Some users not found or do not belong to this tenant', 400);
+    }
+
+    let result;
+    switch (action) {
+      case 'activate':
+        result = await prisma.user.updateMany({
+          where: { id: { in: userIds }, tenantId },
+          data: { isActive: true }
+        });
+        break;
+
+      case 'deactivate':
+        // Prevent deactivating all admin users
+        const adminUsers = await prisma.user.findMany({
+          where: {
+            id: { in: userIds },
+            tenantId,
+            userRoles: {
+              some: {
+                role: {
+                  name: { contains: 'Admin', mode: 'insensitive' }
                 }
               }
             }
           }
-        }
-      });
+        });
 
-      await createAuditLogFromRequest(req, { id: user.id, email: user.email, role: 'user' }, 'users.create', {
-        tenantId: user.tenant.id,
-        userId: newUser.id,
-        userEmail: newUser.email
-      });
-
-      return createSuccessResponse({
-        user: {
-          id: updatedUser!.id,
-          name: updatedUser!.name,
-          email: updatedUser!.email,
-          isActive: updatedUser!.isActive,
-          createdAt: updatedUser!.createdAt,
-          roles: updatedUser!.userRoles.map(ur => ur.role)
+        if (adminUsers.length > 0) {
+          return createErrorResponse('Cannot deactivate admin users', 400);
         }
-      }, 'User created successfully');
+
+        result = await prisma.user.updateMany({
+          where: { id: { in: userIds }, tenantId },
+          data: { isActive: false }
+        });
+        break;
+
+      case 'delete':
+        // Prevent deleting admin users
+        const adminUsersToDelete = await prisma.user.findMany({
+          where: {
+            id: { in: userIds },
+            tenantId,
+            userRoles: {
+              some: {
+                role: {
+                  name: { contains: 'Admin', mode: 'insensitive' }
+                }
+              }
+            }
+          }
+        });
+
+        if (adminUsersToDelete.length > 0) {
+          return createErrorResponse('Cannot delete admin users', 400);
+        }
+
+        result = await prisma.user.deleteMany({
+          where: { id: { in: userIds }, tenantId }
+        });
+        break;
+
+      case 'assignRoles':
+        if (!roleIds || roleIds.length === 0) {
+          return createErrorResponse('Role IDs are required for role assignment', 400);
+        }
+
+        // Remove existing role assignments
+        await prisma.userRole.deleteMany({
+          where: { userId: { in: userIds } }
+        });
+
+        // Assign new roles
+        const roleAssignments = userIds.flatMap(userId =>
+          roleIds.map(roleId => ({ userId, roleId }))
+        );
+
+        await prisma.userRole.createMany({
+          data: roleAssignments
+        });
+
+        result = { count: userIds.length };
+        break;
+
+      default:
+        return createErrorResponse('Invalid action', 400);
     }
 
-    await createAuditLogFromRequest(req, { id: user.id, email: user.email, role: 'user' }, 'users.create', {
-      tenantId: user.tenant.id,
-      userId: newUser.id,
-      userEmail: newUser.email
+    // Create audit log
+    await createAuditLogFromRequest(req, {
+      id: req.user!.id,
+      email: req.user!.email,
+      role: req.user!.role as 'user' | 'superadmin',
+      tenantId: req.user!.tenantId
+    }, `users.bulk_${action}`, {
+      userIds,
+      action,
+      roleIds,
+      affectedCount: result.count
     });
 
-    return createSuccessResponse({
-      user: {
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        isActive: newUser.isActive,
-        createdAt: newUser.createdAt,
-        roles: []
-      }
-    }, 'User created successfully');
-
+    return createSuccessResponse(result, `Bulk ${action} completed successfully`);
   } catch (error: any) {
-    console.error('Error creating user:', error);
-    return createErrorResponse('Failed to create user', 500);
+    console.error('Error performing bulk action:', error);
+    return createErrorResponse('Failed to perform bulk action', 500);
   }
 }); 

@@ -2,6 +2,7 @@
 
 import { useSidebar } from "@/context/SidebarContext";
 import { DynamicPermissionsProvider } from "@/context/DynamicPermissionsContext";
+import { TenantAuthProvider } from "@/context/TenantAuthContext";
 import AppHeader from "@/layout/AppHeader";
 import DynamicSidebar from "@/layout/DynamicSidebar";
 import Backdrop from "@/layout/Backdrop";
@@ -30,26 +31,28 @@ export default function TenantLayout({
     : "lg:ml-[90px]";
 
   return (
-    <DynamicPermissionsProvider>
-      {/* If it's an auth page, render without header and sidebar */}
-      {isLoginPage || isSignupPage || isForgotPasswordPage || isResetPasswordPage ? (
-        <div className="min-h-screen">
-          {children}
-        </div>
-      ) : (
+    <TenantAuthProvider>
+      <DynamicPermissionsProvider>
         <div className="min-h-screen xl:flex">
-          {/* Sidebar and Backdrop - Only for authenticated pages */}
-          <DynamicSidebar />
+          {/* Always render components to maintain hook order */}
+          <DynamicSidebar isAuthPage={isLoginPage || isSignupPage || isForgotPasswordPage || isResetPasswordPage} />
           <Backdrop />
+          
           {/* Main Content Area */}
-          <div className={`flex-1 transition-all duration-300 ease-in-out ${mainContentMargin}`}>
+          <div className={`flex-1 transition-all duration-300 ease-in-out ${
+            isLoginPage || isSignupPage || isForgotPasswordPage || isResetPasswordPage 
+              ? "ml-0" 
+              : mainContentMargin
+          }`}>
             {/* Header - Only for authenticated pages */}
-            <AppHeader />
+            {!(isLoginPage || isSignupPage || isForgotPasswordPage || isResetPasswordPage) && (
+              <AppHeader />
+            )}
             {/* Page Content */}
             <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">{children}</div>
           </div>
         </div>
-      )}
-    </DynamicPermissionsProvider>
+      </DynamicPermissionsProvider>
+    </TenantAuthProvider>
   );
 }

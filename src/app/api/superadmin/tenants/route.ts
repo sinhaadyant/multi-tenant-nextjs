@@ -151,6 +151,7 @@ export const GET = asyncHandler(async (req: NextRequest) => {
         domain: tenant.domain,
         description: tenant.description,
         isActive: tenant.isActive,
+        status: tenant.isActive ? 'active' : 'suspended', // Transform isActive to status
         plan: tenant.plan,
         region: tenant.region,
         features: tenant.features ? JSON.parse(tenant.features) : [],
@@ -202,131 +203,80 @@ export const POST = asyncHandler(async (req: NextRequest) => {
     );
   }
 
-  const { name, slug, domain, description, plan, region, features, isActive, metadata } = tenant;
-  const { name: adminName, email: adminEmail, password: adminPassword, contactNumber } = admin;
-
-  if (!name || !slug || !adminEmail || !adminName || !adminPassword) {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('❌ Missing required fields for tenant creation');
-    }
-    const errors = [];
-    if (!name) errors.push({ field: 'tenant.name', message: 'Tenant name is required' });
-    if (!slug) errors.push({ field: 'tenant.slug', message: 'Tenant slug is required' });
-    if (!adminEmail) errors.push({ field: 'admin.email', message: 'Admin email is required' });
-    if (!adminName) errors.push({ field: 'admin.name', message: 'Admin name is required' });
-    if (!adminPassword) errors.push({ field: 'admin.password', message: 'Admin password is required' });
-    
-    return createErrorResponse(
-      'All required fields must be provided',
-      400,
-      errors
-    );
-  }
-
   try {
     // Check if tenant slug already exists
     const existingTenant = await prisma.tenant.findUnique({
-      where: { slug }
+      where: { slug: tenant.slug }
     });
 
     if (existingTenant) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Tenant slug already exists:', slug);
+        console.log('❌ Tenant slug already exists:', tenant.slug);
       }
       return createErrorResponse(
         'Tenant slug already exists',
-        409,
-        [{ field: 'slug', message: 'Tenant slug already exists' }]
+        409
       );
     }
 
-    // Check if admin email already exists in users table
-    const existingUser = await prisma.user.findFirst({
-      where: { email: adminEmail.toLowerCase() },
-      include: {
-        tenant: {
-          select: { name: true, slug: true }
-        }
-      }
+    // Check if admin email already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email: admin.email }
     });
 
     if (existingUser) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Admin email already exists in tenant:', existingUser.tenant?.name);
+        console.log('❌ Admin email already exists:', admin.email);
       }
       return createErrorResponse(
-        `Email is already registered in tenant: ${existingUser.tenant?.name || 'Unknown'}`,
-        409,
-        [{ field: 'admin.email', message: `Email is already registered in tenant: ${existingUser.tenant?.name || 'Unknown'}` }]
-      );
-    }
-
-    // Check if admin email already exists in superadmin table
-    const existingSuperAdmin = await prisma.superAdmin.findFirst({
-      where: { email: adminEmail.toLowerCase() }
-    });
-
-    if (existingSuperAdmin) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Admin email already exists as SuperAdmin');
-      }
-      return createErrorResponse(
-        'Email is already registered as a SuperAdmin',
-        409,
-        [{ field: 'admin.email', message: 'Email is already registered as a SuperAdmin' }]
+        'Admin email already exists',
+        409
       );
     }
 
     // Create tenant and admin user in a transaction
     const result = await prisma.$transaction(async (tx) => {
       // Create tenant
-      const tenant = await tx.tenant.create({
+      const newTenant = await tx.tenant.create({
         data: {
-          name,
-          slug,
-          domain: domain || `${slug}.example.com`,
-          description: description || `${name} - ${plan} tenant`,
-          plan: plan || 'starter',
-          region: region || 'US East',
-          features: Array.isArray(features) ? JSON.stringify(features) : JSON.stringify(features || ['analytics', 'api', 'sso']),
-          isActive: isActive !== undefined ? isActive : true,
-          metadata: typeof metadata === 'object' ? JSON.stringify(metadata) : (metadata || '{}')
-        }
-      });
-
-      // Hash the provided admin password
-      const hashedPassword = await hashPassword(adminPassword);
-
-      // Get the Tenant Admin role
-      const tenantAdminRole = await tx.role.findFirst({
-        where: { name: 'Tenant Admin' }
-      });
-
-      // Create admin user
-      const adminUser = await tx.user.create({
-        data: {
-          email: adminEmail.toLowerCase(),
-          name: adminName,
-          password: hashedPassword,
-          contactNumber: contactNumber || '',
-          tenantId: tenant.id,
-          roleId: tenantAdminRole?.id,
+          name: tenant.name,
+          slug: tenant.slug,
+          domain: tenant.domain,
+          description: tenant.description,
+          plan: tenant.plan || 'starter',
+          region: tenant.region || 'us-east-1',
+          features: tenant.features ? JSON.stringify(tenant.features) : '[]',
           isActive: true
         }
       });
 
-      return { tenant, adminUser };
+      // Hash password
+      const hashedPassword = await hashPassword(admin.password);
+
+      // Create admin user
+      const adminUser = await tx.user.create({
+        data: {
+          name: admin.name,
+          email: admin.email,
+          password: hashedPassword,
+          tenantId: newTenant.id,
+          role: 'admin',
+          isActive: true
+        }
+      });
+
+      return { tenant: newTenant, admin: adminUser };
     });
 
     // Create audit log
     await createAuditLogFromRequest(
       req,
       authResult,
-      'tenant.create',
+      'tenant.created',
       {
         tenantId: result.tenant.id,
         tenantName: result.tenant.name,
-        adminEmail: adminEmail
+        adminEmail: result.admin.email
       }
     );
 
@@ -340,20 +290,21 @@ export const POST = asyncHandler(async (req: NextRequest) => {
         name: result.tenant.name,
         slug: result.tenant.slug,
         domain: result.tenant.domain,
+        description: result.tenant.description,
+        isActive: result.tenant.isActive,
+        status: result.tenant.isActive ? 'active' : 'suspended',
         plan: result.tenant.plan,
         region: result.tenant.region,
-        createdAt: result.tenant.createdAt
-      },
-      admin: {
-        id: result.adminUser.id,
-        name: result.adminUser.name,
-        email: result.adminUser.email
+        features: result.tenant.features ? JSON.parse(result.tenant.features) : [],
+        createdAt: result.tenant.createdAt,
+        updatedAt: result.tenant.updatedAt,
+        userCount: 1
       }
-    }, 'Tenant created successfully', 201);
+    }, 'Tenant created successfully');
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
       console.error('❌ Error creating tenant:', error);
     }
     throw error;
   }
-}); 
+});

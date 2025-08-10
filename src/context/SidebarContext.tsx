@@ -1,6 +1,6 @@
 "use client";
-import React, { createContext, useContext, useState, useEffect } from "react";
 
+import React, { createContext, useContext, useState, useEffect } from "react";
 
 type SidebarContextType = {
   isExpanded: boolean;
@@ -37,6 +37,7 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({
   const [activeItem, setActiveItem] = useState<string | null>(null);
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
 
+  // Move useEffect to the top, before any conditional logic
   useEffect(() => {
     // Load saved sidebar state from localStorage after hydration
     if (typeof window !== 'undefined') {

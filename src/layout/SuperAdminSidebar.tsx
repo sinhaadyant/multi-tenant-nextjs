@@ -93,7 +93,12 @@ const superAdminNavElements: NavItem[] = [
     icon: "chart-bar",
     path: "/superadmin/reports"
   },
-
+  {
+    id: "notifications",
+    label: "Notifications",
+    icon: "bell",
+    path: "/superadmin/notifications"
+  },
   {
     id: "support",
     label: "Support / Logs",

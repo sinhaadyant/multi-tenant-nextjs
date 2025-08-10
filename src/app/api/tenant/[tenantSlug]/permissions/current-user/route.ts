@@ -1,23 +1,48 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { asyncHandler } from '@/lib/errorHandler';
+import { NextRequest } from 'next/server';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-import { withTenantAuth, AuthenticatedRequest } from '@/lib/authMiddleware';
+import { verifyToken } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { createAuditLogFromRequest } from '@/lib/audit';
 
-// GET /api/tenant/[tenantSlug]/permissions/current-user - Get current user's permissions and menu config
-export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
-  const { tenantSlug } = await params;
-  
+export async function GET(req: NextRequest) {
   try {
-    // User is already authenticated and verified by middleware
-    const userId = req.user!.id;
-    const tenantId = req.user!.tenantId;
+    const { searchParams } = new URL(req.url);
+    const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
+    
+    if (!tenantSlug) {
+      return createErrorResponse('Tenant slug is required', 400);
+    }
 
-    // Fetch user with roles and permissions
+    // Verify authentication token
+    const token = req.headers.get('authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return createErrorResponse('No authentication token found', 401);
+    }
+
+    const decoded = await verifyToken(token);
+    if (!decoded || !decoded.id) {
+      return createErrorResponse('Invalid authentication token', 401);
+    }
+
+    // Get tenant
+    const tenant = await prisma.tenant.findUnique({
+      where: { slug: tenantSlug },
+      select: { id: true, name: true, slug: true, isActive: true }
+    });
+
+    if (!tenant) {
+      return createErrorResponse('Tenant not found', 404);
+    }
+
+    if (!tenant.isActive) {
+      return createErrorResponse('Tenant is inactive', 403);
+    }
+
+    // Get user with roles and permissions
     const user = await prisma.user.findFirst({
       where: {
-        id: userId,
-        tenantId: tenantId,
+        id: decoded.id,
+        tenantId: tenant.id,
         isActive: true
       },
       include: {
@@ -27,11 +52,7 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
               include: {
                 permissions: {
                   include: {
-                    permission: {
-                      include: {
-                        module: true
-                      }
-                    }
+                    permission: true
                   }
                 }
               }
@@ -50,129 +71,155 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
     });
 
     if (!user) {
-      return createErrorResponse('User not found', 404);
+      return createErrorResponse('User not found or not authorized for this tenant', 404);
     }
 
-    if (!user.tenant || user.tenant.slug !== tenantSlug) {
-      return createErrorResponse('Tenant mismatch', 403);
-    }
-
-    if (!user.tenant.isActive) {
-      return createErrorResponse('Tenant is disabled', 403);
-    }
-
-    // Extract user permissions
-    const userPermissions = new Set<string>();
-    const modulePermissions = new Map<string, Set<string>>();
-    const accessibleModules = new Set<string>();
+    // Extract all permissions from user's roles
+    const allPermissions: string[] = [];
+    const modulePermissions: { [key: string]: string[] } = {};
+    const accessibleModules: string[] = [];
 
     user.userRoles.forEach(userRole => {
       userRole.role.permissions.forEach(rp => {
         const permission = rp.permission;
-        const moduleKey = permission.module.moduleKey;
+        const permissionKey = `${permission.module}:${permission.action}`;
         
-        // Add to user permissions set
-        userPermissions.add(`${moduleKey}:${permission.action}`);
-        
-        // Add to module permissions map
-        if (!modulePermissions.has(moduleKey)) {
-          modulePermissions.set(moduleKey, new Set());
+        // Add to all permissions
+        if (!allPermissions.includes(permissionKey)) {
+          allPermissions.push(permissionKey);
         }
-        modulePermissions.get(moduleKey)!.add(permission.action);
-        
-        // Mark module as accessible
-        accessibleModules.add(moduleKey);
+
+        // Add to module permissions
+        if (!modulePermissions[permission.module]) {
+          modulePermissions[permission.module] = [];
+        }
+        if (!modulePermissions[permission.module].includes(permission.action)) {
+          modulePermissions[permission.module].push(permission.action);
+        }
+
+        // Add to accessible modules
+        if (!accessibleModules.includes(permission.module)) {
+          accessibleModules.push(permission.module);
+        }
       });
     });
 
-    // Fetch all modules with their hierarchy
-    const allModules = await prisma.module.findMany({
-      where: {
-        isActive: true,
-        isVisible: true
+    // Generate menu items based on permissions
+    const menuItems = [
+      {
+        id: "dashboard",
+        label: "Dashboard",
+        icon: "LayoutDashboard",
+        path: "/dashboard",
+        description: "Main dashboard with overview and analytics",
+        permissions: ["dashboard:view"],
+        hasChildren: false
       },
-      orderBy: [
-        { orderIndex: 'asc' },
-        { moduleName: 'asc' }
-      ]
+      {
+        id: "users",
+        label: "Users",
+        icon: "Users",
+        path: "/users",
+        description: "Manage users and their roles",
+        permissions: ["users:view"],
+        hasChildren: false
+      },
+      {
+        id: "roles",
+        label: "Roles",
+        icon: "Shield",
+        path: "/roles",
+        description: "Manage roles and permissions",
+        permissions: ["roles:view"],
+        hasChildren: false
+      },
+      {
+        id: "audit",
+        label: "Audit Logs",
+        icon: "ClipboardList",
+        path: "/audit",
+        description: "View system audit logs",
+        permissions: ["audit:view"],
+        hasChildren: false
+      },
+      {
+        id: "notifications",
+        label: "Notifications",
+        icon: "Bell",
+        path: "/notifications",
+        description: "Manage notifications",
+        permissions: ["notifications:view"],
+        hasChildren: false
+      },
+      {
+        id: "utilities",
+        label: "Settings",
+        icon: "Settings",
+        path: "/utilities",
+        description: "System and tenant settings",
+        permissions: ["settings:view"],
+        hasChildren: false
+      }
+    ].filter(item => {
+      // Filter menu items based on user permissions
+      return item.permissions.some(permission => allPermissions.includes(permission));
     });
 
-    // Build menu structure based on user permissions
-    const buildMenuItems = (modules: any[], parentKey: string | null = null) => {
-      return modules
-        .filter(module => {
-          // Filter by parent
-          if (parentKey === null) {
-            return !module.parentModuleKey;
-          }
-          return module.parentModuleKey === parentKey;
-        })
-        .filter(module => {
-          // Check if user has access to this module
-          return accessibleModules.has(module.moduleKey);
-        })
-        .map(module => {
-          const modulePerms = modulePermissions.get(module.moduleKey) || new Set();
-          const children = buildMenuItems(modules, module.moduleKey);
-          
-          return {
-            id: module.moduleKey,
-            label: module.moduleName,
-            icon: module.icon,
-            path: module.path,
-            description: module.description,
-            permissions: Array.from(modulePerms),
-            children: children.length > 0 ? children : undefined,
-            hasChildren: children.length > 0
-          };
-        })
-        .filter(item => {
-          // Remove parent items that have no accessible children
-          if (item.hasChildren && (!item.children || item.children.length === 0)) {
-            return false;
-          }
-          return true;
-        });
+    // Create audit log
+    await createAuditLogFromRequest(
+      req,
+      { id: user.id, email: user.email, role: 'user' },
+      'user.permissions.fetch',
+      { 
+        userId: user.id,
+        tenantId: tenant.id,
+        permissionsCount: allPermissions.length,
+        modulesCount: accessibleModules.length
+      }
+    );
+
+    const userPermissionsData = {
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar,
+        isActive: user.isActive,
+        lastLogin: user.lastLogin,
+        createdAt: user.createdAt,
+        tenant: user.tenant,
+        roles: user.userRoles.map(userRole => ({
+          id: userRole.role.id,
+          name: userRole.role.name,
+          description: userRole.role.description,
+          isDefault: userRole.role.isDefault
+        }))
+      },
+      permissions: allPermissions,
+      modulePermissions: modulePermissions,
+      accessibleModules: accessibleModules,
+      menuItems: menuItems,
+      hasAccess: allPermissions.length > 0,
+      totalPermissions: allPermissions.length,
+      totalModules: accessibleModules.length
     };
 
-    const menuItems = buildMenuItems(allModules);
-
-    // Check if user has any accessible modules
-    const hasAccess = accessibleModules.size > 0;
-
-    // Build user profile with roles
-    const userProfile = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      avatar: user.avatar,
-      isActive: user.isActive,
-      lastLogin: user.lastLogin,
-      createdAt: user.createdAt,
-      tenant: user.tenant,
-      roles: user.userRoles.map(ur => ({
-        id: ur.role.id,
-        name: ur.role.name,
-        description: ur.role.description,
-        isDefault: ur.role.isDefault
-      }))
-    };
-
-    return createSuccessResponse({
-      user: userProfile,
-      permissions: Array.from(userPermissions),
-      modulePermissions: Object.fromEntries(
-        Array.from(modulePermissions.entries()).map(([key, value]) => [key, Array.from(value)])
-      ),
-      accessibleModules: Array.from(accessibleModules),
-      menuItems,
-      hasAccess,
-      totalPermissions: userPermissions.size,
-      totalModules: accessibleModules.size
-    }, 'User permissions retrieved successfully');
+    return createSuccessResponse(userPermissionsData, 'User permissions fetched successfully');
 
   } catch (error: any) {
     console.error('Error fetching user permissions:', error);
-    return createErrorResponse('Failed to fetch user permissions', 500);
+    return createErrorResponse(
+      error.message || 'Internal server error',
+      error.status || 500
+    );
   }
-}); 
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    return createSuccessResponse({ message: 'API endpoint working' }, 'Success');
+  } catch (error: any) {
+    console.error('Error:', error);
+    return createErrorResponse('Internal server error', 500);
+  }
+}

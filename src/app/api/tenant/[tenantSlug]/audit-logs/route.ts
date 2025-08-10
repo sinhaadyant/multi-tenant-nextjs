@@ -2,48 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { asyncHandler } from '@/lib/errorHandler';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-import { verifyToken } from '@/lib/jwt';
+import { withTenantAuth, AuthenticatedRequest } from '@/lib/authMiddleware';
+import { createAuditLogFromRequest } from '@/lib/audit';
+import { getAuditLogStats } from '@/lib/auditRetention';
 
 // GET /api/tenant/[tenantSlug]/audit-logs - Get audit logs for specific tenant
-export const GET = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
+export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
   const { tenantSlug } = await params;
   
-  // Get authorization header
-  const authHeader = req.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return createErrorResponse('Unauthorized - No token provided', 401);
-  }
-
-  const token = authHeader.substring(7);
-  
   try {
-    // Verify JWT token
-    const decoded = verifyToken(token);
-    if (!decoded || !decoded.id || !decoded.tenantId) {
-      return createErrorResponse('Invalid token', 401);
-    }
+    const userId = req.user!.id;
+    const tenantId = req.user!.tenantId;
 
-    // Verify user belongs to the tenant
-    const user = await prisma.user.findFirst({
-      where: {
-        id: decoded.id,
-        tenant: {
-          slug: tenantSlug,
-          isActive: true
-        }
-      },
-      include: {
-        tenant: true
-      }
-    });
-
-    if (!user || !user.tenant || user.tenant.slug !== tenantSlug || !user.tenant.isActive) {
-      return createErrorResponse('Access denied - Invalid tenant or user not found', 403);
-    }
-
-    // Note: Audit logs are already filtered by tenant, so we don't need additional permission checks
-    // The user can only see logs for their own tenant
-
+    // Get query parameters
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
@@ -53,22 +24,42 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
     const endDate = searchParams.get('endDate') || '';
     const sortBy = searchParams.get('sortBy') || 'createdAt';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
+    const status = searchParams.get('status') || '';
+    const severity = searchParams.get('severity') || '';
+    const resourceType = searchParams.get('resourceType') || '';
+    const includeArchived = searchParams.get('includeArchived') === 'true';
 
     const skip = (page - 1) * limit;
 
     // Build where clause - only show logs for this tenant
     const where: any = {
-      tenantId: user.tenant.id
+      tenantId: tenantId
     };
+    
+    if (!includeArchived) {
+      where.isArchived = false;
+    }
     
     if (userEmail) {
       where.user = {
-        email: { contains: userEmail }
+        email: { contains: userEmail, mode: 'insensitive' }
       };
     }
 
     if (actionType) {
-      where.action = { contains: actionType };
+      where.action = { contains: actionType, mode: 'insensitive' };
+    }
+
+    if (status) {
+      where.status = status;
+    }
+
+    if (severity) {
+      where.severity = severity;
+    }
+
+    if (resourceType) {
+      where.resourceType = resourceType;
     }
 
     if (startDate || endDate) {
@@ -81,98 +72,105 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
       }
     }
 
+    // Validate sort parameters
+    const validSortFields = ['createdAt', 'action', 'ipAddress', 'status', 'severity', 'resourceType'];
+    const validSortOrders = ['asc', 'desc'];
+    
+    const finalSortBy = validSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const finalSortOrder = validSortOrders.includes(sortOrder) ? sortOrder : 'desc';
+
     // Build order by clause
     const orderBy: any = {};
-    orderBy[sortBy] = sortOrder;
+    orderBy[finalSortBy] = finalSortOrder;
 
-    try {
-      // Get audit logs with pagination
-      const [auditLogs, totalCount] = await Promise.all([
-        prisma.auditLog.findMany({
-          where,
-          skip,
-          take: limit,
-          orderBy,
-          include: {
-            tenant: {
-              select: { name: true, slug: true }
-            },
-            user: {
-              select: { email: true, name: true }
-            },
-            superAdmin: {
-              select: { email: true, name: true }
-            }
-          }
-        }),
-        prisma.auditLog.count({ where })
-      ]);
-
-      // Get statistics by action type for this tenant
-      const actionStats = await prisma.auditLog.groupBy({
-        by: ['action'],
-        _count: {
-          id: true
-        },
-        where: {
-          tenantId: user.tenant.id,
-          createdAt: {
-            gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Last 30 days
+    // Get audit logs with pagination
+    const [auditLogs, totalCount] = await Promise.all([
+      prisma.auditLog.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy,
+        include: {
+          tenant: {
+            select: { name: true, slug: true }
+          },
+          user: {
+            select: { email: true, name: true }
+          },
+          superAdmin: {
+            select: { email: true, name: true }
           }
         }
-      });
+      }),
+      prisma.auditLog.count({ where })
+    ]);
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log('✅ Tenant audit logs fetched successfully:', auditLogs.length);
-      }
+    // Get enhanced statistics
+    const stats = await getAuditLogStats(tenantId);
 
-      return createSuccessResponse({
-        auditLogs: auditLogs.map(log => {
-          return {
-            id: log.id,
-            action: log.action,
-            details: log.details,
-            ipAddress: log.ipAddress,
-            userAgent: log.userAgent,
-            createdAt: log.createdAt,
-            tenant: log.tenant ? {
-              id: log.tenantId,
-              name: log.tenant.name,
-              slug: log.tenant.slug
-            } : null,
-            user: log.user ? {
-              id: log.userId,
-              email: log.user.email,
-              name: log.user.name
-            } : null,
-            superAdmin: log.superAdmin ? {
-              id: log.superAdminId,
-              email: log.superAdmin.email,
-              name: log.superAdmin.name
-            } : null
-          };
-        }),
-        stats: {
-          total: totalCount,
-          actionBreakdown: actionStats.map(stat => ({
-            action: stat.action,
-            count: stat._count.id
-          }))
-        }
-      }, 'Tenant audit logs fetched successfully', 200, {
+    // Transform the data
+    const transformedLogs = auditLogs.map(log => ({
+      id: log.id,
+      action: log.action,
+      details: log.details,
+      ipAddress: log.ipAddress,
+      userAgent: log.userAgent,
+      createdAt: log.createdAt.toISOString(),
+      status: log.status,
+      severity: log.severity,
+      resourceType: log.resourceType,
+      resourceId: log.resourceId,
+      oldValues: log.oldValues,
+      newValues: log.newValues,
+      sessionId: log.sessionId,
+      requestId: log.requestId,
+      isArchived: log.isArchived,
+      archivedAt: log.archivedAt?.toISOString(),
+      retentionExpiry: log.retentionExpiry?.toISOString(),
+      tenant: log.tenant ? {
+        id: log.tenantId,
+        name: log.tenant.name,
+        slug: log.tenant.slug
+      } : null,
+      user: log.user ? {
+        id: log.userId,
+        email: log.user.email,
+        name: log.user.name
+      } : null,
+      superAdmin: log.superAdmin ? {
+        id: log.superAdminId,
+        email: log.superAdmin.email,
+        name: log.superAdmin.name
+      } : null
+    }));
+
+    // Create audit log for this action
+    await createAuditLogFromRequest(req, { id: userId, email: req.user!.email || '', role: 'user' }, 'audit.view', {
+      tenantId: tenantId,
+      logsCount: transformedLogs.length,
+      filters: { userEmail, actionType, startDate, endDate, status, severity, resourceType, page, limit }
+    });
+
+    return createSuccessResponse({
+      auditLogs: transformedLogs,
+      stats: {
+        total: totalCount,
+        archived: stats.archived,
+        expired: stats.expired,
+        bySeverity: stats.bySeverity,
+        byStatus: stats.byStatus,
+        actionBreakdown: stats.actionBreakdown || []
+      },
+      pagination: {
         page,
         limit,
-        totalPages: Math.ceil(totalCount / limit),
-        totalRecords: totalCount
-      });
-    } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('❌ Error fetching tenant audit logs:', error);
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit)
       }
-      throw error;
-    }
+    }, 'Audit logs fetched successfully');
+
   } catch (error: any) {
-    console.error('Error fetching tenant audit logs:', error);
-    return createErrorResponse('Failed to fetch tenant audit logs', 500);
+    console.error('Error fetching audit logs:', error);
+    return createErrorResponse('Failed to fetch audit logs', 500);
   }
 }); 

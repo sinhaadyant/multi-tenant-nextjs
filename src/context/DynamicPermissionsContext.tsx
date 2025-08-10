@@ -143,18 +143,55 @@ export const DynamicPermissionsProvider: React.FC<DynamicPermissionsProviderProp
         }
       });
 
+      console.log('Permissions API response:', response.data);
+
       if (response.data.success) {
         const permissionsData = response.data.data;
-        setUserPermissions(permissionsData);
+        
+        console.log('Raw permissions data:', permissionsData);
+        console.log('Permissions data type:', typeof permissionsData);
+        console.log('Permissions data keys:', permissionsData ? Object.keys(permissionsData) : 'null');
+        
+        // Ensure the permissions data has the expected structure
+        const validatedPermissionsData: UserPermissions = {
+          user: permissionsData.user || {
+            id: '',
+            name: '',
+            email: '',
+            isActive: false,
+            createdAt: new Date().toISOString(),
+            tenant: {
+              id: '',
+              name: '',
+              slug: '',
+              isActive: false
+            },
+            roles: []
+          },
+          permissions: permissionsData.permissions || [],
+          modulePermissions: permissionsData.modulePermissions || {},
+          accessibleModules: permissionsData.accessibleModules || [],
+          menuItems: permissionsData.menuItems || [],
+          hasAccess: permissionsData.hasAccess || false,
+          totalPermissions: permissionsData.totalPermissions || 0,
+          totalModules: permissionsData.totalModules || 0
+        };
+        
+        setUserPermissions(validatedPermissionsData);
         
         // Store in localStorage for offline access
-        localStorage.setItem('user_permissions', JSON.stringify(permissionsData));
+        localStorage.setItem('user_permissions', JSON.stringify(validatedPermissionsData));
         localStorage.setItem('permissions_timestamp', Date.now().toString());
       } else {
         throw new Error(response.data.message || 'Failed to fetch user permissions');
       }
     } catch (err: any) {
       console.error('Error fetching user permissions:', err);
+      console.error('Error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
       
       // Only set error if it's not a missing token (which is normal for login pages)
       if (err.message !== 'No authentication token found') {
@@ -171,7 +208,37 @@ export const DynamicPermissionsProvider: React.FC<DynamicPermissionsProviderProp
         if (cacheAge < 60 * 60 * 1000) {
           try {
             const parsedPermissions = JSON.parse(cachedPermissions);
-            setUserPermissions(parsedPermissions);
+            
+            console.log('Cached permissions data:', parsedPermissions);
+            console.log('Cached permissions type:', typeof parsedPermissions);
+            console.log('Cached permissions keys:', parsedPermissions ? Object.keys(parsedPermissions) : 'null');
+            
+            // Validate cached permissions structure
+            const validatedCachedPermissions: UserPermissions = {
+              user: parsedPermissions.user || {
+                id: '',
+                name: '',
+                email: '',
+                isActive: false,
+                createdAt: new Date().toISOString(),
+                tenant: {
+                  id: '',
+                  name: '',
+                  slug: '',
+                  isActive: false
+                },
+                roles: []
+              },
+              permissions: parsedPermissions.permissions || [],
+              modulePermissions: parsedPermissions.modulePermissions || {},
+              accessibleModules: parsedPermissions.accessibleModules || [],
+              menuItems: parsedPermissions.menuItems || [],
+              hasAccess: parsedPermissions.hasAccess || false,
+              totalPermissions: parsedPermissions.totalPermissions || 0,
+              totalModules: parsedPermissions.totalModules || 0
+            };
+            
+            setUserPermissions(validatedCachedPermissions);
             console.log('Using cached permissions');
           } catch (parseError) {
             console.error('Error parsing cached permissions:', parseError);
@@ -194,45 +261,45 @@ export const DynamicPermissionsProvider: React.FC<DynamicPermissionsProviderProp
   }, [tenantSlug]);
 
   const hasPermission = useCallback((moduleKey: string, action: string): boolean => {
-    if (!userPermissions) return false;
+    if (!userPermissions || !userPermissions.permissions || !Array.isArray(userPermissions.permissions)) return false;
     
     const permissionKey = `${moduleKey}:${action}`;
     return userPermissions.permissions.includes(permissionKey);
   }, [userPermissions]);
 
   const hasAnyPermission = useCallback((moduleKey: string): boolean => {
-    if (!userPermissions) return false;
+    if (!userPermissions || !userPermissions.permissions || !Array.isArray(userPermissions.permissions)) return false;
     
     return userPermissions.permissions.some(permission => 
-      permission.startsWith(`${moduleKey}:`)
+      permission && typeof permission === 'string' && permission.startsWith(`${moduleKey}:`)
     );
   }, [userPermissions]);
 
   const hasRole = useCallback((roleName: string): boolean => {
-    if (!userPermissions) return false;
+    if (!userPermissions || !userPermissions.user || !userPermissions.user.roles || !Array.isArray(userPermissions.user.roles)) return false;
     
     return userPermissions.user.roles.some(role => 
-      role.name.toLowerCase() === roleName.toLowerCase()
+      role && role.name && typeof role.name === 'string' && role.name.toLowerCase() === roleName.toLowerCase()
     );
   }, [userPermissions]);
 
   const canAccessModule = useCallback((moduleKey: string): boolean => {
-    if (!userPermissions) return false;
+    if (!userPermissions || !userPermissions.accessibleModules || !Array.isArray(userPermissions.accessibleModules)) return false;
     
     return userPermissions.accessibleModules.includes(moduleKey);
   }, [userPermissions]);
 
   const canPerformAction = useCallback((moduleKey: string, action: string): boolean => {
-    if (!userPermissions) return false;
+    if (!userPermissions || !userPermissions.modulePermissions) return false;
     
     const modulePerms = userPermissions.modulePermissions[moduleKey];
-    if (!modulePerms) return false;
+    if (!modulePerms || !Array.isArray(modulePerms)) return false;
     
     return modulePerms.includes(action);
   }, [userPermissions]);
 
   const getMenuItems = useCallback((): MenuItem[] => {
-    if (!userPermissions) return [];
+    if (!userPermissions || !userPermissions.menuItems || !Array.isArray(userPermissions.menuItems)) return [];
     
     // If menu items are empty, return fallback items
     if (userPermissions.menuItems.length === 0) {
@@ -262,7 +329,7 @@ export const DynamicPermissionsProvider: React.FC<DynamicPermissionsProviderProp
   }, [userPermissions]);
 
   const getModulePermissions = useCallback((moduleKey: string): string[] => {
-    if (!userPermissions) return [];
+    if (!userPermissions || !userPermissions.modulePermissions) return [];
     
     return userPermissions.modulePermissions[moduleKey] || [];
   }, [userPermissions]);
@@ -280,7 +347,7 @@ export const DynamicPermissionsProvider: React.FC<DynamicPermissionsProviderProp
   // Check if user has access (has permissions and is authenticated)
   // Also return true if we have fallback menu items available
   const hasAccess = useCallback((): boolean => {
-    return userPermissions !== null && userPermissions.hasAccess;
+    return userPermissions !== null && userPermissions.hasAccess === true;
   }, [userPermissions]);
 
   useEffect(() => {

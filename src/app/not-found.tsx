@@ -15,14 +15,14 @@ export default function NotFound() {
         <Image
           src="/images/error/404.svg"
           alt="404"
-          className="dark:hidden"
+          className="dark:hidden w-auto h-auto"
           width={472}
           height={152}
         />
         <Image
           src="/images/error/404-dark.svg"
           alt="404"
-          className="hidden dark:block"
+          className="hidden dark:block w-auto h-auto"
           width={472}
           height={152}
         />

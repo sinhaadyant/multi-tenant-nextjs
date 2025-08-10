@@ -1,36 +1,52 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { asyncHandler } from '@/lib/errorHandler';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-import { withAuth, AuthenticatedRequest } from '@/lib/authMiddleware';
+import { verifyAccessToken } from '@/lib/jwt';
 
-// GET /api/auth/verify - Verify current user's token and return user info
-export const GET = withAuth(async (req: AuthenticatedRequest) => {
+export async function GET(req: NextRequest) {
   try {
-    if (!req.user) {
-      return createErrorResponse('User not found', 404);
+    // Get authorization header
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return createErrorResponse('Authorization header is required', 401);
     }
 
-    // Fetch user data based on role
-    let userData;
+    const token = authHeader.substring(7);
+
+    // Verify the token
+    let decoded;
+    try {
+      decoded = verifyAccessToken(token);
+    } catch (error) {
+      console.error('Token verification failed:', error);
+      return createErrorResponse('Invalid or expired token', 401);
+    }
     
-    if (req.user.role === 'superadmin') {
-      userData = await prisma.superAdmin.findUnique({
-        where: { id: req.user.id },
+    if (!decoded || !decoded.id) {
+      return createErrorResponse('Invalid token payload', 401);
+    }
+
+    // Check if user exists
+    let user;
+    if (decoded.role === 'superadmin') {
+      user = await prisma.superAdmin.findUnique({
+        where: { 
+          id: decoded.id,
+          isActive: true
+        },
         select: {
           id: true,
           email: true,
           name: true,
+          avatar: true,
           isActive: true,
-          lastLogin: true,
           createdAt: true
         }
       });
     } else {
-      userData = await prisma.user.findFirst({
+      user = await prisma.user.findUnique({
         where: { 
-          id: req.user.id,
-          tenantId: req.user.tenantId,
+          id: decoded.id,
           isActive: true
         },
         include: {
@@ -39,48 +55,61 @@ export const GET = withAuth(async (req: AuthenticatedRequest) => {
               id: true,
               name: true,
               slug: true,
-              isActive: true
+              plan: true
+            }
+          },
+          userRoles: {
+            include: {
+              role: true
             }
           }
         }
       });
     }
 
-    if (!userData) {
-      return createErrorResponse('User not found', 404);
+    if (!user) {
+      return createErrorResponse('User not found or inactive', 404);
     }
 
-    // Check if user is active
-    if (!userData.isActive) {
-      return createErrorResponse('User account is disabled', 403);
+    // Format response based on user type
+    let userData;
+    if (decoded.role === 'superadmin') {
+      const superAdminUser = user as any;
+      userData = {
+        id: superAdminUser.id,
+        email: superAdminUser.email,
+        name: superAdminUser.name,
+        role: 'superadmin',
+        avatar: superAdminUser.avatar,
+        isActive: superAdminUser.isActive,
+        createdAt: superAdminUser.createdAt
+      };
+    } else {
+      const tenantUser = user as any;
+      userData = {
+        id: tenantUser.id,
+        email: tenantUser.email,
+        name: tenantUser.name,
+        role: 'user',
+        tenantId: tenantUser.tenantId,
+        tenantSlug: tenantUser.tenant?.slug,
+        avatar: tenantUser.avatar,
+        isActive: tenantUser.isActive,
+        createdAt: tenantUser.createdAt,
+        tenant: tenantUser.tenant,
+        roles: tenantUser.userRoles.map((ur: any) => ur.role)
+      };
     }
 
-    // For tenant users, check if tenant is active
-    if (req.user.role !== 'superadmin' && userData.tenant && !userData.tenant.isActive) {
-      return createErrorResponse('Tenant is disabled', 403);
-    }
-
-    // Format user data
-    const user = {
-      id: userData.id,
-      email: userData.email,
-      name: userData.name,
-      role: req.user.role,
-      tenantId: req.user.tenantId,
-      tenantSlug: req.user.tenantSlug,
-      isActive: userData.isActive,
-      lastLogin: userData.lastLogin,
-      createdAt: userData.createdAt,
-      tenant: req.user.role !== 'superadmin' ? userData.tenant : undefined
-    };
-
-    return createSuccessResponse({
-      user,
-      isAuthenticated: true
-    }, 'Token verified successfully');
+    return createSuccessResponse(userData);
 
   } catch (error: any) {
-    console.error('Error verifying token:', error);
-    return createErrorResponse('Failed to verify token', 500);
+    console.error('Auth verify error:', error);
+    return createErrorResponse('Internal server error', 500);
   }
-}, { requireAuth: true }); 
+}
+
+export async function POST(req: NextRequest) {
+  // Handle POST requests the same as GET
+  return GET(req);
+}

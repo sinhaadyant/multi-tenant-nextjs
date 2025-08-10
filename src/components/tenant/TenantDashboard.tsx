@@ -39,8 +39,8 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ className = ''
   
   const { userPermissions, hasPermission, hasRole, isLoading: permissionsLoading } = useDynamicPermissions();
   const { data: dashboardData, isLoading: dashboardLoading, error: dashboardError, refetch } = useTenantDashboard(tenantSlug);
-  const { data: auditLogs, isLoading: auditLoading } = useTenantAuditLogs(tenantSlug, { limit: 10 });
-  const { data: chartData, isLoading: chartsLoading } = useTenantCharts(tenantSlug);
+  const { auditLogs, loading: auditLoading } = useTenantAuditLogs();
+  // const { data: chartData, isLoading: chartsLoading } = useTenantCharts(tenantSlug);
   
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -52,10 +52,10 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ className = ''
 
   // Update last updated time when data changes
   useEffect(() => {
-    if (dashboardData || chartData) {
+    if (dashboardData) {
       setLastUpdated(new Date());
     }
-  }, [dashboardData, chartData]);
+  }, [dashboardData]);
 
   // Handle refresh
   const handleRefresh = async () => {
@@ -128,44 +128,38 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ className = ''
       </div>
 
       {/* Count Cards */}
-      {dashboardData?.stats && (
+      {dashboardData?.summary && (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           <CountCard
             title="Total Users"
-            count={dashboardData.stats.totalUsers}
+            count={dashboardData.summary.totalUsers}
             icon={<Users className="w-6 h-6" />}
             bgColor="bg-blue-100 dark:bg-blue-900"
             iconColor="text-blue-600 dark:text-blue-400"
             onClick={() => window.location.href = '/users'}
-            trend={dashboardData.stats.newUsers}
-            trendLabel="new this month"
           />
           <CountCard
             title="Active Users"
-            count={dashboardData.stats.activeUsers}
+            count={dashboardData.summary.activeUsers}
             icon={<UserCheck className="w-6 h-6" />}
             bgColor="bg-green-100 dark:bg-green-900"
             iconColor="text-green-600 dark:text-green-400"
             onClick={() => window.location.href = '/users?status=active'}
-            trend={dashboardData.stats.activeUsersChange}
-            trendLabel="from last month"
           />
           <CountCard
-            title="Total Roles"
-            count={dashboardData.stats.totalRoles || 0}
-            icon={<Shield className="w-6 h-6" />}
+            title="Total Activities"
+            count={dashboardData.summary.totalActivities}
+            icon={<Activity className="w-6 h-6" />}
             bgColor="bg-purple-100 dark:bg-purple-900"
             iconColor="text-purple-600 dark:text-purple-400"
-            onClick={() => window.location.href = '/roles'}
+            onClick={() => window.location.href = '/audit'}
           />
           <CountCard
             title="System Health"
-            count={`${dashboardData.stats.systemHealth}%`}
+            count={dashboardData.summary.systemHealth}
             icon={<CheckCircle className="w-6 h-6" />}
             bgColor="bg-emerald-100 dark:bg-emerald-900"
             iconColor="text-emerald-600 dark:text-emerald-400"
-            trend={dashboardData.stats.systemHealthChange}
-            trendLabel="from last week"
           />
         </div>
       )}
@@ -177,29 +171,19 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ className = ''
         hasRoleAccess={hasPermission('roles', 'view')}
       />
 
-      {/* Charts Section */}
-      {chartData && (
+      {/* Charts Section - Temporarily disabled due to data structure mismatch */}
+      {/* {dashboardData?.charts && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <UserActivityChart 
-            data={chartData.userActivity}
+            data={dashboardData.charts.userActivity}
             isLoading={chartsLoading}
           />
           <RoleDistributionChart 
-            data={chartData.roleDistribution}
+            data={dashboardData.charts.systemUsage}
             isLoading={chartsLoading}
           />
         </div>
-      )}
-
-      {/* Login Trends Chart */}
-      {chartData?.loginTrends && (
-        <div className="grid grid-cols-1 gap-6">
-          <LoginTrendsChart 
-            data={chartData.loginTrends}
-            isLoading={chartsLoading}
-          />
-        </div>
-      )}
+      )} */}
 
       {/* Recent Audit Logs */}
       {auditLogs && (

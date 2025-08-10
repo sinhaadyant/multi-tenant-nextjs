@@ -1,254 +1,234 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { requireSuperAdmin } from '@/middleware/auth';
-import { asyncHandler } from '@/lib/errorHandler';
+import { NextRequest } from 'next/server';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
+import { createNotificationSchema, notificationFiltersSchema } from '@/lib/validations/superadmin';
+import { prisma } from '@/lib/prisma';
+import { verifySuperAdminToken } from '@/lib/auth';
+import { checkPermission } from '@/lib/permissions';
 import { createAuditLog } from '@/lib/audit';
 
-// POST /api/superadmin/notifications - Send notification
-export const POST = asyncHandler(async (req: NextRequest) => {
-  if (process.env.NODE_ENV === 'development') {
-    console.log('📢 Creating notification');
-  }
-
-  // Authenticate SuperAdmin
-  const authResult = await requireSuperAdmin(req);
-  if (authResult instanceof NextResponse) {
-    return authResult;
-  }
-
-  const superAdmin = authResult as any;
-  const body = await req.json();
-
-  const { title, message, targetType, targetTenantId, priority = 'medium' } = body;
-
-  // Validation
-  if (!title || title.trim().length === 0) {
-    return createErrorResponse('Title is required', 400);
-  }
-
-  if (title.length > 100) {
-    return createErrorResponse('Title must be 100 characters or less', 400);
-  }
-
-  if (!message || message.trim().length === 0) {
-    return createErrorResponse('Message is required', 400);
-  }
-
-  if (message.length > 500) {
-    return createErrorResponse('Message must be 500 characters or less', 400);
-  }
-
-  if (!targetType || !['superadmin', 'all_tenants', 'specific_tenant'].includes(targetType)) {
-    return createErrorResponse('Invalid target type', 400);
-  }
-
-  if (targetType === 'specific_tenant' && !targetTenantId) {
-    return createErrorResponse('Target tenant ID is required for specific tenant notifications', 400);
-  }
-
-  if (!['low', 'medium', 'high'].includes(priority)) {
-    return createErrorResponse('Invalid priority level', 400);
-  }
-
+export async function GET(req: NextRequest) {
   try {
-    let notifications = [];
-
-    if (targetType === 'superadmin') {
-      // Get all superadmins
-      const superAdmins = await prisma.superAdmin.findMany({
-        where: { isActive: true }
-      });
-
-      // Create notifications for each superadmin
-      notifications = await Promise.all(
-        superAdmins.map(superAdmin =>
-          prisma.notification.create({
-            data: {
-              title,
-              message,
-              priority,
-              targetType: 'superadmin',
-              targetTenantId: null,
-              createdBy: superAdmin.id,
-              isActive: true
-            }
-          })
-        )
-      );
-    } else if (targetType === 'all_tenants') {
-      // Get all active tenants
-      const tenants = await prisma.tenant.findMany({
-        where: { isActive: true }
-      });
-
-      // Create notifications for each tenant
-      notifications = await Promise.all(
-        tenants.map(tenant =>
-          prisma.notification.create({
-            data: {
-              title,
-              message,
-              priority,
-              targetType: 'all_tenants',
-              targetTenantId: tenant.id,
-              createdBy: superAdmin.id,
-              isActive: true
-            }
-          })
-        )
-      );
-    } else if (targetType === 'specific_tenant') {
-      // Verify tenant exists
-      const tenant = await prisma.tenant.findUnique({
-        where: { id: targetTenantId, isActive: true }
-      });
-
-      if (!tenant) {
-        return createErrorResponse('Target tenant not found or inactive', 404);
-      }
-
-      // Create notification for specific tenant
-      const notification = await prisma.notification.create({
-        data: {
-          title,
-          message,
-          priority,
-          targetType: 'specific_tenants',
-          targetTenantId: targetTenantId,
-          createdBy: superAdmin.id,
-          isActive: true
-        }
-      });
-
-      notifications = [notification];
+    // Verify authentication
+    const token = req.headers.get('authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return createErrorResponse('Unauthorized', 401);
     }
+
+    const superAdmin = await verifySuperAdminToken(token);
+    if (!superAdmin) {
+      return createErrorResponse('Unauthorized', 401);
+    }
+
+    // Check permission to view notifications
+    const hasPermission = await checkPermission(superAdmin.id, 'notifications', 'view');
+    if (!hasPermission) {
+      return createErrorResponse('Insufficient permissions', 403);
+    }
+
+    const { searchParams } = new URL(req.url);
+    const filters = {
+      search: searchParams.get('search') || undefined,
+      type: searchParams.getAll('type'),
+      status: searchParams.getAll('status'),
+      priority: searchParams.getAll('priority'),
+      targetType: searchParams.getAll('targetType'),
+      dateRange: searchParams.get('dateRange') ? JSON.parse(searchParams.get('dateRange')!) : undefined,
+      sortBy: searchParams.get('sortBy') || 'createdAt',
+      sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc',
+      page: parseInt(searchParams.get('page') || '1'),
+      limit: parseInt(searchParams.get('limit') || '10'),
+    };
+
+    // Validate filters
+    const validatedFilters = notificationFiltersSchema.parse(filters);
+
+    // Build where clause
+    const where: any = {
+      isActive: true,
+    };
+
+    if (validatedFilters.search) {
+      where.OR = [
+        { title: { contains: validatedFilters.search, mode: 'insensitive' } },
+        { message: { contains: validatedFilters.search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (validatedFilters.type && validatedFilters.type.length > 0) {
+      where.type = { in: validatedFilters.type };
+    }
+
+    if (validatedFilters.status && validatedFilters.status.length > 0) {
+      where.status = { in: validatedFilters.status };
+    }
+
+    if (validatedFilters.priority && validatedFilters.priority.length > 0) {
+      where.priority = { in: validatedFilters.priority };
+    }
+
+    if (validatedFilters.targetType && validatedFilters.targetType.length > 0) {
+      where.targetType = { in: validatedFilters.targetType };
+    }
+
+    if (validatedFilters.dateRange) {
+      where.createdAt = {
+        gte: new Date(validatedFilters.dateRange.start),
+        lte: new Date(validatedFilters.dateRange.end),
+      };
+    }
+
+    // Calculate pagination
+    const skip = (validatedFilters.page - 1) * validatedFilters.limit;
+    const take = validatedFilters.limit;
+
+    // Get notifications with pagination
+    const [notifications, total] = await Promise.all([
+      prisma.notification.findMany({
+        where,
+        include: {
+          superAdmin: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          tenant: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+            },
+          },
+          _count: {
+            select: {
+              userNotifications: true,
+            },
+          },
+        },
+        orderBy: {
+          [validatedFilters.sortBy]: validatedFilters.sortOrder,
+        },
+        skip,
+        take,
+      }),
+      prisma.notification.count({ where }),
+    ]);
+
+    // Get stats
+    const stats = await prisma.notification.groupBy({
+      by: ['status'],
+      where: { isActive: true },
+      _count: {
+        status: true,
+      },
+    });
+
+    const statsMap = {
+      total,
+      draft: 0,
+      sent: 0,
+      scheduled: 0,
+      cancelled: 0,
+    };
+
+    stats.forEach((stat) => {
+      statsMap[stat.status as keyof typeof statsMap] = stat._count.status;
+    });
+
+    const response = {
+      notifications,
+      stats: statsMap,
+      pagination: {
+        page: validatedFilters.page,
+        limit: validatedFilters.limit,
+        total,
+        totalPages: Math.ceil(total / validatedFilters.limit),
+      },
+    };
+
+    return createSuccessResponse(response, 'Notifications retrieved successfully');
+  } catch (error: any) {
+    console.error('Error fetching notifications:', error);
+    return createErrorResponse('Internal server error', 500);
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    // Verify authentication
+    const token = req.headers.get('authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return createErrorResponse('Unauthorized', 401);
+    }
+
+    const superAdmin = await verifySuperAdminToken(token);
+    if (!superAdmin) {
+      return createErrorResponse('Unauthorized', 401);
+    }
+
+    // Check permission to create notifications
+    const hasPermission = await checkPermission(superAdmin.id, 'notifications', 'create');
+    if (!hasPermission) {
+      return createErrorResponse('Insufficient permissions', 403);
+    }
+
+    const body = await req.json();
+    const validatedData = createNotificationSchema.parse(body);
+
+    // Create notification
+    const notification = await prisma.notification.create({
+      data: {
+        title: validatedData.title,
+        message: validatedData.message,
+        type: validatedData.type,
+        priority: validatedData.priority,
+        targetType: validatedData.targetType,
+        targetTenantId: validatedData.targetTenantId,
+        scheduledAt: validatedData.scheduledAt ? new Date(validatedData.scheduledAt) : null,
+        attachments: validatedData.attachments ? JSON.stringify(validatedData.attachments) : null,
+        metadata: validatedData.metadata ? JSON.stringify(validatedData.metadata) : null,
+        createdBy: superAdmin.id,
+        createdByType: 'superadmin',
+        status: validatedData.scheduledAt ? 'scheduled' : 'draft',
+      },
+      include: {
+        superAdmin: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+      },
+    });
 
     // Create audit log
     await createAuditLog({
-      action: 'notification.create',
-      details: {
-        title,
-        targetType,
-        targetTenantId,
-        priority,
-        notificationCount: notifications.length
+      action: 'notification_created',
+      details: `Created notification: ${notification.title}`,
+      superAdminId: superAdmin.id,
+      metadata: {
+        notificationId: notification.id,
+        targetType: notification.targetType,
+        type: notification.type,
+        priority: notification.priority,
       },
-      superAdminId: superAdmin.id
     });
 
-    if (process.env.NODE_ENV === 'development') {
-      console.log('✅ Notification created successfully:', notifications.length, 'notifications');
+    return createSuccessResponse({ notification }, 'Notification created successfully');
+  } catch (error: any) {
+    console.error('Error creating notification:', error);
+    if (error.name === 'ZodError') {
+      return createErrorResponse('Validation error', 400, error.errors);
     }
-
-    return createSuccessResponse({
-      message: `Notification sent successfully to ${notifications.length} recipients`,
-      notifications: notifications.map(n => ({
-        id: n.id,
-        title: n.title,
-        targetType,
-        createdAt: n.createdAt
-      }))
-    }, 'Notification sent successfully');
-
-  } catch (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('❌ Error creating notification:', error);
-    }
-    throw error;
+    return createErrorResponse('Internal server error', 500);
   }
-});
-
-// GET /api/superadmin/notifications - Fetch notifications for header
-export const GET = asyncHandler(async (req: NextRequest) => {
-  if (process.env.NODE_ENV === 'development') {
-    console.log('📢 Fetching notifications');
-  }
-
-  // Authenticate SuperAdmin
-  const authResult = await requireSuperAdmin(req);
-  if (authResult instanceof NextResponse) {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('❌ Authentication failed for notifications API');
-    }
-    return authResult;
-  }
-
-  const superAdmin = authResult as any;
-  
-  if (process.env.NODE_ENV === 'development') {
-    console.log('🔐 SuperAdmin authenticated:', superAdmin.id, superAdmin.email);
-  }
-  const { searchParams } = new URL(req.url);
-  const limit = parseInt(searchParams.get('limit') || '10');
-  const unreadOnly = searchParams.get('unreadOnly') === 'true';
-
-  try {
-    // Build where clause for superadmin notifications
-    const where: any = {
-      OR: [
-        // Notifications sent to all superadmins
-        {
-          targetType: 'superadmin'
-        },
-        // Notifications created by this superadmin
-        {
-          createdBy: superAdmin.id
-        },
-        // Notifications sent to all tenants (superadmins can see these too)
-        {
-          targetType: 'all_tenants'
-        }
-      ],
-      isActive: true
-    };
-
-    if (unreadOnly) {
-      where.isRead = false;
-    }
-
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🔍 Notifications query where clause:', JSON.stringify(where, null, 2));
-    }
-
-    // Get notifications
-    const notifications = await prisma.notification.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      select: {
-        id: true,
-        title: true,
-        message: true,
-        isRead: true,
-        createdAt: true,
-        targetType: true,
-        priority: true
-      }
-    });
-
-    // Get unread count
-    const unreadCount = await prisma.notification.count({
-      where: {
-        ...where,
-        isRead: false
-      }
-    });
-
-    if (process.env.NODE_ENV === 'development') {
-      console.log('✅ Notifications fetched successfully:', notifications.length);
-    }
-
-    return createSuccessResponse({
-      notifications,
-      unreadCount,
-      totalCount: notifications.length
-    }, 'Notifications fetched successfully');
-
-  } catch (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('❌ Error fetching notifications:', error);
-    }
-    throw error;
-  }
-}); 
+}

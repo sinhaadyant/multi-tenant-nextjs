@@ -20,51 +20,54 @@ model SuperAdmin {
   auditLogs           AuditLog[]
   inviteTokens        InviteToken[]
   notifications       Notification[]
-  reports             Report[]
   passwordResetTokens PasswordResetToken[]
   refreshTokens       RefreshToken[]
+  reports             Report[]
 
   @@map("super_admins")
 }
 
 model Tenant {
-  id             String          @id @default(cuid())
-  name           String
-  slug           String          @unique
-  domain         String?
-  description    String?
-  isActive       Boolean         @default(true)
-  plan           String          @default("starter")
-  region         String          @default("US East")
-  features       String          @db.LongText
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  metadata       String?         @db.LongText
-  auditLogs      AuditLog[]
-  notifications  Notification[]
-  supportTickets SupportTicket[]
-  users          User[]
-  roles          Role[]          // Tenant-specific roles
-  reports        Report[]
+  id                String             @id @default(cuid())
+  name              String
+  slug              String             @unique
+  domain            String?
+  description       String?
+  isActive          Boolean            @default(true)
+  plan              String             @default("starter")
+  region            String             @default("US East")
+  features          String             @db.LongText
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  metadata          String?            @db.LongText
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  reports           Report[]
+  roles             Role[]
+  supportTickets    SupportTicket[]
+  tenantModules     TenantModule[]
+  userNotifications UserNotification[]
+  users             User[]
 
   @@map("tenants")
 }
 
 model User {
-  id             String          @id @default(cuid())
-  email          String
-  name           String
-  password       String
-  isActive       Boolean         @default(true)
-  lastLogin      DateTime?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  tenantId       String?
-  contactNumber  String?
-  auditLogs      AuditLog[]
-  supportTickets SupportTicket[]
-  tenant         Tenant?         @relation(fields: [tenantId], references: [id])
-  userRoles      UserRole[]      // Multiple role assignments
+  id                String             @id @default(cuid())
+  email             String
+  name              String
+  password          String
+  isActive          Boolean            @default(true)
+  lastLogin         DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  tenantId          String?
+  contactNumber     String?
+  auditLogs         AuditLog[]
+  supportTickets    SupportTicket[]
+  userNotifications UserNotification[]
+  userRoles         UserRole[]
+  tenant            Tenant?            @relation(fields: [tenantId], references: [id])
 
   @@unique([email, tenantId])
   @@index([tenantId], map: "users_tenantId_fkey")
@@ -76,53 +79,97 @@ model Role {
   name        String
   description String?
   isActive    Boolean          @default(true)
-  isDefault   Boolean          @default(false)  // Default role for tenant
-  isTemplate  Boolean          @default(false)  // Template role from SuperAdmin
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
-  tenantId    String?          // null for template roles
-  tenant      Tenant?          @relation(fields: [tenantId], references: [id])
+  isDefault   Boolean          @default(false)
+  isTemplate  Boolean          @default(false)
+  tenantId    String?
+  color       String?
+  createdBy   String?
+  isSystem    Boolean          @default(false)
+  priority    Int              @default(0)
   permissions RolePermission[]
+  tenant      Tenant?          @relation(fields: [tenantId], references: [id])
   userRoles   UserRole[]
 
-  @@unique([name, tenantId])  // Role names unique within tenant
+  @@unique([name, tenantId])
   @@index([tenantId], map: "roles_tenantId_fkey")
+  @@index([isActive])
+  @@index([isTemplate])
   @@map("roles")
 }
 
 model Module {
-  id              String           @id @default(cuid())
-  moduleKey       String           @unique // e.g., "dashboard", "users", "reports"
-  moduleName      String           // Display name e.g., "Dashboard", "User Management"
-  path            String?          // Frontend route path
-  icon            String?          // Icon identifier
-  parentModuleKey String?          // For hierarchical menu structure
-  parentModule    Module?          @relation("ModuleHierarchy", fields: [parentModuleKey], references: [moduleKey])
-  childModules    Module[]         @relation("ModuleHierarchy")
+  id              String         @id @default(cuid())
+  moduleKey       String         @unique
+  moduleName      String
+  path            String?
+  icon            String?
+  parentModuleKey String?
   description     String?
-  isActive        Boolean          @default(true)
-  isVisible       Boolean          @default(true) // Whether to show in menu
-  orderIndex      Int              @default(0) // Menu ordering
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  isActive        Boolean        @default(true)
+  isVisible       Boolean        @default(true)
+  orderIndex      Int            @default(0)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  maxVersion      String?
+  minVersion      String?
+  releaseNotes    String?        @db.Text
+  version         String?
+  parentModule    Module?        @relation("ModuleHierarchy", fields: [parentModuleKey], references: [moduleKey])
+  childModules    Module[]       @relation("ModuleHierarchy")
   permissions     Permission[]
+  tenantModules   TenantModule[]
 
+  @@index([parentModuleKey], map: "modules_parentModuleKey_fkey")
   @@map("modules")
+}
+
+model TenantModule {
+  id             String    @id @default(cuid())
+  tenantId       String
+  moduleKey      String
+  isEnabled      Boolean   @default(true)
+  isVisible      Boolean   @default(true)
+  version        String?
+  settings       String?   @db.LongText
+  enabledAt      DateTime?
+  disabledAt     DateTime?
+  enabledBy      String?
+  disabledBy     String?
+  lastAccessedAt DateTime?
+  accessCount    Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  module         Module    @relation(fields: [moduleKey], references: [moduleKey], onDelete: Cascade)
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, moduleKey])
+  @@index([tenantId], map: "tenant_modules_tenantId_fkey")
+  @@index([moduleKey], map: "tenant_modules_moduleKey_fkey")
+  @@index([isEnabled])
+  @@map("tenant_modules")
 }
 
 model Permission {
   id              String           @id @default(cuid())
   name            String           @unique
   description     String?
-  moduleKey       String           // Reference to Module.moduleKey
-  module          Module           @relation(fields: [moduleKey], references: [moduleKey])
-  submodule       String?          // e.g., "Analytics", "Management", "News"
-  action          String           // e.g., "view", "create", "edit", "delete"
-  isActive        Boolean          @default(true)
+  action          String
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+  isActive        Boolean          @default(true)
+  submodule       String?
+  moduleKey       String
+  category        String?
+  isSystem        Boolean          @default(false)
+  resource        String?
+  module          Module           @relation(fields: [moduleKey], references: [moduleKey])
   rolePermissions RolePermission[]
 
+  @@unique([moduleKey, action, resource])
+  @@index([action])
+  @@index([isActive])
   @@map("permissions")
 }
 
@@ -139,13 +186,13 @@ model RolePermission {
 }
 
 model UserRole {
-  id        String   @id @default(cuid())
-  userId    String
-  roleId    String
+  id         String   @id @default(cuid())
+  userId     String
+  roleId     String
   assignedAt DateTime @default(now())
-  assignedBy String?  // Who assigned this role (SuperAdmin or Tenant Admin)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  assignedBy String?
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, roleId])
   @@index([userId], map: "user_roles_userId_fkey")
@@ -154,61 +201,111 @@ model UserRole {
 }
 
 model AuditLog {
-  id           String      @id @default(cuid())
-  action       String
-  details      String?     @db.LongText
-  ipAddress    String?
-  userAgent    String?
-  createdAt    DateTime    @default(now())
-  tenantId     String?
-  userId       String?
-  superAdminId String?
-  superAdmin   SuperAdmin? @relation(fields: [superAdminId], references: [id])
-  tenant       Tenant?     @relation(fields: [tenantId], references: [id])
-  user         User?       @relation(fields: [userId], references: [id])
+  id              String      @id @default(cuid())
+  action          String
+  details         String?     @db.LongText
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime    @default(now())
+  tenantId        String?
+  userId          String?
+  superAdminId    String?
+  archivedAt      DateTime?
+  isArchived      Boolean     @default(false)
+  newValues       String?     @db.LongText
+  oldValues       String?     @db.LongText
+  requestId       String?
+  resourceId      String?
+  resourceType    String?
+  retentionExpiry DateTime?
+  sessionId       String?
+  severity        String      @default("info")
+  status          String      @default("success")
+  superAdmin      SuperAdmin? @relation(fields: [superAdminId], references: [id])
+  tenant          Tenant?     @relation(fields: [tenantId], references: [id])
+  user            User?       @relation(fields: [userId], references: [id])
 
   @@index([superAdminId], map: "audit_logs_superAdminId_fkey")
   @@index([tenantId], map: "audit_logs_tenantId_fkey")
   @@index([userId], map: "audit_logs_userId_fkey")
+  @@index([status], map: "audit_logs_status_fkey")
+  @@index([severity], map: "audit_logs_severity_fkey")
+  @@index([resourceType], map: "audit_logs_resourceType_fkey")
+  @@index([createdAt], map: "audit_logs_createdAt_fkey")
+  @@index([isArchived], map: "audit_logs_isArchived_fkey")
+  @@index([retentionExpiry], map: "audit_logs_retentionExpiry_fkey")
   @@map("audit_logs")
 }
 
 model Notification {
-  id             String      @id @default(cuid())
-  title          String      @db.VarChar(100)
-  message        String      @db.Text
-  isRead         Boolean     @default(false)
-  isActive       Boolean     @default(true)
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-  createdBy      String?
-  priority       String      @default("medium")
-  targetTenantId String?
-  targetType     String      @default("superadmin")
-  super_admins   SuperAdmin? @relation(fields: [createdBy], references: [id])
-  tenants        Tenant?     @relation(fields: [targetTenantId], references: [id])
+  id                String             @id @default(cuid())
+  title             String             @db.VarChar(255)
+  message           String             @db.Text
+  isActive          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  createdBy         String?
+  priority          String             @default("medium")
+  targetTenantId    String?
+  targetType        String             @default("superadmin")
+  attachments       String?            @db.Text
+  createdByType     String             @default("superadmin")
+  metadata          String?            @db.Text
+  scheduledAt       DateTime?
+  sentAt            DateTime?
+  status            String             @default("draft")
+  type              String             @default("info")
+  superAdmin        SuperAdmin?        @relation(fields: [createdBy], references: [id])
+  tenant            Tenant?            @relation(fields: [targetTenantId], references: [id])
+  userNotifications UserNotification[]
 
   @@index([createdBy], map: "notifications_createdBy_fkey")
   @@index([targetTenantId], map: "notifications_targetTenantId_fkey")
+  @@index([status])
+  @@index([type])
+  @@index([priority])
+  @@index([createdAt])
   @@map("notifications")
 }
 
+model UserNotification {
+  id             String       @id @default(cuid())
+  notificationId String
+  userId         String
+  tenantId       String?
+  isRead         Boolean      @default(false)
+  readAt         DateTime?
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  tenant         Tenant?      @relation(fields: [tenantId], references: [id])
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, userId])
+  @@index([userId], map: "user_notifications_userId_fkey")
+  @@index([notificationId], map: "user_notifications_notificationId_fkey")
+  @@index([tenantId], map: "user_notifications_tenantId_fkey")
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("user_notifications")
+}
+
 model SupportTicket {
-  id          String   @id @default(cuid())
-  title       String   @db.VarChar(255)
-  description String   @db.Text
-  category    String   @default("general")
-  status      String   @default("open")
-  priority    String   @default("medium")
-  isForwarded Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id          String                    @id @default(cuid())
+  description String                    @db.Text
+  status      String                    @default("open")
+  priority    String                    @default("medium")
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
   tenantId    String?
   userId      String?
-  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
-  user        User?    @relation(fields: [userId], references: [id])
-  comments    SupportTicketComment[]
+  category    String                    @default("general")
+  isForwarded Boolean                   @default(false)
+  title       String                    @db.VarChar(255)
   attachments SupportTicketAttachment[]
+  comments    SupportTicketComment[]
+  tenant      Tenant?                   @relation(fields: [tenantId], references: [id])
+  user        User?                     @relation(fields: [userId], references: [id])
 
   @@index([tenantId], map: "support_tickets_tenantId_fkey")
   @@index([userId], map: "support_tickets_userId_fkey")
@@ -219,15 +316,15 @@ model SupportTicket {
 }
 
 model SupportTicketComment {
-  id          String        @id @default(cuid())
-  text        String        @db.Text
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  ticketId    String
-  commentedBy String        // Can be userId, tenantId, or superAdminId
-  commenterType String      // "user", "tenant", "superadmin"
-  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  attachments SupportTicketCommentAttachment[]
+  id            String                           @id @default(cuid())
+  text          String                           @db.Text
+  createdAt     DateTime                         @default(now())
+  updatedAt     DateTime                         @updatedAt
+  ticketId      String
+  commentedBy   String
+  commenterType String
+  attachments   SupportTicketCommentAttachment[]
+  ticket        SupportTicket                    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
   @@index([ticketId], map: "support_ticket_comments_ticketId_fkey")
   @@index([commentedBy], map: "support_ticket_comments_commentedBy_fkey")
@@ -235,30 +332,30 @@ model SupportTicketComment {
 }
 
 model SupportTicketAttachment {
-  id          String        @id @default(cuid())
-  filename    String
+  id           String        @id @default(cuid())
+  filename     String
   originalName String
-  mimeType    String
-  size        Int
-  path        String
-  createdAt   DateTime      @default(now())
-  ticketId    String
-  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  mimeType     String
+  size         Int
+  path         String
+  createdAt    DateTime      @default(now())
+  ticketId     String
+  ticket       SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
   @@index([ticketId], map: "support_ticket_attachments_ticketId_fkey")
   @@map("support_ticket_attachments")
 }
 
 model SupportTicketCommentAttachment {
-  id          String                @id @default(cuid())
-  filename    String
+  id           String               @id @default(cuid())
+  filename     String
   originalName String
-  mimeType    String
-  size        Int
-  path        String
-  createdAt   DateTime              @default(now())
-  commentId   String
-  comment     SupportTicketComment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  mimeType     String
+  size         Int
+  path         String
+  createdAt    DateTime             @default(now())
+  commentId    String
+  comment      SupportTicketComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
 
   @@index([commentId], map: "support_ticket_comment_attachments_commentId_fkey")
   @@map("support_ticket_comment_attachments")
@@ -275,14 +372,14 @@ model SystemSetting {
 }
 
 model InviteToken {
-  id        String   @id @default(cuid())
-  email     String
-  token     String   @unique
-  type      String   // "tenant", "user", "superadmin"
-  expiresAt DateTime
-  isUsed    Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id           String      @id @default(cuid())
+  token        String      @unique
+  email        String
+  isUsed       Boolean     @default(false)
+  expiresAt    DateTime
+  createdAt    DateTime    @default(now())
   superAdminId String?
+  type         String
   superAdmin   SuperAdmin? @relation(fields: [superAdminId], references: [id])
 
   @@index([superAdminId], map: "invite_tokens_superAdminId_fkey")
@@ -291,7 +388,7 @@ model InviteToken {
 
 model SystemLog {
   id        String   @id @default(cuid())
-  level     String   // "info", "warn", "error"
+  level     String
   message   String   @db.Text
   createdAt DateTime @default(now())
 
@@ -299,15 +396,15 @@ model SystemLog {
 }
 
 model Report {
-  id          String      @id @default(cuid())
-  name        String
-  type        String      // "analytics", "audit", "system"
-  data        String      @db.LongText
-  createdAt   DateTime    @default(now())
-  tenantId    String?
+  id           String      @id @default(cuid())
+  tenantId     String?
+  createdAt    DateTime    @default(now())
+  data         String      @db.LongText
+  name         String
   superAdminId String?
-  tenant      Tenant?     @relation(fields: [tenantId], references: [id])
-  superAdmin  SuperAdmin? @relation(fields: [superAdminId], references: [id])
+  type         String
+  superAdmin   SuperAdmin? @relation(fields: [superAdminId], references: [id])
+  tenant       Tenant?     @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId], map: "reports_tenantId_fkey")
   @@index([superAdminId], map: "reports_superAdminId_fkey")
@@ -320,31 +417,31 @@ model PasswordResetToken {
   email        String
   expiresAt    DateTime
   used         Boolean     @default(false)
-  type         String      @default("superadmin") // "superadmin" or "tenant"
   createdAt    DateTime    @default(now())
   superAdminId String?
+  type         String      @default("superadmin")
   superAdmin   SuperAdmin? @relation(fields: [superAdminId], references: [id])
 
-  @@index([email], map: "password_reset_tokens_email_idx")
+  @@index([email])
   @@index([superAdminId], map: "password_reset_tokens_superAdminId_fkey")
   @@map("password_reset_tokens")
 }
 
 model RefreshToken {
-  id           String      @id @default(cuid())
-  tokenId      String      @unique // Unique identifier for the token pair
-  hashedToken  String      @unique // Hashed refresh token for security
+  id           String     @id @default(cuid())
+  tokenId      String     @unique
+  hashedToken  String     @unique
   superAdminId String
-  superAdmin   SuperAdmin  @relation(fields: [superAdminId], references: [id], onDelete: Cascade)
-  isRevoked    Boolean     @default(false)
+  isRevoked    Boolean    @default(false)
   expiresAt    DateTime
-  createdAt    DateTime    @default(now())
+  createdAt    DateTime   @default(now())
   lastUsedAt   DateTime?
-  deviceInfo   String?     // User agent, device fingerprint
-  ipAddress    String?     // IP address where token was issued
-  
+  deviceInfo   String?
+  ipAddress    String?
+  superAdmin   SuperAdmin @relation(fields: [superAdminId], references: [id], onDelete: Cascade)
+
   @@index([superAdminId], map: "refresh_tokens_superAdminId_fkey")
-  @@index([tokenId], map: "refresh_tokens_tokenId_idx")
-  @@index([expiresAt], map: "refresh_tokens_expiresAt_idx")
+  @@index([tokenId])
+  @@index([expiresAt])
   @@map("refresh_tokens")
 }

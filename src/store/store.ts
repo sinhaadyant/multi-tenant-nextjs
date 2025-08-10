@@ -2,7 +2,40 @@ import { configureStore, combineReducers } from '@reduxjs/toolkit';
 import { persistReducer, persistStore } from 'redux-persist';
 import storage from 'redux-persist/lib/storage'; // defaults to localStorage for web
 import authReducer, { setHydrated } from './slices/authSlice';
+import tenantAuthReducer, { setTenantHydrated } from './slices/tenantAuthSlice';
 import { FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
+
+// Custom storage that handles sync storage fallback gracefully
+const customStorage = {
+  getItem: (key: string) => {
+    try {
+      return storage.getItem(key);
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Redux-persist storage getItem failed, falling back to noop storage');
+      }
+      return null;
+    }
+  },
+  setItem: (key: string, value: string) => {
+    try {
+      return storage.setItem(key, value);
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Redux-persist storage setItem failed, falling back to noop storage');
+      }
+    }
+  },
+  removeItem: (key: string) => {
+    try {
+      return storage.removeItem(key);
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Redux-persist storage removeItem failed, falling back to noop storage');
+      }
+    }
+  }
+};
 
 // Custom middleware to handle unexpected state keys
 const unexpectedKeysMiddleware = (store: any) => (next: any) => (action: any) => {
@@ -31,19 +64,17 @@ const unexpectedKeysMiddleware = (store: any) => (next: any) => (action: any) =>
   return next(action);
 };
 
-// Use standard storage to avoid wrapper object issues
-const customStorage = storage;
-
 // Root reducer
 const rootReducer = combineReducers({
   auth: authReducer,
+  tenantAuth: tenantAuthReducer,
 });
 
 // Configure persist
 const persistConfig = {
   key: 'superadmin-root',
   storage: customStorage,
-  whitelist: ['auth'], // Only persist auth state
+  whitelist: ['auth', 'tenantAuth'], // Persist both auth states
   migrate: (state: any) => {
     // Migration function to handle any state format changes
     if (state && typeof state === 'object') {
@@ -57,7 +88,7 @@ const persistConfig = {
       }
       
       // Ensure we only have expected keys
-      const expectedKeys = ['auth'];
+      const expectedKeys = ['auth', 'tenantAuth'];
       const finalState: any = {};
       
       expectedKeys.forEach(key => {
@@ -102,6 +133,7 @@ export const persistor = persistStore(store, {}, () => {
   }
   // Dispatch hydration action after rehydration is complete
   store.dispatch(setHydrated());
+  store.dispatch(setTenantHydrated());
 });
 
 // Add debugging for rehydration issues
@@ -110,10 +142,15 @@ if (process.env.NODE_ENV === 'development') {
     const { bootstrapped } = persistor.getState();
     if (bootstrapped) {
       const state = store.getState();
-      console.log('🔄 Redux Persist: Store state after rehydration:', {
-        auth: state.auth,
-        hasUnexpectedKeys: Object.keys(state).some(key => !['auth'].includes(key)),
-      });
+      // Only log if there are unexpected keys or issues
+      const hasUnexpectedKeys = Object.keys(state).some(key => !['auth', 'tenantAuth'].includes(key));
+      if (hasUnexpectedKeys) {
+        console.log('🔄 Redux Persist: Store state after rehydration:', {
+          auth: state.auth,
+          tenantAuth: state.tenantAuth,
+          hasUnexpectedKeys: true,
+        });
+      }
     }
   });
 }

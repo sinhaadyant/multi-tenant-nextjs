@@ -1,84 +1,65 @@
 import { NextRequest } from 'next/server';
-import { asyncHandler } from '@/lib/errorHandler';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-import { createAuditLogFromRequest } from '@/lib/audit';
 import { verifyToken } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
+import { createAuditLogFromRequest } from '@/lib/audit';
 
-// GET /api/tenant/[tenantSlug]/support/[id] - Get single support ticket
-export const GET = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ tenantSlug: string; id: string }> }) => {
-  const { tenantSlug, id } = await params;
-  const authHeader = req.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return createErrorResponse('Unauthorized - No token provided', 401);
-  }
-
-  const token = authHeader.substring(7);
-  
+export async function GET(req: NextRequest) {
   try {
-    const decoded = verifyToken(token);
-    if (!decoded || !decoded.id || !decoded.tenantId) {
-      return createErrorResponse('Invalid token', 401);
+    const { searchParams } = new URL(req.url);
+    const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
+    const ticketId = req.nextUrl.pathname.split('/')[5];
+    
+    if (!tenantSlug || !ticketId) {
+      return createErrorResponse('Tenant slug and ticket ID are required', 400);
     }
 
-    // Verify user belongs to the tenant
+    // Verify authentication token
+    const token = req.headers.get('authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return createErrorResponse('No authentication token found', 401);
+    }
+
+    const decoded = await verifyToken(token);
+    if (!decoded || !decoded.id) {
+      return createErrorResponse('Invalid authentication token', 401);
+    }
+
+    // Get tenant
+    const tenant = await prisma.tenant.findUnique({
+      where: { slug: tenantSlug },
+      select: { id: true, name: true, slug: true, isActive: true }
+    });
+
+    if (!tenant) {
+      return createErrorResponse('Tenant not found', 404);
+    }
+
+    if (!tenant.isActive) {
+      return createErrorResponse('Tenant is inactive', 403);
+    }
+
+    // Verify user belongs to this tenant
     const user = await prisma.user.findFirst({
       where: {
         id: decoded.id,
-        tenant: {
-          slug: tenantSlug,
-          isActive: true
-        }
-      },
-      include: {
-        tenant: true,
-        userRoles: {
-          include: {
-            role: {
-              include: {
-                permissions: {
-                  include: {
-                    permission: true
-                  }
-                }
-              }
-            }
-          }
-        }
+        tenantId: tenant.id,
+        isActive: true
       }
     });
 
-    if (!user || !user.tenant || user.tenant.slug !== tenantSlug || !user.tenant.isActive) {
-      return createErrorResponse('Access denied - Invalid tenant or user not found', 403);
+    if (!user) {
+      return createErrorResponse('User not found or not authorized for this tenant', 404);
     }
 
-    // Check if user is admin (can see all tickets) or regular user (can only see their own)
-    const isAdmin = user.userRoles.some(userRole =>
-      userRole.role.name.toLowerCase().includes('admin') ||
-      userRole.role.permissions.some(rp => 
-        rp.permission.module === 'support' && 
-        (rp.permission.action === 'view' || rp.permission.action === 'manage')
-      )
-    );
-
-    // Get the ticket
+    // Get support ticket with comments
     const ticket = await prisma.supportTicket.findFirst({
       where: {
-        id,
-        tenantId: user.tenant.id,
-        // If not admin, only show user's own tickets
-        ...(isAdmin ? {} : { createdById: user.id })
+        id: ticketId,
+        tenantId: tenant.id
       },
       include: {
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        },
-        assignedTo: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -87,34 +68,13 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
         },
         comments: {
           include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-              }
-            },
-            attachments: {
-              select: {
-                id: true,
-                filename: true,
-                fileSize: true,
-                mimeType: true,
-                url: true
-              }
-            }
+            attachments: true
           },
-          orderBy: { createdAt: 'asc' }
-        },
-        attachments: {
-          select: {
-            id: true,
-            filename: true,
-            fileSize: true,
-            mimeType: true,
-            url: true
+          orderBy: {
+            createdAt: 'asc'
           }
-        }
+        },
+        attachments: true
       }
     });
 
@@ -122,272 +82,231 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
       return createErrorResponse('Support ticket not found', 404);
     }
 
-    await createAuditLogFromRequest(req, { id: user.id, email: user.email, role: 'user' }, 'support.view', {
-      tenantId: user.tenant.id,
-      ticketId: ticket.id,
-      ticketTitle: ticket.title
-    });
-
-    return createSuccessResponse({
-      ticket: {
-        id: ticket.id,
-        title: ticket.title,
-        description: ticket.description,
-        status: ticket.status,
-        priority: ticket.priority,
-        category: ticket.category,
-        createdAt: ticket.createdAt,
-        updatedAt: ticket.updatedAt,
-        resolvedAt: ticket.resolvedAt,
-        createdBy: ticket.createdBy,
-        assignedTo: ticket.assignedTo,
-        comments: ticket.comments,
-        attachments: ticket.attachments
+    // Create audit log
+    await createAuditLogFromRequest(
+      req,
+      { id: user.id, email: user.email, role: 'user' },
+      'support.ticket.view',
+      { 
+        tenantId: tenant.id,
+        tenantSlug: tenant.slug,
+        ticketId: ticket.id
       }
-    }, 'Support ticket retrieved successfully');
+    );
+
+    return createSuccessResponse({ ticket }, 'Support ticket retrieved successfully');
 
   } catch (error: any) {
     console.error('Error fetching support ticket:', error);
-    return createErrorResponse('Failed to fetch support ticket', 500);
+    return createErrorResponse(
+      error.message || 'Internal server error',
+      error.status || 500
+    );
   }
-});
+}
 
-// PUT /api/tenant/[tenantSlug]/support/[id] - Update support ticket
-export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ tenantSlug: string; id: string }> }) => {
-  const { tenantSlug, id } = await params;
-  const authHeader = req.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return createErrorResponse('Unauthorized - No token provided', 401);
-  }
-
-  const token = authHeader.substring(7);
-  
+export async function PUT(req: NextRequest) {
   try {
-    const decoded = verifyToken(token);
-    if (!decoded || !decoded.id || !decoded.tenantId) {
-      return createErrorResponse('Invalid token', 401);
+    const { searchParams } = new URL(req.url);
+    const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
+    const ticketId = req.nextUrl.pathname.split('/')[5];
+    
+    if (!tenantSlug || !ticketId) {
+      return createErrorResponse('Tenant slug and ticket ID are required', 400);
     }
 
-    // Verify user belongs to the tenant
+    // Verify authentication token
+    const token = req.headers.get('authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return createErrorResponse('No authentication token found', 401);
+    }
+
+    const decoded = await verifyToken(token);
+    if (!decoded || !decoded.id) {
+      return createErrorResponse('Invalid authentication token', 401);
+    }
+
+    // Get tenant
+    const tenant = await prisma.tenant.findUnique({
+      where: { slug: tenantSlug },
+      select: { id: true, name: true, slug: true, isActive: true }
+    });
+
+    if (!tenant) {
+      return createErrorResponse('Tenant not found', 404);
+    }
+
+    if (!tenant.isActive) {
+      return createErrorResponse('Tenant is inactive', 403);
+    }
+
+    // Verify user belongs to this tenant
     const user = await prisma.user.findFirst({
       where: {
         id: decoded.id,
-        tenant: {
-          slug: tenantSlug,
-          isActive: true
-        }
-      },
-      include: {
-        tenant: true,
-        userRoles: {
-          include: {
-            role: {
-              include: {
-                permissions: {
-                  include: {
-                    permission: true
-                  }
-                }
-              }
-            }
-          }
-        }
+        tenantId: tenant.id,
+        isActive: true
       }
     });
 
-    if (!user || !user.tenant || user.tenant.slug !== tenantSlug || !user.tenant.isActive) {
-      return createErrorResponse('Access denied - Invalid tenant or user not found', 403);
+    if (!user) {
+      return createErrorResponse('User not found or not authorized for this tenant', 404);
     }
 
-    // Check if user is admin (can update all tickets) or regular user (can only update their own)
-    const isAdmin = user.userRoles.some(userRole =>
-      userRole.role.name.toLowerCase().includes('admin') ||
-      userRole.role.permissions.some(rp => 
-        rp.permission.module === 'support' && 
-        (rp.permission.action === 'edit' || rp.permission.action === 'manage')
-      )
-    );
+    const body = await req.json();
+    const { title, description, category, priority, status } = body;
 
-    // Get the ticket
-    const ticket = await prisma.supportTicket.findFirst({
+    // Get existing ticket
+    const existingTicket = await prisma.supportTicket.findFirst({
       where: {
-        id,
-        tenantId: user.tenant.id,
-        // If not admin, only allow updates to user's own tickets
-        ...(isAdmin ? {} : { createdById: user.id })
+        id: ticketId,
+        tenantId: tenant.id
       }
     });
 
-    if (!ticket) {
+    if (!existingTicket) {
       return createErrorResponse('Support ticket not found', 404);
-    }
-
-    const { title, description, priority, category, status, assignedToId } = await req.json();
-
-    // Validate priority
-    const validPriorities = ['low', 'medium', 'high', 'urgent'];
-    if (priority && !validPriorities.includes(priority)) {
-      return createErrorResponse('Invalid priority level', 400);
-    }
-
-    // Validate category
-    const validCategories = ['technical', 'billing', 'feature-request', 'bug-report', 'general'];
-    if (category && !validCategories.includes(category)) {
-      return createErrorResponse('Invalid category', 400);
-    }
-
-    // Validate status
-    const validStatuses = ['open', 'in-progress', 'resolved', 'closed'];
-    if (status && !validStatuses.includes(status)) {
-      return createErrorResponse('Invalid status', 400);
-    }
-
-    // Verify assigned user belongs to the same tenant if provided
-    let assignedTo = null;
-    if (assignedToId) {
-      assignedTo = await prisma.user.findFirst({
-        where: {
-          id: assignedToId,
-          tenantId: user.tenant.id
-        }
-      });
-
-      if (!assignedTo) {
-        return createErrorResponse('Assigned user not found in this tenant', 400);
-      }
     }
 
     // Update ticket
     const updatedTicket = await prisma.supportTicket.update({
-      where: { id },
+      where: { id: ticketId },
       data: {
-        title: title || ticket.title,
-        description: description !== undefined ? description : ticket.description,
-        priority: priority || ticket.priority,
-        category: category || ticket.category,
-        status: status || ticket.status,
-        assignedToId: assignedToId !== undefined ? (assignedTo?.id || null) : ticket.assignedToId,
-        resolvedAt: status === 'resolved' && ticket.status !== 'resolved' ? new Date() : ticket.resolvedAt
+        ...(title && { title }),
+        ...(description && { description }),
+        ...(category && { category }),
+        ...(priority && { priority }),
+        ...(status && { status }),
+        updatedAt: new Date()
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        comments: {
+          include: {
+            attachments: true
+          },
+          orderBy: {
+            createdAt: 'asc'
+          }
+        },
+        attachments: true
       }
     });
 
-    await createAuditLogFromRequest(req, { id: user.id, email: user.email, role: 'user' }, 'support.update', {
-      tenantId: user.tenant.id,
-      ticketId: updatedTicket.id,
-      ticketTitle: updatedTicket.title,
-      statusChanged: status && status !== ticket.status
-    });
-
-    return createSuccessResponse({
-      ticket: {
-        id: updatedTicket.id,
-        title: updatedTicket.title,
-        description: updatedTicket.description,
-        status: updatedTicket.status,
-        priority: updatedTicket.priority,
-        category: updatedTicket.category,
-        updatedAt: updatedTicket.updatedAt,
-        resolvedAt: updatedTicket.resolvedAt
+    // Create audit log
+    await createAuditLogFromRequest(
+      req,
+      { id: user.id, email: user.email, role: 'user' },
+      'support.ticket.update',
+      { 
+        tenantId: tenant.id,
+        tenantSlug: tenant.slug,
+        ticketId: ticketId,
+        changes: { title, description, category, priority, status }
       }
-    }, 'Support ticket updated successfully');
+    );
+
+    return createSuccessResponse({ ticket: updatedTicket }, 'Support ticket updated successfully');
 
   } catch (error: any) {
     console.error('Error updating support ticket:', error);
-    return createErrorResponse('Failed to update support ticket', 500);
+    return createErrorResponse(
+      error.message || 'Internal server error',
+      error.status || 500
+    );
   }
-});
+}
 
-// DELETE /api/tenant/[tenantSlug]/support/[id] - Delete support ticket (admin only)
-export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ tenantSlug: string; id: string }> }) => {
-  const { tenantSlug, id } = await params;
-  const authHeader = req.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return createErrorResponse('Unauthorized - No token provided', 401);
-  }
-
-  const token = authHeader.substring(7);
-  
+export async function DELETE(req: NextRequest) {
   try {
-    const decoded = verifyToken(token);
-    if (!decoded || !decoded.id || !decoded.tenantId) {
-      return createErrorResponse('Invalid token', 401);
+    const { searchParams } = new URL(req.url);
+    const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
+    const ticketId = req.nextUrl.pathname.split('/')[5];
+    
+    if (!tenantSlug || !ticketId) {
+      return createErrorResponse('Tenant slug and ticket ID are required', 400);
     }
 
-    // Verify user belongs to the tenant
+    // Verify authentication token
+    const token = req.headers.get('authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return createErrorResponse('No authentication token found', 401);
+    }
+
+    const decoded = await verifyToken(token);
+    if (!decoded || !decoded.id) {
+      return createErrorResponse('Invalid authentication token', 401);
+    }
+
+    // Get tenant
+    const tenant = await prisma.tenant.findUnique({
+      where: { slug: tenantSlug },
+      select: { id: true, name: true, slug: true, isActive: true }
+    });
+
+    if (!tenant) {
+      return createErrorResponse('Tenant not found', 404);
+    }
+
+    if (!tenant.isActive) {
+      return createErrorResponse('Tenant is inactive', 403);
+    }
+
+    // Verify user belongs to this tenant
     const user = await prisma.user.findFirst({
       where: {
         id: decoded.id,
-        tenant: {
-          slug: tenantSlug,
-          isActive: true
-        }
-      },
-      include: {
-        tenant: true,
-        userRoles: {
-          include: {
-            role: {
-              include: {
-                permissions: {
-                  include: {
-                    permission: true
-                  }
-                }
-              }
-            }
-          }
-        }
+        tenantId: tenant.id,
+        isActive: true
       }
     });
 
-    if (!user || !user.tenant || user.tenant.slug !== tenantSlug || !user.tenant.isActive) {
-      return createErrorResponse('Access denied - Invalid tenant or user not found', 403);
+    if (!user) {
+      return createErrorResponse('User not found or not authorized for this tenant', 404);
     }
 
-    // Check if user is admin (can delete tickets)
-    const isAdmin = user.userRoles.some(userRole =>
-      userRole.role.name.toLowerCase().includes('admin') ||
-      userRole.role.permissions.some(rp => 
-        rp.permission.module === 'support' && 
-        (rp.permission.action === 'delete' || rp.permission.action === 'manage')
-      )
-    );
-
-    if (!isAdmin) {
-      return createErrorResponse('Only administrators can delete support tickets', 403);
-    }
-
-    // Get the ticket
-    const ticket = await prisma.supportTicket.findFirst({
+    // Get existing ticket
+    const existingTicket = await prisma.supportTicket.findFirst({
       where: {
-        id,
-        tenantId: user.tenant.id
+        id: ticketId,
+        tenantId: tenant.id
       }
     });
 
-    if (!ticket) {
+    if (!existingTicket) {
       return createErrorResponse('Support ticket not found', 404);
     }
 
-    // Delete ticket (this will cascade delete comments and attachments)
+    // Delete ticket (cascade will handle comments and attachments)
     await prisma.supportTicket.delete({
-      where: { id }
+      where: { id: ticketId }
     });
 
-    await createAuditLogFromRequest(req, { id: user.id, email: user.email, role: 'user' }, 'support.delete', {
-      tenantId: user.tenant.id,
-      ticketId: ticket.id,
-      ticketTitle: ticket.title
-    });
+    // Create audit log
+    await createAuditLogFromRequest(
+      req,
+      { id: user.id, email: user.email, role: 'user' },
+      'support.ticket.delete',
+      { 
+        tenantId: tenant.id,
+        tenantSlug: tenant.slug,
+        ticketId: ticketId
+      }
+    );
 
-    return createSuccessResponse({
-      message: 'Support ticket deleted successfully'
-    }, 'Support ticket deleted successfully');
+    return createSuccessResponse({}, 'Support ticket deleted successfully');
 
   } catch (error: any) {
     console.error('Error deleting support ticket:', error);
-    return createErrorResponse('Failed to delete support ticket', 500);
+    return createErrorResponse(
+      error.message || 'Internal server error',
+      error.status || 500
+    );
   }
-}); 
+}

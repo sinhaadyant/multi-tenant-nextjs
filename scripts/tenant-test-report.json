@@ -1,0 +1,85 @@
+{
+  "timestamp": "2025-08-10T21:20:27.597Z",
+  "summary": {
+    "totalTests": 4,
+    "passedTests": 0,
+    "failedTests": 4,
+    "totalDuration": 11920
+  },
+  "results": [
+    {
+      "category": "Authentication",
+      "status": "FAIL",
+      "error": "Command failed: npm test -- --testPathPattern=\"tenant-auth-tests\" --verbose --silent\nwatchman warning:  Recrawled this watch 37 times, most recently because:\nMustScanSubDirs UserDroppedTo resolve, please review the information on\nhttps://facebook.github.io/watchman/docs/troubleshooting.html#recrawl\nTo clear this warning, run:\n`watchman watch-del '/Users/adyant/Documents/GitHub/nextJS/multi-tenant-nextjs' ; watchman watch-project '/Users/adyant/Documents/GitHub/nextJS/multi-tenant-nextjs'`\n\nFAIL src/__tests__/api/tenant/tenant-auth-tests.ts\n  ● Test suite failed to run\n\n    ReferenceError: Request is not defined\n\n      20 |     requestId?: string;\n      21 |     performance?: {\n    > 22 |       queryTime?: number;\n         |                 ^\n      23 |       totalTime?: number;\n      24 |     };\n      25 |   };\n\n      at Object.Request (node_modules/next/src/server/web/spec-extension/request.ts:14:34)\n      at Object.<anonymous> (node_modules/next/server.js:2:16)\n      at Object.<anonymous> (src/lib/apiResponse.ts:22:17)\n      at Object.<anonymous> (src/lib/authMiddleware.ts:26:22)\n      at Object.<anonymous> (src/app/api/tenant/[tenantSlug]/users/route.ts:22:25)\n      at Object.<anonymous> (src/__tests__/api/tenant/tenant-auth-tests.ts:11:16)\n\nTest Suites: 1 failed, 1 total\nTests:       0 total\nSnapshots:   0 total\nTime:        3.8 s\n",
+      "output": "\n> free-nextjs-admin-dashboard@2.0.2 test\n> jest --testPathPattern=tenant-auth-tests --verbose --silent\n\n",
+      "timestamp": "2025-08-10T21:20:21.275Z"
+    },
+    {
+      "category": "Users API",
+      "status": "FAIL",
+      "error": "Command failed: npm test -- --testPathPattern=\"tenant-users-api\" --verbose --silent\nwatchman warning:  Recrawled this watch 37 times, most recently because:\nMustScanSubDirs UserDroppedTo resolve, please review the information on\nhttps://facebook.github.io/watchman/docs/troubleshooting.html#recrawl\nTo clear this warning, run:\n`watchman watch-del '/Users/adyant/Documents/GitHub/nextJS/multi-tenant-nextjs' ; watchman watch-project '/Users/adyant/Documents/GitHub/nextJS/multi-tenant-nextjs'`\n\nFAIL src/__tests__/api/tenant/tenant-users-api.test.ts\n  ● Test suite failed to run\n\n    ReferenceError: Request is not defined\n\n      20 |     requestId?: string;\n      21 |     performance?: {\n    > 22 |       queryTime?: number;\n         |                 ^\n      23 |       totalTime?: number;\n      24 |     };\n      25 |   };\n\n      at Object.Request (node_modules/next/src/server/web/spec-extension/request.ts:14:34)\n      at Object.<anonymous> (node_modules/next/server.js:2:16)\n      at Object.<anonymous> (src/lib/apiResponse.ts:22:17)\n      at Object.<anonymous> (src/lib/authMiddleware.ts:26:22)\n      at Object.<anonymous> (src/app/api/tenant/[tenantSlug]/users/route.ts:22:25)\n      at Object.<anonymous> (src/__tests__/api/tenant/tenant-users-api.test.ts:11:16)\n\nTest Suites: 1 failed, 1 total\nTests:       0 total\nSnapshots:   0 total\nTime:        0.549 s\n",
+      "output": "\n> free-nextjs-admin-dashboard@2.0.2 test\n> jest --testPathPattern=tenant-users-api --verbose --silent\n\n",
+      "timestamp": "2025-08-10T21:20:23.460Z"
+    },
+    {
+      "category": "Roles API",
+      "status": "FAIL",
+      "error": "Command failed: npm test -- --testPathPattern=\"tenant-roles-api\" --verbose --silent\nwatchman warning:  Recrawled this watch 37 times, most recently because:\nMustScanSubDirs UserDroppedTo resolve, please review the information on\nhttps://facebook.github.io/watchman/docs/troubleshooting.html#recrawl\nTo clear this warning, run:\n`watchman watch-del '/Users/adyant/Documents/GitHub/nextJS/multi-tenant-nextjs' ; watchman watch-project '/Users/adyant/Documents/GitHub/nextJS/multi-tenant-nextjs'`\n\nFAIL src/__tests__/api/tenant/tenant-roles-api.test.ts\n  ● Test suite failed to run\n\n    ReferenceError: Request is not defined\n\n      20 |     requestId?: string;\n      21 |     performance?: {\n    > 22 |       queryTime?: number;\n         |                 ^\n      23 |       totalTime?: number;\n      24 |     };\n      25 |   };\n\n      at Object.Request (node_modules/next/src/server/web/spec-extension/request.ts:14:34)\n      at Object.<anonymous> (node_modules/next/server.js:2:16)\n      at Object.<anonymous> (src/lib/apiResponse.ts:22:17)\n      at Object.<anonymous> (src/app/api/tenant/[tenantSlug]/roles/route.ts:19:22)\n      at Object.<anonymous> (src/__tests__/api/tenant/tenant-roles-api.test.ts:11:16)\n\nTest Suites: 1 failed, 1 total\nTests:       0 total\nSnapshots:   0 total\nTime:        0.82 s\n",
+      "output": "\n> free-nextjs-admin-dashboard@2.0.2 test\n> jest --testPathPattern=tenant-roles-api --verbose --silent\n\n",
+      "timestamp": "2025-08-10T21:20:25.418Z"
+    },
+    {
+      "category": "Audit Logs API",
+      "status": "FAIL",
+      "error": "Command failed: npm test -- --testPathPattern=\"tenant-audit-logs-api\" --verbose --silent\nwatchman warning:  Recrawled this watch 37 times, most recently because:\nMustScanSubDirs UserDroppedTo resolve, please review the information on\nhttps://facebook.github.io/watchman/docs/troubleshooting.html#recrawl\nTo clear this warning, run:\n`watchman watch-del '/Users/adyant/Documents/GitHub/nextJS/multi-tenant-nextjs' ; watchman watch-project '/Users/adyant/Documents/GitHub/nextJS/multi-tenant-nextjs'`\n\nFAIL src/__tests__/api/tenant/tenant-audit-logs-api.test.ts\n  ● Test suite failed to run\n\n    PrismaClient is unable to run in this browser environment, or has been bundled for the browser (running in `Node.js`).\n    If this is unexpected, please open an issue: https://pris.ly/prisma-prisma-bug-report\n\n       9 | // GET /api/tenant/[tenantSlug]/audit-logs - Get audit logs for specific tenant\n      10 | export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {\n    > 11 |   const { tenantSlug } = await params;\n         |                 ^\n      12 |   \n      13 |   try {\n      14 |     const userId = req.user!.id;\n\n      at Object.get (node_modules/.prisma/client/index-browser.js:673:15)\n          at Proxy.toString (<anonymous>)\n          at Array.forEach (<anonymous>)\n      at Object.<anonymous> (src/app/api/tenant/[tenantSlug]/audit-logs/route.ts:11:17)\n      at Object.<anonymous> (src/__tests__/api/tenant/tenant-audit-logs-api.test.ts:10:16)\n\nTest Suites: 1 failed, 1 total\nTests:       0 total\nSnapshots:   0 total\nTime:        0.851 s\n",
+      "output": "\n> free-nextjs-admin-dashboard@2.0.2 test\n> jest --testPathPattern=tenant-audit-logs-api --verbose --silent\n\n",
+      "timestamp": "2025-08-10T21:20:27.596Z"
+    }
+  ],
+  "testConfig": {
+    "testUsers": {
+      "techcorp": {
+        "admin": {
+          "email": "admin@techcorp.com",
+          "password": "AdminPass123"
+        },
+        "manager": {
+          "email": "manager@techcorp.com",
+          "password": "AdminPass123"
+        },
+        "user": {
+          "email": "user@techcorp.com",
+          "password": "AdminPass123"
+        },
+        "viewer": {
+          "email": "viewer@techcorp.com",
+          "password": "AdminPass123"
+        }
+      },
+      "globalretail": {
+        "admin": {
+          "email": "admin@globalretail.com",
+          "password": "AdminPass123"
+        },
+        "manager": {
+          "email": "manager@globalretail.com",
+          "password": "AdminPass123"
+        },
+        "user": {
+          "email": "user@globalretail.com",
+          "password": "AdminPass123"
+        },
+        "viewer": {
+          "email": "viewer@globalretail.com",
+          "password": "AdminPass123"
+        }
+      }
+    },
+    "testFiles": [
+      "src/__tests__/api/tenant/tenant-auth-tests.ts",
+      "src/__tests__/api/tenant/tenant-users-api.test.ts",
+      "src/__tests__/api/tenant/tenant-roles-api.test.ts",
+      "src/__tests__/api/tenant/tenant-audit-logs-api.test.ts"
+    ]
+  }
+}

@@ -5,13 +5,13 @@ import api from '@/lib/api';
 export interface DashboardStats {
   totalUsers: number;
   activeUsers: number;
-  newUsers: number;
-  activeUsersChange: number;
-  totalTickets: number;
-  openTickets: number;
+  newUsers?: number;
+  activeUsersChange?: number;
+  totalTickets?: number;
+  openTickets?: number;
   systemHealth: string;
-  totalRoles: number;
-  systemHealthChange: number;
+  totalRoles?: number;
+  systemHealthChange?: number;
 }
 
 export interface DashboardActivity {
@@ -24,13 +24,49 @@ export interface DashboardActivity {
 }
 
 export interface DashboardData {
-  stats: DashboardStats;
+  tenant: {
+    id: string;
+    name: string;
+    slug: string;
+    plan: string;
+    isActive: boolean;
+  };
+  summary: {
+    totalUsers: number;
+    activeUsers: number;
+    totalActivities: number;
+    systemHealth: string;
+  };
+  charts: {
+    userActivity: Array<{
+      date: string;
+      users: number;
+      activities: number;
+    }>;
+    systemUsage: Array<{
+      date: string;
+      cpu: number;
+      memory: number;
+      storage: number;
+    }>;
+  };
   recentActivity: DashboardActivity[];
+  userPermissions: Array<{
+    id: string;
+    name: string;
+    action: string;
+  }>;
+  systemHealth: {
+    uptime: number;
+    activeSessions: number;
+    cpuUsage: number;
+    memoryUsage: number;
+  };
 }
 
 // API function
 const fetchDashboardData = async (tenantSlug: string): Promise<DashboardData> => {
-  const response = await api.get(`/tenant/${tenantSlug}/dashboard/stats`);
+  const response = await api.get(`/tenant/${tenantSlug}/dashboard`);
   return response.data;
 };
 

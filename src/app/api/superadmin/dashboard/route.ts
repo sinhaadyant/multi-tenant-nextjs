@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireSuperAdmin } from '@/middleware/auth';
 import { prisma, logPrismaMessage, ENABLE_PRISMA_LOGGING } from '@/lib/prisma';
+import { asyncHandler } from '@/lib/errorHandler';
+import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
+import { withSuperAdminAuth, AuthenticatedRequest } from '@/lib/authMiddleware';
+import { requireSuperAdmin } from '@/middleware/auth';
 
 // Dashboard data interface matching frontend expectations
 interface DashboardData {

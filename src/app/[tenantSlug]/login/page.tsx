@@ -10,6 +10,7 @@ import Image from 'next/image';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { Eye, EyeOff, Mail, Lock, Building2 } from 'lucide-react';
+import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 
 // Validation schema
 const loginSchema = z.object({
@@ -41,6 +42,11 @@ export default function TenantLoginPage() {
   const params = useParams();
   const router = useRouter();
   const tenantSlug = params.tenantSlug as string;
+  
+  // Check if user is already authenticated and redirect if needed
+  const { shouldRedirect, isLoading: authLoading } = useAuthRedirect({
+    redirectTo: `/${tenantSlug}/dashboard`
+  });
   
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -84,10 +90,10 @@ export default function TenantLoginPage() {
     mutationFn: (data: LoginFormData) => loginUser({ ...data, tenantSlug }),
     onSuccess: (response) => {
       if (response.success && response.data) {
-        // Store auth data
-        localStorage.setItem('auth_token', response.data.token);
-        localStorage.setItem('refresh_token', response.data.refreshToken);
-        localStorage.setItem('user_data', JSON.stringify(response.data.user));
+        // Store auth data using unified auth
+        localStorage.setItem('tenant_auth_token', response.data.token);
+        localStorage.setItem('tenant_refresh_token', response.data.refreshToken);
+        localStorage.setItem('tenant_user_data', JSON.stringify(response.data.user));
         
         toast.success('Login successful!');
         
@@ -107,6 +113,30 @@ export default function TenantLoginPage() {
 
   const tenantName = tenantInfo?.name || tenantSlug.charAt(0).toUpperCase() + tenantSlug.slice(1);
 
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render the login form if user should be redirected
+  if (shouldRedirect) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Redirecting to dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
@@ -117,14 +147,14 @@ export default function TenantLoginPage() {
               alt="Logo"
               width={150}
               height={40}
-              className="dark:hidden"
+              className="dark:hidden w-auto h-auto"
             />
             <Image
               src="/images/logo/logo-dark.svg"
               alt="Logo"
               width={150}
               height={40}
-              className="hidden dark:block"
+              className="hidden dark:block w-auto h-auto"
             />
           </div>
           <div className="mt-6 text-center">

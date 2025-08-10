@@ -19,57 +19,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Handle tenant-specific routes
-  if (pathname.startsWith('/[') || pathname.match(/^\/[^\/]+$/)) {
-    const tenantSlug = pathname.slice(1); // Remove leading slash
-    
-    // Skip if it's a known non-tenant route
-    if (['superadmin', 'login', 'register', 'forgot-password'].includes(tenantSlug)) {
-      return NextResponse.next();
-    }
-
-    try {
-      // Check cache first
-      const cachedTenant = tenantCache.get(tenantSlug);
-      if (cachedTenant && Date.now() - parseInt(cachedTenant.id) < CACHE_TTL) {
-        if (!cachedTenant.isActive) {
-          return NextResponse.redirect(new URL('/404', request.url));
-        }
-        return NextResponse.next();
-      }
-
-      // Query database for tenant
-      const tenant = await prisma.tenant.findUnique({
-        where: { slug: tenantSlug },
-        select: { id: true, isActive: true }
-      });
-
-      if (!tenant) {
-        return NextResponse.redirect(new URL('/404', request.url));
-      }
-
-      // Cache the result
-      tenantCache.set(tenantSlug, {
-        id: Date.now().toString(),
-        isActive: tenant.isActive
-      });
-
-      if (!tenant.isActive) {
-        return NextResponse.redirect(new URL('/404', request.url));
-      }
-
-      // Add tenant info to headers for use in components
-      const response = NextResponse.next();
-      response.headers.set('x-tenant-id', tenant.id);
-      response.headers.set('x-tenant-slug', tenantSlug);
-      
-      return response;
-    } catch (error) {
-      console.error('Middleware error:', error);
-      return NextResponse.redirect(new URL('/500', request.url));
-    }
-  }
-
   // Handle superadmin routes with authentication check
   if (pathname.startsWith('/superadmin')) {
     const token = request.cookies.get('superadmin_token')?.value;
