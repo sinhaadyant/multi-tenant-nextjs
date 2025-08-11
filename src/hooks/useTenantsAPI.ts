@@ -246,11 +246,16 @@ export const useDeleteTenant = () => {
 };
 
 // Check subdomain availability
-export const useCheckSubdomain = (subdomain: string) => {
+export const useCheckSubdomain = (subdomain: string, excludeTenantId?: string) => {
   return useQuery({
-    queryKey: ['subdomain-check', subdomain],
+    queryKey: ['subdomain-check', subdomain, excludeTenantId],
     queryFn: async () => {
-      const response = await api.get(`/superadmin/tenants/check-subdomain?subdomain=${subdomain}`);
+      const params = new URLSearchParams();
+      params.append('subdomain', subdomain);
+      if (excludeTenantId) {
+        params.append('excludeTenantId', excludeTenantId);
+      }
+      const response = await api.get(`/superadmin/tenants/check-subdomain?${params.toString()}`);
       return response.data.data; // Access the actual data from the API response
     },
     enabled: !!subdomain && subdomain.length >= 3,
@@ -363,7 +368,6 @@ export const useTenantActivityLogs = (tenantId: string, filters: {
     queryKey: ['tenant-activity-logs', tenantId, filters],
     queryFn: async () => {
       const params = new URLSearchParams();
-      params.append('tenantId', tenantId);
       
       Object.entries(filters).forEach(([key, value]) => {
         if (value !== undefined && value !== '') {
@@ -371,7 +375,7 @@ export const useTenantActivityLogs = (tenantId: string, filters: {
         }
       });
 
-      const response = await api.get(`/superadmin/audit-logs?${params.toString()}`);
+      const response = await api.get(`/superadmin/tenants/${tenantId}/activity?${params.toString()}`);
       return response.data;
     },
     enabled: !!tenantId,

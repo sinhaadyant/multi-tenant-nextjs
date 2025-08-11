@@ -129,20 +129,26 @@ export const DynamicPermissionsProvider: React.FC<DynamicPermissionsProviderProp
       setIsLoading(true);
       setError(null);
 
-      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('access_token');
+      const token = localStorage.getItem('tenant_auth_token') || localStorage.getItem('auth_token') || sessionStorage.getItem('access_token');
+      console.log('🔍 DynamicPermissionsContext - Token found:', !!token, 'Token preview:', token ? `${token.substring(0, 20)}...` : 'none');
+      
       if (!token) {
         // No token means user is not authenticated - this is normal for login pages
+        console.log('🔍 DynamicPermissionsContext - No token found, skipping permissions fetch');
         setIsLoading(false);
         setIsInitialized(true);
         return;
       }
 
+      console.log('🔍 DynamicPermissionsContext - Making API request to:', `/api/tenant/${tenantSlug}/permissions/current-user`);
+      
       const response = await axios.get(`/api/tenant/${tenantSlug}/permissions/current-user`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
 
+      console.log('🔍 DynamicPermissionsContext - API response received');
       console.log('Permissions API response:', response.data);
 
       if (response.data.success) {
@@ -301,25 +307,73 @@ export const DynamicPermissionsProvider: React.FC<DynamicPermissionsProviderProp
   const getMenuItems = useCallback((): MenuItem[] => {
     if (!userPermissions || !userPermissions.menuItems || !Array.isArray(userPermissions.menuItems)) return [];
     
-    // If menu items are empty, return fallback items
+    // If menu items are empty, return fallback items with proper tenant slug
     if (userPermissions.menuItems.length === 0) {
+      const tenantSlug = userPermissions.user?.tenant?.slug;
+      if (!tenantSlug) return [];
+      
       return [
         {
           id: "dashboard",
           label: "Dashboard",
           icon: "LayoutDashboard",
-          path: "/dashboard",
+          path: `/${tenantSlug}/dashboard`,
           description: "Main dashboard with overview and analytics",
           permissions: ["dashboard:view"],
           hasChildren: false
         },
         {
-          id: "utilities",
+          id: "users",
+          label: "Users",
+          icon: "Users",
+          path: `/${tenantSlug}/users`,
+          description: "Manage users and their roles",
+          permissions: ["users:view"],
+          hasChildren: false
+        },
+        {
+          id: "roles",
+          label: "Roles",
+          icon: "Shield",
+          path: `/${tenantSlug}/roles`,
+          description: "Manage roles and permissions",
+          permissions: ["roles:view"],
+          hasChildren: false
+        },
+        {
+          id: "audit",
+          label: "Audit Logs",
+          icon: "ClipboardList",
+          path: `/${tenantSlug}/audit`,
+          description: "View system audit logs",
+          permissions: ["audit:view"],
+          hasChildren: false
+        },
+        {
+          id: "notifications",
+          label: "Notifications",
+          icon: "Bell",
+          path: `/${tenantSlug}/notifications`,
+          description: "Manage notifications",
+          permissions: ["notifications:view"],
+          hasChildren: false
+        },
+        {
+          id: "settings",
           label: "Settings",
           icon: "Settings",
-          path: "/utilities",
+          path: `/${tenantSlug}/settings`,
           description: "System and tenant settings",
           permissions: ["settings:view"],
+          hasChildren: false
+        },
+        {
+          id: "support",
+          label: "Support",
+          icon: "LifeBuoy",
+          path: `/${tenantSlug}/support`,
+          description: "Support tickets and help",
+          permissions: ["support:view"],
           hasChildren: false
         }
       ];

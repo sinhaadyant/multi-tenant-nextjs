@@ -18,6 +18,7 @@ export const GET = asyncHandler(async (req: NextRequest) => {
 
   const { searchParams } = new URL(req.url);
   const subdomain = searchParams.get('subdomain');
+  const excludeTenantId = searchParams.get('excludeTenantId'); // New parameter for editing
 
   if (!subdomain) {
     return createErrorResponse(
@@ -43,15 +44,27 @@ export const GET = asyncHandler(async (req: NextRequest) => {
   }
 
   try {
-    // Check if subdomain already exists
-    const existingTenant = await prisma.tenant.findUnique({
-      where: { slug: subdomain }
+    // Build the where clause for checking subdomain availability
+    const whereClause: any = { slug: subdomain };
+    
+    // If excludeTenantId is provided, exclude that tenant from the check
+    // This allows a tenant to keep its own subdomain when editing
+    if (excludeTenantId) {
+      whereClause.NOT = { id: excludeTenantId };
+    }
+
+    // Check if subdomain already exists (excluding the current tenant if editing)
+    const existingTenant = await prisma.tenant.findFirst({
+      where: whereClause
     });
 
     const available = !existingTenant;
 
     if (process.env.NODE_ENV === 'development') {
       console.log(`✅ Subdomain check completed: ${subdomain} is ${available ? 'available' : 'unavailable'}`);
+      if (excludeTenantId) {
+        console.log(`🔍 Excluded tenant ID: ${excludeTenantId}`);
+      }
     }
 
     return createSuccessResponse({

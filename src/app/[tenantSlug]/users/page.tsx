@@ -18,16 +18,8 @@ const UsersPageContent = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tenantSlug = params.tenantSlug as string;
-  const { hasPermission, isLoading: permissionsLoading, error: permissionsError } = useDynamicPermissions();
+  const { userPermissions, hasPermission, hasRole, isLoading: permissionsLoading, error: permissionsError } = useDynamicPermissions();
   const { confirm } = useConfirmModalContext();
-
-  // Debug logging
-  console.log('🔍 UsersPageContent Debug:', {
-    tenantSlug,
-    permissionsLoading,
-    permissionsError,
-    hasPermission: hasPermission('users', 'view')
-  });
 
   // State management
   const [filters, setFilters] = useState({
@@ -58,12 +50,24 @@ const UsersPageContent = () => {
   const deleteUserMutation = useDeleteUser(tenantSlug);
   const toggleStatusMutation = useToggleUserStatus(tenantSlug);
 
-  // Permission checks
+  // Permission checks - simplified since each user has only one role
   const canViewUsers = hasPermission('users', 'view');
   const canCreateUsers = hasPermission('users', 'create');
   const canUpdateUsers = hasPermission('users', 'update');
   const canDeleteUsers = hasPermission('users', 'delete');
   const canExportUsers = hasPermission('users', 'export');
+
+  // Debug logging
+  console.log('🔍 UsersPageContent Debug:', {
+    tenantSlug,
+    permissionsLoading,
+    permissionsError,
+    hasPermission: hasPermission('users', 'view'),
+    canViewUsers,
+    userPermissions: userPermissions,
+    allPermissions: userPermissions?.permissions || [],
+    userRoles: userPermissions?.user?.roles || []
+  });
 
   // Update URL when filters change
   useEffect(() => {

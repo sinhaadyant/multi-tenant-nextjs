@@ -36,7 +36,7 @@ export const GET = asyncHandler(async (req: NextRequest) => {
       isActive: role.isActive,
       createdAt: role.createdAt.toISOString(),
       updatedAt: role.updatedAt.toISOString(),
-      userCount: role._count.users,
+      userCount: role._count.userRoles,
       permissions: role.permissions.map(rp => ({
         id: rp.permission.id,
         name: rp.permission.name,
@@ -151,7 +151,7 @@ export const POST = asyncHandler(async (req: NextRequest) => {
       isActive: createdRole.isActive,
       createdAt: createdRole.createdAt.toISOString(),
       updatedAt: createdRole.updatedAt.toISOString(),
-      userCount: createdRole._count.users,
+      userCount: createdRole._count.userRoles,
       permissions: createdRole.permissions.map(rp => ({
         id: rp.permission.id,
         name: rp.permission.name,

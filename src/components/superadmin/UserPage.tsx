@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Download, Users, UserCheck, UserX, AlertTriangle, X } from 'lucide-react';
+import { Download, Users, UserCheck, UserX, AlertTriangle, X, UserPlus } from 'lucide-react';
 import { SortingState } from '@tanstack/react-table';
 import { useUsers, useToggleUserStatus, useDeleteUser, useResetUserPassword, useExportUsers, UserFilters } from '@/hooks/useUsers';
 import UserTable from './UserTable';
 import UserFilterBar from './UserFilterBar';
+import CreateUserModal from './CreateUserModal';
 import { UserErrorBoundaryWrapper } from './UserErrorBoundary';
 import Button from '@/components/ui/button/Button';
 import Badge from '@/components/ui/badge/Badge';
@@ -27,6 +28,7 @@ const UserPage: React.FC = () => {
     sortBy: searchParams.get('sortBy') || 'createdAt',
     sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc',
   });
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Hooks
   const { data: usersData, isLoading, error, refetch } = useUsers(filters);
@@ -206,6 +208,10 @@ const UserPage: React.FC = () => {
                 </button>
               </div>
             )}
+            <Button onClick={() => setShowCreateModal(true)}>
+              <UserPlus className="w-4 h-4 mr-2" />
+              Create User
+            </Button>
             <Button
               variant="outline"
               onClick={handleExportData}
@@ -373,6 +379,16 @@ const UserPage: React.FC = () => {
             ) : null}
           </div>
         )}
+
+        {/* Create User Modal */}
+        <CreateUserModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={() => {
+            refetch();
+            setShowCreateModal(false);
+          }}
+        />
       </div>
     </UserErrorBoundaryWrapper>
   );

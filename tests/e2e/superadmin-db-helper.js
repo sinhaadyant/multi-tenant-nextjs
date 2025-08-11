@@ -65,9 +65,10 @@ class SuperAdminDatabaseHelper {
 
   async updateSuperAdminLastLogin(adminId) {
     try {
+      // SuperAdmin model doesn't have lastLogin field, so we'll just update the updatedAt field
       return await this.prisma.superAdmin.update({
         where: { id: adminId },
-        data: { lastLogin: new Date() },
+        data: { updatedAt: new Date() },
       });
     } catch (error) {
       console.error("Error updating superadmin last login:", error);
@@ -910,6 +911,70 @@ class SuperAdminDatabaseHelper {
       matches: mismatches.length === 0,
       mismatches,
     };
+  }
+
+  // ==================== INVITE TOKEN MANAGEMENT ====================
+
+  async createInviteToken(tokenData) {
+    try {
+      const crypto = require('crypto');
+      const token = crypto.randomBytes(32).toString('hex');
+      
+      return await this.prisma.inviteToken.create({
+        data: {
+          token: token,
+          email: tokenData.email,
+          type: tokenData.type || 'superadmin',
+          expiresAt: tokenData.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours default
+          isUsed: false,
+          superAdminId: tokenData.superAdminId || null,
+        },
+      });
+    } catch (error) {
+      console.error("Error creating invite token:", error);
+      throw error;
+    }
+  }
+
+  async getInviteToken(token) {
+    try {
+      return await this.prisma.inviteToken.findUnique({
+        where: { token },
+        include: {
+          superAdmin: true,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching invite token:", error);
+      return null;
+    }
+  }
+
+  async deleteInviteToken(token) {
+    try {
+      return await this.prisma.inviteToken.delete({
+        where: { token },
+      });
+    } catch (error) {
+      console.error("Error deleting invite token:", error);
+      return null;
+    }
+  }
+
+  async deleteSuperAdminByEmail(email) {
+    try {
+      return await this.prisma.superAdmin.delete({
+        where: { email },
+      });
+    } catch (error) {
+      // If user doesn't exist, that's fine for cleanup
+      if (error.code === 'P2025') {
+        console.log(`SuperAdmin with email ${email} not found for deletion (already cleaned up)`);
+        return null;
+      }
+      console.error("Error deleting superadmin by email:", error);
+      return null;
+    }
   }
 }
 

@@ -18,62 +18,50 @@ const TenantFiltersComponent: React.FC<TenantFiltersProps> = ({
   loading = false
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [searchValue, setSearchValue] = useState(filters.search || '');
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const isUpdatingRef = useRef(false);
+  const [localSearchValue, setLocalSearchValue] = useState(filters.search || '');
+  const [showClearButton, setShowClearButton] = useState(!!filters.search);
+  const searchTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Maintain search value when filters change externally (but not from our own updates)
+  // Sync local search value with filters.search
   useEffect(() => {
-    if (!isUpdatingRef.current && filters.search !== searchValue) {
-      setSearchValue(filters.search || '');
-    }
-  }, [filters.search, searchValue]);
+    setLocalSearchValue(filters.search || '');
+    setShowClearButton(!!filters.search);
+  }, [filters.search]);
 
-  // Debounced search to prevent excessive API calls
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchValue !== filters.search) {
-        isUpdatingRef.current = true;
-        onFiltersChange({ ...filters, search: searchValue, page: 1 });
-        // Reset the flag after a short delay
-        setTimeout(() => {
-          isUpdatingRef.current = false;
-        }, 100);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [searchValue, filters, onFiltersChange]);
-
+  // Debounced search handler
   const handleSearchChange = useCallback((value: string) => {
-    setSearchValue(value);
-  }, []);
+    setLocalSearchValue(value);
+    setShowClearButton(!!value);
+    
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      if (value !== filters.search) {
+        onFiltersChange({
+          ...filters,
+          search: value,
+          page: 1
+        });
+      }
+    }, 500);
+  }, [filters, onFiltersChange]);
 
   const handleFilterChange = useCallback((key: keyof TenantFilters, value: any) => {
     onFiltersChange({ ...filters, [key]: value, page: 1 });
   }, [filters, onFiltersChange]);
 
   const handleClearSearch = useCallback(() => {
-    setSearchValue('');
-    isUpdatingRef.current = true;
+    setLocalSearchValue('');
+    setShowClearButton(false);
     onFiltersChange({ ...filters, search: '', page: 1 });
-    // Reset the flag after a short delay
-    setTimeout(() => {
-      isUpdatingRef.current = false;
-    }, 100);
-    // Maintain focus after clearing
-    setTimeout(() => {
-      searchInputRef.current?.focus();
-    }, 0);
   }, [filters, onFiltersChange]);
 
   const handleClearFilters = useCallback(() => {
     onClearFilters();
-    setSearchValue('');
-    // Maintain focus after clearing all filters
-    setTimeout(() => {
-      searchInputRef.current?.focus();
-    }, 0);
+    setLocalSearchValue('');
+    setShowClearButton(false);
   }, [onClearFilters]);
 
   const hasActiveFilters = filters.status || filters.region || filters.search;
@@ -85,15 +73,14 @@ const TenantFiltersComponent: React.FC<TenantFiltersProps> = ({
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
-            ref={searchInputRef}
             type="text"
             placeholder="Search tenants by name, subdomain, or domain..."
-            value={searchValue}
+            value={localSearchValue}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
             disabled={loading}
           />
-          {searchValue && (
+           {showClearButton && (
             <button
               onClick={handleClearSearch}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"

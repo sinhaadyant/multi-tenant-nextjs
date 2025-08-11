@@ -71,6 +71,79 @@ export async function checkTenantPermission(
 }
 
 /**
+ * Check if a user has a specific permission within a tenant by user ID and tenant slug
+ * @param userId - User ID to check permissions for
+ * @param tenantSlug - Tenant slug to check permissions for
+ * @param moduleKey - Module key (e.g., 'notifications')
+ * @param action - Action to check (e.g., 'view', 'create')
+ * @returns Promise<boolean> - True if user has permission
+ */
+export async function checkTenantPermissionById(
+  userId: string,
+  tenantSlug: string,
+  moduleKey: string,
+  action: string
+): Promise<boolean> {
+  try {
+    // Get tenant by slug
+    const tenant = await prisma.tenant.findUnique({
+      where: { slug: tenantSlug, isActive: true }
+    });
+
+    if (!tenant) {
+      return false;
+    }
+
+    // Get user with roles and permissions
+    const user = await prisma.user.findUnique({
+      where: { id: userId, tenantId: tenant.id },
+      include: {
+        userRoles: {
+          include: {
+            role: {
+              include: {
+                permissions: {
+                  include: {
+                    permission: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!user || !user.isActive) {
+      return false;
+    }
+
+    // Check if any role has the required permission
+    for (const userRole of user.userRoles) {
+      const role = userRole.role;
+      
+      if (!role.isActive) continue;
+      
+      // Check role permissions
+      for (const rolePermission of role.permissions) {
+        const permission = rolePermission.permission;
+        
+        if (permission.isActive && 
+            permission.moduleKey === moduleKey && 
+            permission.action === action) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  } catch (error) {
+    console.error('Error checking tenant permission:', error);
+    return false;
+  }
+}
+
+/**
  * Check if a user has any of the specified permissions
  * @param user - User object with roles and permissions
  * @param tenantId - Tenant ID to check permissions for

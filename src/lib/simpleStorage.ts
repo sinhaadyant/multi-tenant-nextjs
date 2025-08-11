@@ -9,21 +9,37 @@ export const simpleStorage = {
   // Auth operations
   getAuthToken: (): string | null => {
     if (typeof window === 'undefined') return null;
-    const item = localStorage.getItem('auth_token');
-    if (!item) return null;
     
-    try {
-      const parsedItem = JSON.parse(item);
-      if (parsedItem.expiry && Date.now() > parsedItem.expiry) {
-        // Token has expired, remove it
-        localStorage.removeItem('auth_token');
-        return null;
+    // First check localStorage
+    const item = localStorage.getItem('auth_token');
+    if (item) {
+      try {
+        const parsedItem = JSON.parse(item);
+        if (parsedItem.expiry && Date.now() > parsedItem.expiry) {
+          // Token has expired, remove it
+          localStorage.removeItem('auth_token');
+        } else {
+          return parsedItem.value || item; // Fallback to original item
+        }
+      } catch (error) {
+        // If parsing fails, return the original item (backward compatibility)
+        return item;
       }
-      return parsedItem.value || item; // Fallback to original item
-    } catch (error) {
-      // If parsing fails, return the original item (backward compatibility)
-      return item;
     }
+    
+    // If no token in localStorage, check for superadmin token in cookies
+    const cookies = document.cookie.split(';');
+    const superadminTokenCookie = cookies.find(cookie => cookie.trim().startsWith('superadmin_token='));
+    if (superadminTokenCookie) {
+      const token = superadminTokenCookie.split('=')[1];
+      if (token) {
+        // Store it in localStorage for consistency
+        simpleStorage.setAuthToken(token);
+        return token;
+      }
+    }
+    
+    return null;
   },
   
   setAuthToken: (token: string): void => {
@@ -39,6 +55,9 @@ export const simpleStorage = {
     };
     
     localStorage.setItem('auth_token', JSON.stringify(itemWithExpiry));
+    
+    // Also set superadmin token cookie for middleware compatibility
+    document.cookie = `superadmin_token=${token}; path=/; max-age=900; samesite=lax`;
   },
   
   getAuthUser: () => {
@@ -79,6 +98,9 @@ export const simpleStorage = {
     if (typeof window === 'undefined') return;
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user');
+    
+    // Also clear superadmin token cookie
+    document.cookie = 'superadmin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
   },
 
   // Theme

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
+import { simpleStorage } from '@/lib/simpleStorage';
 
 interface User {
   id: string;
@@ -50,8 +51,22 @@ export const useAuth = () => {
     try {
       setState(prev => ({ ...prev, isLoading: true, error: null }));
 
-      // Check if we have a token
-      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('access_token');
+      // Check if we have a token in localStorage or sessionStorage
+      let token = simpleStorage.getAuthToken() || localStorage.getItem('auth_token') || sessionStorage.getItem('access_token');
+      
+      // If no token in storage, check for superadmin token in cookies
+      if (!token) {
+        // Get token from cookies (for superadmin)
+        const cookies = document.cookie.split(';');
+        const superadminTokenCookie = cookies.find(cookie => cookie.trim().startsWith('superadmin_token='));
+        if (superadminTokenCookie) {
+          token = superadminTokenCookie.split('=')[1];
+          // Store it in localStorage for consistency
+          if (token) {
+            simpleStorage.setAuthToken(token);
+          }
+        }
+      }
       
       if (!token) {
         setState({
@@ -67,8 +82,21 @@ export const useAuth = () => {
       const response = await api.get('/auth/verify');
       
       if (response.data.success) {
+        const userData = response.data.data;
+        
+        // Ensure we have the correct user data structure
+        const user = {
+          id: userData.id,
+          email: userData.email,
+          name: userData.name,
+          role: userData.role,
+          tenantId: userData.tenantId,
+          tenantSlug: userData.tenantSlug,
+          avatar: userData.avatar
+        };
+        
         setState({
-          user: response.data.data,
+          user,
           isAuthenticated: true,
           isLoading: false,
           error: null
@@ -106,8 +134,10 @@ export const useAuth = () => {
       if (response.data.success) {
         const { user, token, refreshToken } = response.data.data;
         
-        // Store tokens
-        localStorage.setItem('auth_token', token);
+        // Store tokens using simpleStorage for consistency
+        simpleStorage.setAuthToken(token);
+        simpleStorage.setAuthUser(user);
+        
         if (refreshToken) {
           localStorage.setItem('refresh_token', refreshToken);
         }
@@ -185,7 +215,10 @@ export const useAuth = () => {
   }, [state.isAuthenticated, state.user?.role, router]);
 
   const clearAuth = useCallback(() => {
-    // Clear all auth data
+    // Clear all auth data using simpleStorage
+    simpleStorage.clearAuth();
+    
+    // Also clear other storage locations
     localStorage.removeItem('auth_token');
     localStorage.removeItem('refresh_token');
     sessionStorage.removeItem('access_token');
@@ -219,7 +252,7 @@ export const useAuth = () => {
         const { token, refreshToken: newRefreshToken } = response.data.data;
         
         // Update tokens
-        localStorage.setItem('auth_token', token);
+        simpleStorage.setAuthToken(token);
         if (newRefreshToken) {
           localStorage.setItem('refresh_token', newRefreshToken);
         }

@@ -315,13 +315,13 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-      <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-8">
+      <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-8" data-testid="create-tenant-form">
         {/* Form Error Display */}
         {formError && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
             <div className="flex items-center">
               <X className="w-5 h-5 text-red-500 mr-2" />
-              <p className="text-sm text-red-700 dark:text-red-300">{formError}</p>
+              <p className="text-sm text-red-700 dark:text-red-300" data-testid="validation-error">{formError}</p>
             </div>
           </div>
         )}
@@ -350,6 +350,7 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
                   <input
                     {...field}
                     type="text"
+                    name="name"
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
                       errors.tenantName ? 'border-red-500' : 'border-gray-300'
                     }`}
@@ -358,7 +359,7 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
                 )}
               />
               {errors.tenantName && (
-                <p className="mt-1 text-sm text-red-500">{errors.tenantName.message}</p>
+                <p className="mt-1 text-sm text-red-500" data-testid="validation-error">{errors.tenantName.message}</p>
               )}
             </div>
 
@@ -374,6 +375,7 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
                   <input
                     {...field}
                     type="text"
+                    name="company"
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
                       errors.companyName ? 'border-red-500' : 'border-gray-300'
                     }`}
@@ -382,7 +384,7 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
                 )}
               />
               {errors.companyName && (
-                <p className="mt-1 text-sm text-red-500">{errors.companyName.message}</p>
+                <p className="mt-1 text-sm text-red-500" data-testid="validation-error">{errors.companyName.message}</p>
               )}
             </div>
 
@@ -400,6 +402,7 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
                       <input
                         {...field}
                         type="text"
+                        name="subdomain"
                         className={`flex-1 px-3 py-2 border rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
                           errors.subdomain ? 'border-red-500' : 'border-gray-300'
                         }`}
@@ -424,7 +427,7 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
                 </div>
               </div>
               {errors.subdomain && (
-                <p className="mt-1 text-sm text-red-500">{errors.subdomain.message}</p>
+                <p className="mt-1 text-sm text-red-500" data-testid="validation-error">{errors.subdomain.message}</p>
               )}
               {subdomainAvailable === true && (
                 <p className="mt-1 text-sm text-green-500">Subdomain is available</p>
@@ -445,19 +448,20 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
                 render={({ field }) => (
                   <select
                     {...field}
+                    name="plan"
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
                       errors.tenantType ? 'border-red-500' : 'border-gray-300'
                     }`}
                   >
-                    <option value="">Select tenant type</option>
-                    <option value="SaaS">SaaS</option>
-                    <option value="Enterprise">Enterprise</option>
-                    <option value="Custom">Custom</option>
+                    <option value="">Select plan</option>
+                    <option value="basic">Basic</option>
+                    <option value="premium">Premium</option>
+                    <option value="enterprise">Enterprise</option>
                   </select>
                 )}
               />
               {errors.tenantType && (
-                <p className="mt-1 text-sm text-red-500">{errors.tenantType.message}</p>
+                <p className="mt-1 text-sm text-red-500" data-testid="validation-error">{errors.tenantType.message}</p>
               )}
             </div>
 
@@ -510,7 +514,7 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
                 )}
               />
               {errors.country && (
-                <p className="mt-1 text-sm text-red-500">{errors.country.message}</p>
+                <p className="mt-1 text-sm text-red-500" data-testid="validation-error">{errors.country.message}</p>
               )}
             </div>
 
@@ -564,6 +568,26 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
               )}
             />
           </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Description
+            </label>
+            <Controller
+              name="description"
+              control={control}
+              render={({ field }) => (
+                <textarea
+                  {...field}
+                  name="description"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  placeholder="Enter tenant description"
+                />
+              )}
+            />
+          </div>
         </div>
 
         {/* Admin User Section */}
@@ -598,7 +622,7 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
                 )}
               />
               {errors.adminFullName && (
-                <p className="mt-1 text-sm text-red-500">{errors.adminFullName.message}</p>
+                <p className="mt-1 text-sm text-red-500" data-testid="validation-error">{errors.adminFullName.message}</p>
               )}
             </div>
 
@@ -615,6 +639,7 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
                     <input
                       {...field}
                       type="email"
+                      name="email"
                       className={`w-full px-3 py-2 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
                         errors.adminEmail ? 'border-red-500' : 'border-gray-300'
                       }`}
@@ -635,7 +660,7 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
                 </div>
               </div>
               {errors.adminEmail && (
-                <p className="mt-1 text-sm text-red-500">{errors.adminEmail.message}</p>
+                <p className="mt-1 text-sm text-red-500" data-testid="validation-error">{errors.adminEmail.message}</p>
               )}
               {emailError && !errors.adminEmail && (
                 <p className="mt-1 text-sm text-red-500">{emailError}</p>
@@ -657,6 +682,7 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
                   <input
                     {...field}
                     type="tel"
+                    name="phone"
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
                       errors.adminMobile ? 'border-red-500' : 'border-gray-300'
                     }`}
@@ -666,7 +692,7 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
                 )}
               />
               {errors.adminMobile && (
-                <p className="mt-1 text-sm text-red-500">{errors.adminMobile.message}</p>
+                <p className="mt-1 text-sm text-red-500" data-testid="validation-error">{errors.adminMobile.message}</p>
               )}
             </div>
 
@@ -703,7 +729,7 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
                 </button>
               </div>
               {errors.adminPassword && (
-                <p className="mt-1 text-sm text-red-500">{errors.adminPassword.message}</p>
+                <p className="mt-1 text-sm text-red-500" data-testid="validation-error">{errors.adminPassword.message}</p>
               )}
               {watch('adminPassword') && (
                 <div className="mt-1">
@@ -761,7 +787,7 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
                 </button>
               </div>
               {errors.confirmPassword && (
-                <p className="mt-1 text-sm text-red-500">{errors.confirmPassword.message}</p>
+                <p className="mt-1 text-sm text-red-500" data-testid="validation-error">{errors.confirmPassword.message}</p>
               )}
             </div>
           </div>
@@ -778,6 +804,7 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
           </button>
           <button
             type="submit"
+            data-testid="create-tenant-submit"
             disabled={isSubmitting || createTenantMutation.isPending || subdomainAvailable !== true || emailAvailable !== true}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
           >

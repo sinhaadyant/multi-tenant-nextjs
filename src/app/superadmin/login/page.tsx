@@ -101,24 +101,33 @@ export default function SuperAdminLogin() {
       try {
         console.log('💾 Storing tokens in browser storage...');
         
-        // Store access token in sessionStorage
+        // Store access token in localStorage (primary location for API)
+        localStorage.setItem('auth_token', result.data.token);
+        localStorage.setItem('superadmin_token', result.data.token);
+        console.log('✅ Access token stored in localStorage as auth_token and superadmin_token');
+        
+        // Store access token in sessionStorage (backup)
         sessionStorage.setItem('access_token', result.data.token);
-        console.log('✅ Access token stored in sessionStorage');
+        console.log('✅ Access token stored in sessionStorage as access_token');
         
         // Store refresh token in localStorage
         localStorage.setItem('refresh_token', result.data.refreshToken);
         console.log('✅ Refresh token stored in localStorage');
         
         // Verify storage
+        const storedAuthToken = localStorage.getItem('auth_token');
+        const storedSuperadminToken = localStorage.getItem('superadmin_token');
         const storedAccessToken = sessionStorage.getItem('access_token');
         const storedRefreshToken = localStorage.getItem('refresh_token');
         
         console.log('🔍 Storage verification:');
+        console.log('📦 localStorage auth_token:', storedAuthToken ? 'EXISTS' : 'NOT FOUND');
+        console.log('📦 localStorage superadmin_token:', storedSuperadminToken ? 'EXISTS' : 'NOT FOUND');
         console.log('📦 sessionStorage access_token:', storedAccessToken ? 'EXISTS' : 'NOT FOUND');
         console.log('📦 localStorage refresh_token:', storedRefreshToken ? 'EXISTS' : 'NOT FOUND');
         console.log('📦 localStorage persist:superadmin-root:', localStorage.getItem('persist:superadmin-root') ? 'EXISTS' : 'NOT FOUND');
         
-        if (!storedAccessToken || !storedRefreshToken) {
+        if (!storedAuthToken || !storedSuperadminToken || !storedRefreshToken) {
           throw new Error('Failed to store tokens in browser storage');
         }
         

@@ -24,6 +24,7 @@ export const createTenantSchema = z.object({
   industryType: z.string().optional(),
   country: z.string().min(1, 'Country is required'),
   address: z.string().optional(),
+  description: z.string().optional(),
   status: z.boolean(),
   
   // Admin User Information
@@ -68,7 +69,8 @@ export const updateTenantSchema = createTenantSchema.partial();
 export const createUserSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
   email: emailSchema,
-  roleId: z.string().min(1, 'Role is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  roleId: z.string().optional(),
   tenantId: z.string().min(1, 'Tenant is required'),
   department: z.string().optional(),
   location: z.string().optional(),

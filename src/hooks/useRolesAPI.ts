@@ -47,10 +47,10 @@ export const useRolesAPI = () => {
       
       const response = await api.get('/superadmin/roles');
       
-      if (response.success) {
-        setRoles(response.data.roles);
+      if (response.data.success) {
+        setRoles(response.data.data.roles);
       } else {
-        setError(response.message || 'Failed to fetch roles');
+        setError(response.data.message || 'Failed to fetch roles');
       }
     } catch (err: any) {
       setError(err.message || 'Failed to fetch roles');
@@ -66,12 +66,12 @@ export const useRolesAPI = () => {
       
       const response = await api.post('/superadmin/roles', roleData);
       
-      if (response.success) {
+      if (response.data.success) {
         // Add the new role to the list
-        setRoles(prev => [...prev, response.data.role]);
-        return response.data.role;
+        setRoles(prev => [...prev, response.data.data.role]);
+        return response.data.data.role;
       } else {
-        throw new Error(response.message || 'Failed to create role');
+        throw new Error(response.data.message || 'Failed to create role');
       }
     } catch (err: any) {
       setError(err.message || 'Failed to create role');
@@ -86,14 +86,14 @@ export const useRolesAPI = () => {
       
       const response = await api.put(`/superadmin/roles/${roleId}`, roleData);
       
-      if (response.success) {
+      if (response.data.success) {
         // Update the role in the list
         setRoles(prev => prev.map(role => 
-          role.id === roleId ? { ...role, ...response.data.role } : role
+          role.id === roleId ? { ...role, ...response.data.data.role } : role
         ));
-        return response.data.role;
+        return response.data.data.role;
       } else {
-        throw new Error(response.message || 'Failed to update role');
+        throw new Error(response.data.message || 'Failed to update role');
       }
     } catch (err: any) {
       setError(err.message || 'Failed to update role');
@@ -108,11 +108,11 @@ export const useRolesAPI = () => {
       
       const response = await api.delete(`/superadmin/roles/${roleId}`);
       
-      if (response.success) {
+      if (response.data.success) {
         // Remove the role from the list
         setRoles(prev => prev.filter(role => role.id !== roleId));
       } else {
-        throw new Error(response.message || 'Failed to delete role');
+        throw new Error(response.data.message || 'Failed to delete role');
       }
     } catch (err: any) {
       setError(err.message || 'Failed to delete role');
@@ -127,10 +127,10 @@ export const useRolesAPI = () => {
       
       const response = await api.get(`/superadmin/roles/${roleId}`);
       
-      if (response.success) {
-        return response.data.role;
+      if (response.data.success) {
+        return response.data.data.role;
       } else {
-        throw new Error(response.message || 'Failed to fetch role');
+        throw new Error(response.data.message || 'Failed to fetch role');
       }
     } catch (err: any) {
       setError(err.message || 'Failed to fetch role');
