@@ -1,0 +1,50 @@
+{
+  "timestamp": "2025-08-11T07:08:09.245Z",
+  "summary": {
+    "totalTenants": 2,
+    "totalPermissions": 27,
+    "totalIssues": 0,
+    "issuesBySeverity": {}
+  },
+  "detailedReport": [
+    {
+      "tenant": "TechCorp Solutions",
+      "user": "admin@techcorp.com",
+      "issue": "All permissions present",
+      "severity": "NONE"
+    },
+    {
+      "tenant": "Global Retail Inc",
+      "user": "admin@globalretail.com",
+      "issue": "All permissions present",
+      "severity": "NONE"
+    }
+  ],
+  "allAvailablePermissions": [
+    "audit:view",
+    "dashboard:view",
+    "modules:edit",
+    "modules:enable_disable",
+    "modules:manage_versions",
+    "modules:view",
+    "modules:view_analytics",
+    "notifications:create",
+    "notifications:delete",
+    "notifications:edit",
+    "notifications:send",
+    "notifications:view",
+    "roles:create",
+    "roles:delete",
+    "roles:edit",
+    "roles:view",
+    "settings:edit",
+    "settings:view",
+    "support:create",
+    "support:edit",
+    "support:view",
+    "users:create",
+    "users:delete",
+    "users:edit",
+    "users:view"
+  ]
+}

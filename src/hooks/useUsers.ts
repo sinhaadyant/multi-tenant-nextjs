@@ -237,4 +237,36 @@ export const useExportUsers = () => {
       toast.error(message);
     },
   });
+};
+
+// Fetch tenants for user creation
+export const useTenants = (filters: any = {}) => {
+  return useQuery({
+    queryKey: ['tenants', filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== '') {
+          params.append(key, value.toString());
+        }
+      });
+
+      const response = await api.get(`/superadmin/tenants?${params.toString()}`);
+      return response.data;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
+// Fetch roles for user creation
+export const useRoles = () => {
+  return useQuery({
+    queryKey: ['roles'],
+    queryFn: async () => {
+      const response = await api.get('/superadmin/roles');
+      return response.data;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 }; 

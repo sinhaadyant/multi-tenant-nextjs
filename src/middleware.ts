@@ -26,13 +26,22 @@ export async function middleware(request: NextRequest) {
 
   // Handle superadmin routes with authentication check
   if (pathname.startsWith('/superadmin')) {
-    const token = request.cookies.get('superadmin_token')?.value;
-    
     // Allow access to auth pages without token
     const authPages = ['/superadmin/login', '/superadmin/signup', '/superadmin/forgot-password', '/superadmin/reset-password'];
     
-    if (!token && !authPages.includes(pathname)) {
-      return NextResponse.redirect(new URL('/superadmin/login', request.url));
+    if (authPages.includes(pathname)) {
+      return NextResponse.next();
+    }
+    
+    // Check for token in cookie (for server-side auth)
+    const cookieToken = request.cookies.get('superadmin_token')?.value;
+    
+    // For superadmin routes, we'll let the client-side ProtectedRoute handle authentication
+    // This prevents the redirect loop issue where middleware redirects to login
+    // but the client-side auth state hasn't been properly initialized yet
+    if (!cookieToken) {
+      // Instead of redirecting, let the request through and let client-side handle it
+      return NextResponse.next();
     }
   }
 

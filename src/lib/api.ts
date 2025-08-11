@@ -86,6 +86,7 @@ const clearAuthData = () => {
       sessionStorage.removeItem('auth_token');
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('auth_token');
+      localStorage.removeItem('superadmin_token');
       localStorage.removeItem('persist:superadmin-root');
       
       // Clear cookies

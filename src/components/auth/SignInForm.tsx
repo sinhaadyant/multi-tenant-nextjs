@@ -43,6 +43,12 @@ export default function SignInForm({ superAdmin }: { superAdmin?: boolean }) {
           simpleStorage.setAuthToken(response.data.token);
           simpleStorage.setAuthUser(response.data.user);
           
+          // For superadmin, also ensure the cookie is properly set
+          if (response.data.user.role === 'superadmin') {
+            // Set cookie for superadmin token
+            document.cookie = `superadmin_token=${response.data.token}; path=/; max-age=900; samesite=lax`;
+          }
+          
           // Update Redux state
           dispatch(setLogin({
             user: response.data.user,

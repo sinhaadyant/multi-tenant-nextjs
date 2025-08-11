@@ -36,6 +36,7 @@ import {
   Loader2,
 } from "lucide-react";
 import SidebarWidget from "./SidebarWidget";
+import RoleBadge from "@/components/ui/RoleBadge";
 
 // Icon mapping
 const iconMap: { [key: string]: React.ReactNode } = {
@@ -77,29 +78,20 @@ const getFallbackMenuItems = (tenantSlug: string): MenuItem[] => [
   },
   {
     id: "users",
-    label: "User Management",
+    label: "Users",
     icon: "Users",
     path: `/${tenantSlug}/users`,
-    description: "Manage tenant users, roles, and permissions",
+    description: "Manage users and their roles",
     permissions: ["users:view"],
     hasChildren: false
   },
   {
     id: "roles",
-    label: "Roles & Permissions",
+    label: "Roles",
     icon: "Shield",
     path: `/${tenantSlug}/roles`,
-    description: "Manage roles and assign permissions",
+    description: "Manage roles and permissions",
     permissions: ["roles:view"],
-    hasChildren: false
-  },
-  {
-    id: "modules",
-    label: "Module Management",
-    icon: "Cog",
-    path: `/${tenantSlug}/modules`,
-    description: "Manage tenant modules and features",
-    permissions: ["modules:view"],
     hasChildren: false
   },
   {
@@ -107,26 +99,8 @@ const getFallbackMenuItems = (tenantSlug: string): MenuItem[] => [
     label: "Audit Logs",
     icon: "ClipboardList",
     path: `/${tenantSlug}/audit`,
-    description: "View system audit logs and activity",
+    description: "View system audit logs",
     permissions: ["audit:view"],
-    hasChildren: false
-  },
-  {
-    id: "support",
-    label: "Support",
-    icon: "LifeBuoy",
-    path: `/${tenantSlug}/support`,
-    description: "Support tickets and help",
-    permissions: ["support:view"],
-    hasChildren: false
-  },
-  {
-    id: "content",
-    label: "Content Management",
-    icon: "FileText",
-    path: `/${tenantSlug}/content`,
-    description: "Manage content and documents",
-    permissions: ["content:view"],
     hasChildren: false
   },
   {
@@ -134,7 +108,7 @@ const getFallbackMenuItems = (tenantSlug: string): MenuItem[] => [
     label: "Notifications",
     icon: "Bell",
     path: `/${tenantSlug}/notifications`,
-    description: "Manage notifications and alerts",
+    description: "Manage notifications",
     permissions: ["notifications:view"],
     hasChildren: false
   },
@@ -145,6 +119,15 @@ const getFallbackMenuItems = (tenantSlug: string): MenuItem[] => [
     path: `/${tenantSlug}/settings`,
     description: "System and tenant settings",
     permissions: ["settings:view"],
+    hasChildren: false
+  },
+  {
+    id: "support",
+    label: "Support",
+    icon: "LifeBuoy",
+    path: `/${tenantSlug}/support`,
+    description: "Support tickets and help",
+    permissions: ["support:view"],
     hasChildren: false
   }
 ];
@@ -160,6 +143,10 @@ const DynamicSidebar: React.FC<DynamicSidebarProps> = ({ isAuthPage = false }) =
   const { tenant, user } = useTenantAuth();
   const params = useParams();
   const tenantSlug = params.tenantSlug as string;
+  
+
+  
+
   
   const [openSubmenu, setOpenSubmenu] = useState<number | null>(null);
   const [subMenuHeights, setSubMenuHeight] = useState<{ [key: number]: number }>({});
@@ -260,14 +247,26 @@ const DynamicSidebar: React.FC<DynamicSidebarProps> = ({ isAuthPage = false }) =
   if (!isLoading && !hasAccess && menuItems.length === 0) {
     return (
       <aside className="fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200 w-[290px]">
-        <div className="py-8 flex justify-start">
-          <div className="flex items-center space-x-3">
-            <AlertTriangle className="w-6 h-6 text-yellow-500" />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Using Fallback Menu
-            </span>
-          </div>
+         {/* Tenant and User Info */}
+        <div className="py-6 flex justify-start">
+          {user && <div className="flex items-center space-x-3">
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-xl">
+                {tenant?.name ? tenant.name.charAt(0).toUpperCase() : tenantSlug ? tenantSlug.charAt(0).toUpperCase() : 'T'}  
+              </span>
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+              {tenant?.name || (tenantSlug ? tenantSlug.charAt(0).toUpperCase() + tenantSlug.slice(1) : 'Admin')}
+               </h2>
+             
+            </div>
+          </div>}
         </div>
+        
+       
+         
+        
         <div className="flex-1 overflow-y-auto">
           <nav className="space-y-2">
             {getFallbackMenuItems(tenantSlug).map((item: MenuItem, index: number) => renderMenuItem(item, index))}
@@ -313,12 +312,24 @@ const DynamicSidebar: React.FC<DynamicSidebarProps> = ({ isAuthPage = false }) =
   if (error && menuItems.length === 0) {
     return (
       <aside className="fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200 w-[290px]">
-        <div className="py-8 flex justify-start">
+        <div className="py-6 flex justify-start">
           <div className="flex items-center space-x-3">
-            <AlertTriangle className="w-6 h-6 text-yellow-500" />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Using Fallback Menu
-            </span>
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-xl">
+                {tenant?.name ? tenant.name.charAt(0).toUpperCase() : 
+                 tenantSlug ? tenantSlug.charAt(0).toUpperCase() : 'T'}
+              </span>
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                {tenant?.name || (tenantSlug ? tenantSlug.charAt(0).toUpperCase() + tenantSlug.slice(1) : 'Admin')}
+              </h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {user?.roles && user.roles.length > 0 
+                  ? user.roles[0].name 
+                  : 'User'}
+              </p>
+            </div>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
@@ -369,19 +380,35 @@ const DynamicSidebar: React.FC<DynamicSidebarProps> = ({ isAuthPage = false }) =
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                   {tenant?.name || (tenantSlug ? tenantSlug.charAt(0).toUpperCase() + tenantSlug.slice(1) : 'Admin')}
                 </h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {user?.roles && user.roles.length > 0 
-                    ? user.roles[0].name 
-                    : 'User'}
-                </p>
+                <div className="flex items-center space-x-2">
+                  {user?.roles && user.roles.length > 0 ? (
+                    <RoleBadge 
+                      role={user.roles[0].name} 
+                      size="sm" 
+                    />
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
+                      {user?.roles ? `No roles (${user.roles.length})` : 'User'}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           ) : (
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xl">
-                {tenant?.name ? tenant.name.charAt(0).toUpperCase() : 
-                 tenantSlug ? tenantSlug.charAt(0).toUpperCase() : 'T'}
-              </span>
+            <div className="flex flex-col items-center space-y-2">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-xl">
+                  {tenant?.name ? tenant.name.charAt(0).toUpperCase() : 
+                   tenantSlug ? tenantSlug.charAt(0).toUpperCase() : 'T'}
+                </span>
+              </div>
+              {user?.roles && user.roles.length > 0 && (
+                <div className="w-8 h-6 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 dark:text-blue-400 text-xs font-medium">
+                    {user.roles[0].name.charAt(0)}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </Link>
@@ -400,11 +427,18 @@ const DynamicSidebar: React.FC<DynamicSidebarProps> = ({ isAuthPage = false }) =
               <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                 {user.name}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {user.roles && user.roles.length > 0 
-                  ? user.roles[0].name 
-                  : 'User'}
-              </p>
+              <div className="flex items-center space-x-2 mt-1">
+                {user.roles && user.roles.length > 0 ? (
+                  <RoleBadge 
+                    role={user.roles[0].name} 
+                    size="sm" 
+                  />
+                ) : (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
+                    {user.roles ? `No roles (${user.roles.length})` : 'User'}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -420,6 +454,7 @@ const DynamicSidebar: React.FC<DynamicSidebarProps> = ({ isAuthPage = false }) =
       {(isExpanded || isHovered || isMobileOpen) && (
         <div className="pb-6">
           <SidebarWidget />
+          
         </div>
       )}
     </aside>

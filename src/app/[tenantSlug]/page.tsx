@@ -1,42 +1,42 @@
-import type { Metadata } from "next";
-import { EcommerceMetrics } from "@/components/ecommerce/EcommerceMetrics";
-import React from "react";
-import MonthlyTarget from "@/components/ecommerce/MonthlyTarget";
-import MonthlySalesChart from "@/components/ecommerce/MonthlySalesChart";
-import StatisticsChart from "@/components/ecommerce/StatisticsChart";
-import RecentOrders from "@/components/ecommerce/RecentOrders";
-import DemographicCard from "@/components/ecommerce/DemographicCard";
+"use client";
 
-export const metadata: Metadata = {
-  title:
-    "Next.js E-commerce Dashboard | TailAdmin - Next.js Dashboard Template",
-  description: "This is Next.js Home for TailAdmin Dashboard Template",
-};
+import { TenantDashboardClient } from "@/components/tenant/TenantDashboardClient";
+import { useTenantAuth } from "@/context/TenantAuthContext";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect } from "react";
 
-export default function Ecommerce() {
-  return (
-    <div className="grid grid-cols-12 gap-4 md:gap-6">
-      <div className="col-span-12 space-y-6 xl:col-span-7">
-        <EcommerceMetrics />
+export default function TenantDashboard() {
+  const { user, isLoading } = useTenantAuth();
+  const params = useParams();
+  const router = useRouter();
+  const tenantSlug = params.tenantSlug as string;
 
-        <MonthlySalesChart />
+  useEffect(() => {
+    // If not loading and no user, redirect to login
+    if (!isLoading && !user) {
+      router.push(`/${tenantSlug}/login`);
+    }
+  }, [user, isLoading, router, tenantSlug]);
+
+  // Show loading while checking authentication
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Loading dashboard...
+          </p>
+        </div>
       </div>
+    );
+  }
 
-      <div className="col-span-12 xl:col-span-5">
-        <MonthlyTarget />
-      </div>
+  // If no user, don't render anything (redirect will happen)
+  if (!user) {
+    return null;
+  }
 
-      <div className="col-span-12">
-        <StatisticsChart />
-      </div>
-
-      <div className="col-span-12 xl:col-span-5">
-        <DemographicCard />
-      </div>
-
-      <div className="col-span-12 xl:col-span-7">
-        <RecentOrders />
-      </div>
-    </div>
-  );
+  // User is authenticated, show dashboard
+  return <TenantDashboardClient />;
 }

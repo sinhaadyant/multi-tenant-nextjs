@@ -90,10 +90,16 @@ export default function TenantLoginPage() {
     mutationFn: (data: LoginFormData) => loginUser({ ...data, tenantSlug }),
     onSuccess: (response) => {
       if (response.success && response.data) {
+        console.log('🔍 Login successful, storing tokens...');
+        console.log('Token preview:', response.data.token.substring(0, 50) + '...');
+        
         // Store auth data using unified auth
         localStorage.setItem('tenant_auth_token', response.data.token);
         localStorage.setItem('tenant_refresh_token', response.data.refreshToken);
         localStorage.setItem('tenant_user_data', JSON.stringify(response.data.user));
+        
+        console.log('🔍 Tokens stored in localStorage');
+        console.log('tenant_auth_token exists:', !!localStorage.getItem('tenant_auth_token'));
         
         toast.success('Login successful!');
         

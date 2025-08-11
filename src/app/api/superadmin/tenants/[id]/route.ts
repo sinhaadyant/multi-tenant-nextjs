@@ -113,12 +113,31 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: P
     const dataToUpdate: any = {};
     
     if (updateData.name !== undefined) dataToUpdate.name = updateData.name;
-    if (updateData.slug !== undefined) dataToUpdate.slug = updateData.slug;
     if (updateData.domain !== undefined) dataToUpdate.domain = updateData.domain;
     if (updateData.description !== undefined) dataToUpdate.description = updateData.description;
     if (updateData.plan !== undefined) dataToUpdate.plan = updateData.plan;
     if (updateData.region !== undefined) dataToUpdate.region = updateData.region;
     if (updateData.features !== undefined) dataToUpdate.features = JSON.stringify(updateData.features);
+
+    // Handle slug update with validation
+    if (updateData.slug !== undefined && updateData.slug !== existingTenant.slug) {
+      // Check if the new slug is already taken by another tenant
+      const existingTenantWithSlug = await prisma.tenant.findFirst({
+        where: {
+          slug: updateData.slug,
+          NOT: { id: id } // Exclude current tenant
+        }
+      });
+
+      if (existingTenantWithSlug) {
+        return createErrorResponse(
+          'This subdomain is already taken by another tenant',
+          409
+        );
+      }
+
+      dataToUpdate.slug = updateData.slug;
+    }
 
     // Update tenant
     const updatedTenant = await prisma.tenant.update({

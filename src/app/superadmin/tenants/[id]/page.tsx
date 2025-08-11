@@ -100,7 +100,10 @@ export default function TenantDetailsPage() {
       tenantLoading,
       tenantError,
       usersLoading,
-      usersError
+      usersError,
+      activityFilters,
+      activityData,
+      activities: activities.length
     });
     
     // Debug tenant features
@@ -227,14 +230,23 @@ export default function TenantDetailsPage() {
   };
 
   const handleActivitySearchChange = (search: string) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 Activity search changed:', search);
+    }
     setActivityFilters(prev => ({ ...prev, search, page: 1 }));
   };
 
   const handleActivityActionFilter = (action: string) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 Activity action filter changed:', action);
+    }
     setActivityFilters(prev => ({ ...prev, action, page: 1 }));
   };
 
   const handleActivitySort = (sortBy: string, sortOrder: 'asc' | 'desc') => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 Activity sort changed:', { sortBy, sortOrder });
+    }
     setActivityFilters(prev => ({ ...prev, sortBy, sortOrder, page: 1 }));
   };
 
@@ -438,6 +450,13 @@ export default function TenantDetailsPage() {
                         <dd className="text-sm text-gray-900 dark:text-white">{tenant.domain}</dd>
                       </div>
                     )}
+                    
+                  </dl>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Info</h3>
+                  <dl className="space-y-3">
                     {tenant.description && (
                       <div>
                         <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Description</dt>
@@ -461,24 +480,6 @@ export default function TenantDetailsPage() {
                       </dd>
                     </div>
                   </dl>
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Features</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {Array.isArray(tenant.features) ? tenant.features.map((feature: string, index: number) => (
-                      <span
-                        key={index}
-                        className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                      >
-                        {feature}
-                      </span>
-                    )) : (
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        No features configured
-                      </span>
-                    )}
-                  </div>
                 </div>
               </div>
             </div>
@@ -785,8 +786,14 @@ export default function TenantDetailsPage() {
                       <option value="user.update">User Updated</option>
                       <option value="user.delete">User Deleted</option>
                       <option value="tenant.update">Tenant Updated</option>
+                      <option value="tenant.create">Tenant Created</option>
+                      <option value="tenant.delete">Tenant Deleted</option>
                       <option value="login">Login</option>
                       <option value="logout">Logout</option>
+                      <option value="password.reset">Password Reset</option>
+                      <option value="role.create">Role Created</option>
+                      <option value="role.update">Role Updated</option>
+                      <option value="role.delete">Role Deleted</option>
                     </select>
                   </div>
 

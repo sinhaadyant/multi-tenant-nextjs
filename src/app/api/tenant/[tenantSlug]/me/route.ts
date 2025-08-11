@@ -62,11 +62,19 @@ export async function GET(req: NextRequest, { params }: { params: { tenantSlug: 
         isActive: true
       },
       include: {
-        roles: {
+        userRoles: {
           include: {
-            permissions: {
+            role: {
               include: {
-                module: true
+                permissions: {
+                  include: {
+                    permission: {
+                      include: {
+                        module: true
+                      }
+                    }
+                  }
+                }
               }
             }
           }
@@ -111,29 +119,31 @@ export async function GET(req: NextRequest, { params }: { params: { tenantSlug: 
       lastLogin: user.lastLogin,
       createdAt: user.createdAt,
       tenant: user.tenant,
-      roles: user.roles.map(role => ({
-        id: role.id,
-        name: role.name,
-        description: role.description,
-        isDefault: role.isDefault,
-        permissions: role.permissions.map(permission => ({
-          id: permission.id,
-          name: permission.name,
-          description: permission.description,
-          module: permission.module.name,
-          action: permission.action
+      roles: user.userRoles.map(userRole => ({
+        id: userRole.role.id,
+        name: userRole.role.name,
+        description: userRole.role.description,
+        isDefault: userRole.role.isDefault,
+        permissions: userRole.role.permissions.map(rolePermission => ({
+          id: rolePermission.permission.id,
+          name: rolePermission.permission.name,
+          description: rolePermission.permission.description,
+          module: rolePermission.permission.module.moduleKey,
+          action: rolePermission.permission.action
         }))
       })),
-      permissions: user.roles.flatMap(role => 
-        role.permissions.map(permission => ({
-          id: permission.id,
-          name: permission.name,
-          description: permission.description,
-          module: permission.module.name,
-          action: permission.action
+      permissions: user.userRoles.flatMap(userRole => 
+        userRole.role.permissions.map(rolePermission => ({
+          id: rolePermission.permission.id,
+          name: rolePermission.permission.name,
+          description: rolePermission.permission.description,
+          module: rolePermission.permission.module.moduleKey,
+          action: rolePermission.permission.action
         }))
       )
     };
+
+
 
     return createSuccessResponse(userProfile);
 

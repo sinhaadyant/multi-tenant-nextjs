@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
     user.userRoles.forEach(userRole => {
       userRole.role.permissions.forEach(rp => {
         const permission = rp.permission;
-        const permissionKey = `${permission.module}:${permission.action}`;
+        const permissionKey = `${permission.moduleKey}:${permission.action}`;
         
         // Add to all permissions
         if (!allPermissions.includes(permissionKey)) {
@@ -90,16 +90,16 @@ export async function GET(req: NextRequest) {
         }
 
         // Add to module permissions
-        if (!modulePermissions[permission.module]) {
-          modulePermissions[permission.module] = [];
+        if (!modulePermissions[permission.moduleKey]) {
+          modulePermissions[permission.moduleKey] = [];
         }
-        if (!modulePermissions[permission.module].includes(permission.action)) {
-          modulePermissions[permission.module].push(permission.action);
+        if (!modulePermissions[permission.moduleKey].includes(permission.action)) {
+          modulePermissions[permission.moduleKey].push(permission.action);
         }
 
         // Add to accessible modules
-        if (!accessibleModules.includes(permission.module)) {
-          accessibleModules.push(permission.module);
+        if (!accessibleModules.includes(permission.moduleKey)) {
+          accessibleModules.push(permission.moduleKey);
         }
       });
     });
@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
         id: "dashboard",
         label: "Dashboard",
         icon: "LayoutDashboard",
-        path: "/dashboard",
+        path: `/${tenantSlug}/dashboard`,
         description: "Main dashboard with overview and analytics",
         permissions: ["dashboard:view"],
         hasChildren: false
@@ -119,7 +119,7 @@ export async function GET(req: NextRequest) {
         id: "users",
         label: "Users",
         icon: "Users",
-        path: "/users",
+        path: `/${tenantSlug}/users`,
         description: "Manage users and their roles",
         permissions: ["users:view"],
         hasChildren: false
@@ -128,7 +128,7 @@ export async function GET(req: NextRequest) {
         id: "roles",
         label: "Roles",
         icon: "Shield",
-        path: "/roles",
+        path: `/${tenantSlug}/roles`,
         description: "Manage roles and permissions",
         permissions: ["roles:view"],
         hasChildren: false
@@ -137,7 +137,7 @@ export async function GET(req: NextRequest) {
         id: "audit",
         label: "Audit Logs",
         icon: "ClipboardList",
-        path: "/audit",
+        path: `/${tenantSlug}/audit`,
         description: "View system audit logs",
         permissions: ["audit:view"],
         hasChildren: false
@@ -146,18 +146,27 @@ export async function GET(req: NextRequest) {
         id: "notifications",
         label: "Notifications",
         icon: "Bell",
-        path: "/notifications",
+        path: `/${tenantSlug}/notifications`,
         description: "Manage notifications",
         permissions: ["notifications:view"],
         hasChildren: false
       },
       {
-        id: "utilities",
+        id: "settings",
         label: "Settings",
         icon: "Settings",
-        path: "/utilities",
+        path: `/${tenantSlug}/settings`,
         description: "System and tenant settings",
         permissions: ["settings:view"],
+        hasChildren: false
+      },
+      {
+        id: "support",
+        label: "Support",
+        icon: "LifeBuoy",
+        path: `/${tenantSlug}/support`,
+        description: "Support tickets and help",
+        permissions: ["support:view"],
         hasChildren: false
       }
     ].filter(item => {

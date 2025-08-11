@@ -1,0 +1,109 @@
+SUPERADMIN MODULES
+==================
+
+Authentication & Access
+- Login - working
+- Forgot Password - working
+- Reset Password - working 
+- Invite Superadmin - working 
+ 
+Core Management
+- Dashboard - Working 
+- Tenant Management - 
+  - All Tenants - working 
+  - Create Tenant - 
+  - Tenant Details - 
+  - Tenant Settings- 
+
+- User Management
+  - All Users
+  - Create User
+  - Search Users
+  - User Details
+  - User Settings
+
+
+
+Roles & Permissions
+- Roles Management
+- Permission Groups
+- Role Assignment
+- Create Role
+- Edit Role
+
+System Management
+- Backup & Import
+  - Backup Data
+  - Import Data
+  - Backup History
+  - Restore Data
+
+- Audit Logs
+- Reports & Analytics
+- Notifications
+- Support / Logs
+
+Settings & Configuration
+- System Settings
+  - General Settings
+  - Security Settings
+  - Email Settings
+  - API Settings
+
+
+TENANT MODULES
+==============
+
+Authentication & Access
+- Login
+- Sign Up
+- Forgot Password
+- Reset Password
+- Profile Management
+
+Core Features
+- Dashboard
+- User Management
+  - All Users
+  - Create User
+  - Search Users
+  - User Details
+  - User Settings
+  - User Roles
+- Roles & Permissions
+  - Role Management
+  - Permission Management
+  - Create Role
+  - Edit Role
+  - Assign Roles
+- Module Management
+  - Enabled Modules
+  - Module Settings
+  - Module Permissions
+
+Content & Data
+- Content Management
+  - Documents
+  - Files
+  - Media Library
+  - Templates
+
+Monitoring & Analytics
+- Audit Logs
+- Reports & Analytics
+- Analytics
+
+Communication
+- Notifications
+- Support
+
+Settings
+- Tenant Settings
+- User Settings
+- Security Settings
+- Notification Settings
+
+Utilities
+- Debug Permissions
+- Test Role
+- System Information 

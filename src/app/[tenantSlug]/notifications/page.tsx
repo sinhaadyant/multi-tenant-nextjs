@@ -6,6 +6,7 @@ import { Bell, Plus, Search, RefreshCw, Send, Users } from 'lucide-react';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import LoadingWrapper from '@/components/ui/LoadingWrapper';
 import { useTenantNotifications } from '@/hooks/useTenantNotifications';
+import NotificationDetailModal from '@/components/notifications/NotificationDetailModal';
 
 const NotificationsPage = () => {
   const params = useParams();
@@ -34,8 +35,12 @@ const NotificationsPage = () => {
     router.push(`/${tenantSlug}/notifications/create`);
   };
 
+  const [selectedNotificationId, setSelectedNotificationId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   const handleViewNotification = (notificationId: string) => {
-    router.push(`/${tenantSlug}/notifications/${notificationId}`);
+    setSelectedNotificationId(notificationId);
+    setIsModalOpen(true);
   };
 
   const renderStatsCards = () => {

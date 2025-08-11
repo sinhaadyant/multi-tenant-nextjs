@@ -112,7 +112,7 @@ export const POST = asyncHandler(async (req: NextRequest) => {
       // Mark invite token as used
       await tx.inviteToken.update({
         where: { id: inviteToken.id },
-        data: { isUsed: true, usedAt: new Date() }
+        data: { isUsed: true }
       });
 
       return superAdmin;

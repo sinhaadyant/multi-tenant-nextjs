@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 import { createAuditLogFromRequest } from '@/lib/audit';
+import { hashPassword } from '@/lib/jwt';
 
 export async function POST(req: NextRequest) {
   try {

@@ -84,21 +84,45 @@ export const TenantAuthProvider: React.FC<TenantAuthProviderProps> = ({ children
       setIsLoading(true);
       setError(null);
 
-      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('access_token');
+      const token = localStorage.getItem('tenant_auth_token') || localStorage.getItem('auth_token') || sessionStorage.getItem('access_token');
+      
+      // Debug logging for token
+      console.log('🔍 Token Debug:', {
+        tenantAuthToken: localStorage.getItem('tenant_auth_token'),
+        authToken: localStorage.getItem('auth_token'),
+        accessToken: sessionStorage.getItem('access_token'),
+        finalToken: token,
+        hasToken: !!token,
+        localStorageKeys: Object.keys(localStorage),
+        sessionStorageKeys: Object.keys(sessionStorage)
+      });
+      
       if (!token) {
         // Don't throw error if no token - just set loading to false
         setIsLoading(false);
         return;
       }
 
+      console.log('🔍 Making API call to:', `/api/tenant/${tenantSlug}/me`);
+      
       const response = await axios.get(`/api/tenant/${tenantSlug}/me`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
+      
+      console.log('🔍 API Response:', {
+        success: response.data.success,
+        status: response.status,
+        hasData: !!response.data.data,
+        dataKeys: response.data.data ? Object.keys(response.data.data) : []
+      });
 
       if (response.data.success) {
         const userData = response.data.data;
+        
+
+        
         setUser(userData);
         setPermissions(userData.permissions);
         setRoles(userData.roles);
@@ -116,6 +140,7 @@ export const TenantAuthProvider: React.FC<TenantAuthProviderProps> = ({ children
       // If unauthorized, redirect to login
       if (err.response?.status === 401) {
         localStorage.removeItem('auth_token');
+        localStorage.removeItem('tenant_auth_token');
         sessionStorage.removeItem('access_token');
         window.location.href = `/${tenantSlug}/login`;
       }

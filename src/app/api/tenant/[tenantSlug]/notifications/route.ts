@@ -3,7 +3,7 @@ import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 import { createNotificationSchema, notificationFiltersSchema } from '@/lib/validations/superadmin';
 import { prisma } from '@/lib/prisma';
 import { withTenantAuth, AuthenticatedRequest } from '@/lib/authMiddleware';
-import { checkTenantPermission } from '@/lib/permissions';
+import { checkTenantPermissionById } from '@/lib/permissions';
 import { createAuditLog } from '@/lib/audit';
 
 export const GET = withTenantAuth(async (
@@ -15,7 +15,7 @@ export const GET = withTenantAuth(async (
     const user = req.user!;
 
     // Check permission to view notifications
-    const hasPermission = await checkTenantPermission(user.id, tenantSlug, 'notifications', 'view');
+    const hasPermission = await checkTenantPermissionById(user.id, tenantSlug, 'notifications', 'view');
     if (!hasPermission) {
       return createErrorResponse('Insufficient permissions', 403);
     }
@@ -178,13 +178,22 @@ export const POST = withTenantAuth(async (
     const user = req.user!;
 
     // Check permission to create notifications
-    const hasPermission = await checkTenantPermission(user.id, tenantSlug, 'notifications', 'create');
+    const hasPermission = await checkTenantPermissionById(user.id, tenantSlug, 'notifications', 'create');
     if (!hasPermission) {
       return createErrorResponse('Insufficient permissions', 403);
     }
 
     const body = await req.json();
     const validatedData = createNotificationSchema.parse(body);
+
+    // Get tenant ID from slug
+    const tenant = await prisma.tenant.findUnique({
+      where: { slug: tenantSlug }
+    });
+
+    if (!tenant) {
+      return createErrorResponse('Tenant not found', 404);
+    }
 
     // Create notification
     const notification = await prisma.notification.create({
@@ -194,7 +203,7 @@ export const POST = withTenantAuth(async (
         type: validatedData.type,
         priority: validatedData.priority,
         targetType: validatedData.targetType,
-        targetTenantId: validatedData.targetTenantId || user.tenantId,
+        targetTenantId: tenant.id, // Use actual tenant ID
         scheduledAt: validatedData.scheduledAt ? new Date(validatedData.scheduledAt) : null,
         attachments: validatedData.attachments ? JSON.stringify(validatedData.attachments) : null,
         metadata: validatedData.metadata ? JSON.stringify(validatedData.metadata) : null,
