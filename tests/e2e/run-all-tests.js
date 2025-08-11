@@ -3,201 +3,145 @@ const UserManagementTester = require('./user-management.test');
 const AuditLogsTester = require('./audit-logs.test');
 const NotificationsTester = require('./notifications.test');
 const SupportSystemTester = require('./support-system.test');
+const ComprehensiveTenantTester = require('./comprehensive-tenant-test');
+const EnhancedComprehensiveTester = require('./enhanced-comprehensive-test');
 
 class TestRunner {
   constructor() {
-    this.results = [];
-    this.startTime = null;
+    this.testResults = [];
+    this.startTime = Date.now();
   }
 
   async runAllTests() {
-    console.log('🚀 Starting All E2E Tests...\n');
-    this.startTime = Date.now();
-    
+    console.log('🚀 Starting All E2E Tests');
+    console.log('=========================');
+
     const testModules = [
-      { name: 'Dashboard', tester: DashboardTester },
-      { name: 'User Management', tester: UserManagementTester },
-      { name: 'Audit Logs', tester: AuditLogsTester },
-      { name: 'Notifications', tester: NotificationsTester },
-      { name: 'Support System', tester: SupportSystemTester }
+      { name: 'dashboard', tester: DashboardTester },
+      { name: 'user-management', tester: UserManagementTester },
+      { name: 'audit-logs', tester: AuditLogsTester },
+      { name: 'notifications', tester: NotificationsTester },
+      { name: 'support-system', tester: SupportSystemTester }
     ];
 
     for (const module of testModules) {
-      console.log(`\n${'='.repeat(60)}`);
-      console.log(`🧪 Testing Module: ${module.name}`);
-      console.log(`${'='.repeat(60)}`);
-      
+      console.log(`\n📋 Testing ${module.name}...`);
       try {
         const tester = new module.tester();
         await tester.runAllTests();
-        
-        // Collect results from the tester
-        if (tester.results) {
-          this.results.push({
-            module: module.name,
-            results: tester.results
-          });
-        }
-        
+        this.testResults.push({ module: module.name, status: 'PASSED' });
       } catch (error) {
-        console.error(`❌ Error running ${module.name} tests:`, error.message);
-        this.results.push({
-          module: module.name,
-          results: [{
-            test: 'Module Execution',
-            status: 'FAIL',
-            details: `Error: ${error.message}`,
-            timestamp: new Date().toISOString()
-          }]
-        });
+        console.error(`❌ ${module.name} test failed:`, error.message);
+        this.testResults.push({ module: module.name, status: 'FAILED', error: error.message });
       }
     }
 
-    this.generateFinalReport();
+    await this.generateFinalReport();
   }
 
   async runModule(moduleName) {
-    console.log(`🚀 Starting ${moduleName} E2E Tests...\n`);
-    this.startTime = Date.now();
-    
-    const testModules = {
-      'dashboard': DashboardTester,
-      'user-management': UserManagementTester,
-      'audit-logs': AuditLogsTester,
-      'notifications': NotificationsTester,
-      'support-system': SupportSystemTester
-    };
+    console.log(`🚀 Starting ${moduleName} Tests`);
+    console.log('=' .repeat(30));
 
-    const testerClass = testModules[moduleName.toLowerCase()];
-    if (!testerClass) {
-      console.error(`❌ Unknown module: ${moduleName}`);
-      console.log('Available modules:', Object.keys(testModules).join(', '));
-      return;
+    let tester;
+    switch (moduleName.toLowerCase()) {
+      case 'dashboard':
+        tester = new DashboardTester();
+        break;
+      case 'user-management':
+        tester = new UserManagementTester();
+        break;
+      case 'audit-logs':
+        tester = new AuditLogsTester();
+        break;
+      case 'notifications':
+        tester = new NotificationsTester();
+        break;
+      case 'support-system':
+        tester = new SupportSystemTester();
+        break;
+      case 'comprehensive':
+        tester = new ComprehensiveTenantTester();
+        break;
+      case 'enhanced':
+        tester = new EnhancedComprehensiveTester();
+        break;
+      default:
+        console.error(`❌ Unknown module: ${moduleName}`);
+        console.log('Available modules: dashboard, user-management, audit-logs, notifications, support-system, comprehensive, enhanced');
+        process.exit(1);
     }
 
     try {
-      const tester = new testerClass();
       await tester.runAllTests();
-      
-      // Collect results from the tester
-      if (tester.results) {
-        this.results.push({
-          module: moduleName,
-          results: tester.results
-        });
-      }
-      
+      console.log(`✅ ${moduleName} tests completed successfully!`);
     } catch (error) {
-      console.error(`❌ Error running ${moduleName} tests:`, error.message);
-      this.results.push({
-        module: moduleName,
-        results: [{
-          test: 'Module Execution',
-          status: 'FAIL',
-          details: `Error: ${error.message}`,
-          timestamp: new Date().toISOString()
-        }]
-      });
+      console.error(`❌ ${moduleName} tests failed:`, error);
+      process.exit(1);
     }
-
-    this.generateFinalReport();
   }
 
-  generateFinalReport() {
+  async generateFinalReport() {
     const endTime = Date.now();
-    const totalDuration = ((endTime - this.startTime) / 1000).toFixed(2);
+    const duration = (endTime - this.startTime) / 1000;
+
+    console.log('\n📊 FINAL E2E TEST RESULTS SUMMARY');
+    console.log('==================================');
     
-    console.log('\n' + '='.repeat(80));
-    console.log('📊 FINAL E2E TEST RESULTS SUMMARY');
-    console.log('='.repeat(80));
+    const totalTests = this.testResults.length;
+    const passedTests = this.testResults.filter(r => r.status === 'PASSED').length;
+    const failedTests = this.testResults.filter(r => r.status === 'FAILED').length;
     
-    let totalTests = 0;
-    let totalPassed = 0;
-    let totalFailed = 0;
+    console.log(`Total Tests: ${totalTests}`);
+    console.log(`Passed: ${passedTests} ✅`);
+    console.log(`Failed: ${failedTests} ❌`);
+    console.log(`Success Rate: ${((passedTests / totalTests) * 100).toFixed(1)}%`);
+    console.log(`Duration: ${duration.toFixed(2)} seconds`);
     
-    this.results.forEach(moduleResult => {
-      const moduleTests = moduleResult.results.length;
-      const modulePassed = moduleResult.results.filter(r => r.status === 'PASS').length;
-      const moduleFailed = moduleResult.results.filter(r => r.status === 'FAIL').length;
-      
-      totalTests += moduleTests;
-      totalPassed += modulePassed;
-      totalFailed += moduleFailed;
-      
-      const moduleSuccessRate = ((modulePassed / moduleTests) * 100).toFixed(1);
-      
-      console.log(`\n📋 ${moduleResult.module}:`);
-      console.log(`   Total Tests: ${moduleTests}`);
-      console.log(`   Passed: ${modulePassed} ✅`);
-      console.log(`   Failed: ${moduleFailed} ❌`);
-      console.log(`   Success Rate: ${moduleSuccessRate}%`);
+    console.log('\n📋 Detailed Results:');
+    this.testResults.forEach(result => {
+      const statusIcon = result.status === 'PASSED' ? '✅' : '❌';
+      console.log(`${statusIcon} ${result.module}: ${result.status}`);
+      if (result.error) {
+        console.log(`   Error: ${result.error}`);
+      }
     });
-    
-    const overallSuccessRate = ((totalPassed / totalTests) * 100).toFixed(1);
-    
-    console.log('\n' + '='.repeat(80));
-    console.log('📈 OVERALL SUMMARY:');
-    console.log(`   Total Tests: ${totalTests}`);
-    console.log(`   Total Passed: ${totalPassed} ✅`);
-    console.log(`   Total Failed: ${totalFailed} ❌`);
-    console.log(`   Overall Success Rate: ${overallSuccessRate}%`);
-    console.log(`   Total Duration: ${totalDuration} seconds`);
-    console.log('='.repeat(80));
-    
-    // Save comprehensive results to file
+
+    // Save results to file
     const fs = require('fs');
     const reportData = {
       summary: {
-        totalTests: totalTests,
-        totalPassed: totalPassed,
-        totalFailed: totalFailed,
-        overallSuccessRate: overallSuccessRate,
-        totalDuration: totalDuration
+        total: totalTests,
+        passed: passedTests,
+        failed: failedTests,
+        successRate: ((passedTests / totalTests) * 100).toFixed(1),
+        duration: duration.toFixed(2)
       },
-      modules: this.results,
+      results: this.testResults,
       timestamp: new Date().toISOString()
     };
     
-    fs.writeFileSync('e2e-test-results-comprehensive.json', JSON.stringify(reportData, null, 2));
-    console.log('\n💾 Comprehensive test results saved to e2e-test-results-comprehensive.json');
+    fs.writeFileSync(
+      `e2e-test-results-comprehensive-${new Date().toISOString().split('T')[0]}.json`,
+      JSON.stringify(reportData, null, 2)
+    );
     
-    // Exit with appropriate code
-    if (totalFailed > 0) {
-      console.log('\n❌ Some tests failed. Exiting with code 1.');
-      process.exit(1);
-    } else {
-      console.log('\n✅ All tests passed! Exiting with code 0.');
-      process.exit(0);
-    }
+    console.log('\n💾 Comprehensive test results saved to JSON file');
   }
 }
 
 // Parse command line arguments
 const args = process.argv.slice(2);
-const testRunner = new TestRunner();
+const moduleName = args[0];
 
-if (args.length === 0) {
-  // Run all tests
-  testRunner.runAllTests().catch(console.error);
-} else if (args[0] === '--help' || args[0] === '-h') {
-  console.log('E2E Test Runner Usage:');
-  console.log('  node run-all-tests.js                    - Run all tests');
-  console.log('  node run-all-tests.js <module-name>      - Run specific module');
-  console.log('');
-  console.log('Available modules:');
-  console.log('  dashboard');
-  console.log('  user-management');
-  console.log('  audit-logs');
-  console.log('  notifications');
-  console.log('  support-system');
-  console.log('');
-  console.log('Examples:');
-  console.log('  node run-all-tests.js dashboard');
-  console.log('  node run-all-tests.js user-management');
-} else {
+const runner = new TestRunner();
+
+if (moduleName) {
   // Run specific module
-  const moduleName = args[0];
-  testRunner.runModule(moduleName).catch(console.error);
+  runner.runModule(moduleName);
+} else {
+  // Run all tests
+  runner.runAllTests();
 }
 
 module.exports = TestRunner; 

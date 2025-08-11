@@ -28,7 +28,10 @@ import {
   Facebook,
   Twitter,
   Linkedin,
-  Github
+  Github,
+  ExternalLink,
+  Key,
+  UserCheck
 } from 'lucide-react';
 
 // Sample tenant data from installation guide
@@ -115,16 +118,38 @@ const benefits = [
   }
 ];
 
+// Getting Started Steps
+const gettingStartedSteps = [
+  {
+    icon: <Key className="w-8 h-8" />,
+    title: 'Superadmin Access',
+    description: 'Access the platform administration panel to manage all tenants and system settings.',
+    action: 'Go to Superadmin',
+    href: '/superadmin/login',
+    color: 'bg-gradient-to-r from-blue-500 to-purple-600'
+  },
+  {
+    icon: <Building2 className="w-8 h-8" />,
+    title: 'Tenant Management',
+    description: 'Create and manage tenant organizations with custom configurations and branding.',
+    action: 'Manage Tenants',
+    href: '/superadmin/tenants',
+    color: 'bg-gradient-to-r from-green-500 to-teal-600'
+  },
+  {
+    icon: <UserCheck className="w-8 h-8" />,
+    title: 'User Access',
+    description: 'Access tenant-specific dashboards with role-based permissions and features.',
+    action: 'View Demo Tenants',
+    href: '#demo-tenants',
+    color: 'bg-gradient-to-r from-purple-500 to-pink-600'
+  }
+];
+
 export default function LandingPage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [selectedTenant, setSelectedTenant] = useState('');
-  const [loginForm, setLoginForm] = useState({
-    email: '',
-    password: '',
-    tenantSlug: ''
-  });
 
   // Auto-play slider
   useEffect(() => {
@@ -137,21 +162,10 @@ export default function LandingPage() {
     return () => clearInterval(interval);
   }, [isPlaying, useCases.length]);
 
-  const scrollToLogin = () => {
-    document.getElementById('login-section')?.scrollIntoView({ 
+  const scrollToGettingStarted = () => {
+    document.getElementById('getting-started-section')?.scrollIntoView({ 
       behavior: 'smooth' 
     });
-  };
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!loginForm.tenantSlug || !loginForm.email || !loginForm.password) {
-      alert('Please fill in all fields');
-      return;
-    }
-    
-    // Redirect to tenant login page
-    window.location.href = `/${loginForm.tenantSlug}/login`;
   };
 
   const nextSlide = () => {
@@ -246,7 +260,7 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
-                onClick={scrollToLogin}
+                onClick={scrollToGettingStarted}
                 className="bg-blue-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
               >
                 Get Started
@@ -263,83 +277,85 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Tenant Login Section */}
-      <section id="login-section" className="py-16 bg-gray-50 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md mx-auto">
-          <div className="bg-white rounded-xl shadow-lg p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
-              Tenant Login
+      {/* Getting Started Section */}
+      <section id="getting-started-section" className="py-16 bg-gray-50 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+              Getting Started
             </h2>
-            <form onSubmit={handleLogin} className="space-y-6">
-              {/* Tenant Selector */}
-              <div>
-                <label htmlFor="tenant" className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Tenant
-                </label>
-                <select
-                  id="tenant"
-                  value={loginForm.tenantSlug}
-                  onChange={(e) => setLoginForm({ ...loginForm, tenantSlug: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                >
-                  <option value="">Choose a tenant...</option>
-                  {sampleTenants.map((tenant) => (
-                    <option key={tenant.slug} value={tenant.slug}>
-                      {tenant.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Choose your path to access the multi-tenant platform
+            </p>
+          </div>
 
-              {/* Email */}
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  value={loginForm.email}
-                  onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter your email"
-                  required
-                />
-              </div>
-
-              {/* Password */}
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  id="password"
-                  value={loginForm.password}
-                  onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter your password"
-                  required
-                />
-              </div>
-
-              {/* Login Button */}
-              <button
-                type="submit"
-                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-300 transform hover:scale-105"
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {gettingStartedSteps.map((step, index) => (
+              <div
+                key={index}
+                className="bg-white rounded-xl shadow-lg p-8 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100"
               >
-                Login to Dashboard
-              </button>
-            </form>
-
-            {/* Demo Credentials */}
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-              <h3 className="text-sm font-semibold text-blue-900 mb-2">Demo Credentials:</h3>
-              <div className="text-xs text-blue-800 space-y-1">
-                <p><strong>TechCorp:</strong> admin@techcorp.com / AdminPass123</p>
-                <p><strong>Global Retail:</strong> admin@globalretail.com / AdminPass123</p>
+                <div className={`${step.color} w-16 h-16 rounded-lg flex items-center justify-center text-white mb-6 mx-auto`}>
+                  {step.icon}
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-4 text-center">
+                  {step.title}
+                </h3>
+                <p className="text-gray-600 mb-6 text-center">
+                  {step.description}
+                </p>
+                <div className="text-center">
+                  <Link
+                    href={step.href}
+                    className="inline-flex items-center bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-300 transform hover:scale-105"
+                  >
+                    {step.action}
+                    <ExternalLink className="ml-2 w-4 h-4" />
+                  </Link>
+                </div>
               </div>
+            ))}
+          </div>
+
+          {/* Demo Tenants Section */}
+          <div id="demo-tenants" className="mt-16">
+            <div className="text-center mb-8">
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                Demo Tenants
+              </h3>
+              <p className="text-gray-600">
+                Explore the platform with our demo tenant organizations
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+              {sampleTenants.map((tenant) => (
+                <div
+                  key={tenant.slug}
+                  className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 border border-gray-100"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                        {tenant.name}
+                      </h4>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Demo tenant with sample data
+                      </p>
+                      <div className="text-xs text-gray-500 space-y-1">
+                        <p><strong>Admin:</strong> admin@{tenant.slug}.com</p>
+                        <p><strong>Password:</strong> AdminPass123</p>
+                      </div>
+                    </div>
+                    <Link
+                      href={`/${tenant.slug}/login`}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+                    >
+                      Access
+                    </Link>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

@@ -19,6 +19,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Handle /login redirect to root
+  if (pathname === '/login') {
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+
   // Handle superadmin routes with authentication check
   if (pathname.startsWith('/superadmin')) {
     const token = request.cookies.get('superadmin_token')?.value;

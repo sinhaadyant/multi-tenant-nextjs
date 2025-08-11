@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-import { verifyToken } from '@/lib/auth';
+import { verifyToken } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
 import { createAuditLogFromRequest } from '@/lib/audit';
 

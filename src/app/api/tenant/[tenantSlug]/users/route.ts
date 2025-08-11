@@ -85,7 +85,7 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
     const skip = (page - 1) * limit;
 
     // Fetch users with pagination and stats
-    const [users, totalUsers, stats] = await Promise.all([
+    const [users, totalUsers] = await Promise.all([
       prisma.user.findMany({
         where,
         include: {
@@ -107,16 +107,7 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
         skip,
         take: limit
       }),
-      prisma.user.count({ where }),
-      prisma.user.aggregate({
-        where: { tenantId },
-        _count: {
-          id: true
-        },
-        _sum: {
-          isActive: true ? 1 : 0
-        }
-      })
+      prisma.user.count({ where })
     ]);
 
     // Calculate stats
