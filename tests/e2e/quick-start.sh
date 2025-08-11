@@ -61,9 +61,10 @@ echo "5) Run notifications tests"
 echo "6) Run support system tests"
 echo "7) Run comprehensive tenant tests (all modules + edge cases)"
 echo "8) Run enhanced comprehensive tests (CRUD + DB verification + immediate updates)"
-echo "9) Exit"
+echo "9) Run SuperAdmin comprehensive tests (authentication + dashboard + tenant management + cross-verification)"
+echo "10) Exit"
 
-read -p "Enter your choice (1-9): " choice
+read -p "Enter your choice (1-10): " choice
 
 case $choice in
     1)
@@ -99,6 +100,10 @@ case $choice in
         node tests/e2e/run-all-tests.js enhanced
         ;;
     9)
+        echo "🧪 Running SuperAdmin comprehensive tests..."
+        node tests/e2e/run-all-tests.js superadmin
+        ;;
+    10)
         echo "👋 Goodbye!"
         exit 0
         ;;
