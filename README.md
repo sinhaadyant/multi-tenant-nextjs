@@ -5,7 +5,8 @@ A comprehensive multi-tenant management platform built with Next.js, featuring r
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 18+ 
+
+- Node.js 18+
 - npm or yarn
 - PostgreSQL database
 - Git
@@ -13,22 +14,26 @@ A comprehensive multi-tenant management platform built with Next.js, featuring r
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/sinhaadyant/multi-tenant-nextjs.git
    cd multi-tenant-nextjs
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Set up environment variables**
+
    ```bash
    cp .env.example .env
    ```
-   
+
    Configure your `.env` file with:
+
    ```env
    DATABASE_URL="postgresql://username:password@localhost:5432/multi_tenant_db"
    JWT_SECRET="your-jwt-secret-key"
@@ -37,10 +42,11 @@ A comprehensive multi-tenant management platform built with Next.js, featuring r
    ```
 
 4. **Set up the database**
+
    ```bash
    # Run database migrations
    npx prisma migrate dev
-   
+
    # Seed the database with initial data
    npx prisma db seed
    ```
@@ -55,6 +61,7 @@ The application will be available at `http://localhost:3000`
 ## 🔐 Login Credentials
 
 ### SuperAdmin Access
+
 - **URL**: http://localhost:3000/superadmin/login
 - **Email**: admin@superadmin.com
 - **Password**: AdminPass123
@@ -62,6 +69,7 @@ The application will be available at `http://localhost:3000`
 ### Tenant Access
 
 #### TechCorp Solutions
+
 - **URL**: http://localhost:3000/techcorp/login
 - **Admin**: admin@techcorp.com / AdminPass123
 - **Manager**: manager@techcorp.com / AdminPass123
@@ -69,6 +77,7 @@ The application will be available at `http://localhost:3000`
 - **Viewer**: viewer@techcorp.com / AdminPass123
 
 #### Global Retail Inc
+
 - **URL**: http://localhost:3000/globalretail/login
 - **Admin**: admin@globalretail.com / AdminPass123
 - **Manager**: manager@globalretail.com / AdminPass123
@@ -109,9 +118,11 @@ multi-tenant-nextjs/
 ## 🔧 Configuration
 
 ### Database
+
 The application uses PostgreSQL with Prisma ORM. Database migrations are located in `prisma/migrations/`.
 
 ### Environment Variables
+
 See `.env.example` for all required environment variables.
 
 ## 📚 Documentation
@@ -135,4 +146,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🆘 Support
 
-For support and questions, please refer to the documentation in the `docs/` folder or create an issue in the repository. 
+For support and questions, please refer to the documentation in the `docs/` folder or create an issue in the repository.

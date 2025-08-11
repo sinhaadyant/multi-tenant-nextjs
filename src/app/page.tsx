@@ -1,14 +1,14 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
-import { 
-  ChevronDown, 
-  Users, 
-  Shield, 
-  BarChart3, 
-  Settings, 
+import React, { useState, useEffect } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import {
+  ChevronDown,
+  Users,
+  Shield,
+  BarChart3,
+  Settings,
   ClipboardList,
   Building2,
   Lock,
@@ -31,119 +31,136 @@ import {
   Github,
   ExternalLink,
   Key,
-  UserCheck
-} from 'lucide-react';
+  UserCheck,
+} from "lucide-react";
 
-// Sample tenant data from installation guide
 const sampleTenants = [
-  { slug: 'techcorp', name: 'TechCorp Solutions' },
-  { slug: 'globalretail', name: 'Global Retail Inc' }
+  { slug: "techcorp", name: "TechCorp Solutions" },
+  { slug: "globalretail", name: "Global Retail Inc" },
 ];
 
-// Features data
 const features = [
   {
     icon: <Users className="w-8 h-8" />,
-    title: 'Tenant Dashboard',
-    description: 'Comprehensive dashboard for managing multiple tenants with real-time analytics and insights.',
-    color: 'text-blue-600'
+    title: "Tenant Dashboard",
+    description:
+      "Comprehensive dashboard for managing multiple tenants with real-time analytics and insights.",
+    color: "text-blue-600",
   },
   {
     icon: <Shield className="w-8 h-8" />,
-    title: 'Role Management',
-    description: 'Advanced role-based access control with granular permissions and user management.',
-    color: 'text-green-600'
+    title: "Role Management",
+    description:
+      "Advanced role-based access control with granular permissions and user management.",
+    color: "text-green-600",
   },
   {
     icon: <ClipboardList className="w-8 h-8" />,
-    title: 'Audit Logs',
-    description: 'Complete audit trail with detailed activity logs and compliance reporting.',
-    color: 'text-purple-600'
+    title: "Audit Logs",
+    description:
+      "Complete audit trail with detailed activity logs and compliance reporting.",
+    color: "text-purple-600",
   },
   {
     icon: <Settings className="w-8 h-8" />,
-    title: 'Settings & Configuration',
-    description: 'Flexible configuration options for tenant customization and system preferences.',
-    color: 'text-orange-600'
-  }
+    title: "Settings & Configuration",
+    description:
+      "Flexible configuration options for tenant customization and system preferences.",
+    color: "text-orange-600",
+  },
 ];
 
-// Use cases for slider
 const useCases = [
   {
-    title: 'SaaS Applications',
-    description: 'Perfect for SaaS platforms managing multiple client organizations',
-    image: '/images/saas.jpg',
-    features: ['Multi-tenant isolation', 'Custom branding', 'Scalable architecture']
+    title: "SaaS Applications",
+    description:
+      "Perfect for SaaS platforms managing multiple client organizations",
+    image: "/images/saas.jpg",
+    features: [
+      "Multi-tenant isolation",
+      "Custom branding",
+      "Scalable architecture",
+    ],
   },
   {
-    title: 'Enterprise Portals',
-    description: 'Ideal for large enterprises with multiple departments and teams',
-    image: '/images/enterprise.jpg',
-    features: ['Department management', 'Advanced security', 'Compliance ready']
+    title: "Enterprise Portals",
+    description:
+      "Ideal for large enterprises with multiple departments and teams",
+    image: "/images/enterprise.jpg",
+    features: [
+      "Department management",
+      "Advanced security",
+      "Compliance ready",
+    ],
   },
   {
-    title: 'Educational Platforms',
-    description: 'Built for educational institutions managing multiple schools and courses',
-    image: '/images/education.jpg',
-    features: ['School management', 'Course administration', 'Student portals']
-  }
+    title: "Educational Platforms",
+    description:
+      "Built for educational institutions managing multiple schools and courses",
+    image: "/images/education.jpg",
+    features: ["School management", "Course administration", "Student portals"],
+  },
 ];
 
-// Benefits data
 const benefits = [
   {
     icon: <TrendingUp className="w-6 h-6" />,
-    title: 'Scalability',
-    description: 'Built to handle thousands of tenants with optimal performance and resource management.',
-    color: 'bg-gradient-to-r from-blue-500 to-purple-600'
+    title: "Scalability",
+    description:
+      "Built to handle thousands of tenants with optimal performance and resource management.",
+    color: "bg-gradient-to-r from-blue-500 to-purple-600",
   },
   {
     icon: <Shield className="w-6 h-6" />,
-    title: 'Security',
-    description: 'Enterprise-grade security with data isolation, encryption, and compliance standards.',
-    color: 'bg-gradient-to-r from-green-500 to-teal-600'
+    title: "Security",
+    description:
+      "Enterprise-grade security with data isolation, encryption, and compliance standards.",
+    color: "bg-gradient-to-r from-green-500 to-teal-600",
   },
   {
     icon: <BarChart3 className="w-6 h-6" />,
-    title: 'Analytics',
-    description: 'Comprehensive analytics and reporting for better decision-making and insights.',
-    color: 'bg-gradient-to-r from-purple-500 to-pink-600'
+    title: "Analytics",
+    description:
+      "Comprehensive analytics and reporting for better decision-making and insights.",
+    color: "bg-gradient-to-r from-purple-500 to-pink-600",
   },
   {
     icon: <Users className="w-6 h-6" />,
-    title: 'Role-Based Access',
-    description: 'Granular permission system with role-based access control for maximum security.',
-    color: 'bg-gradient-to-r from-orange-500 to-red-600'
-  }
+    title: "Role-Based Access",
+    description:
+      "Granular permission system with role-based access control for maximum security.",
+    color: "bg-gradient-to-r from-orange-500 to-red-600",
+  },
 ];
 
-// Getting Started Steps
 const gettingStartedSteps = [
   {
     icon: <Key className="w-8 h-8" />,
-    title: 'Superadmin Access',
-    description: 'Access the platform administration panel to manage all tenants and system settings.',
-    action: 'Go to Superadmin',
-    href: '/superadmin/login',
-    color: 'bg-gradient-to-r from-blue-500 to-purple-600'
+    title: "Superadmin Access",
+    description:
+      "Access the platform administration panel to manage all tenants and system settings.",
+    action: "Go to Superadmin",
+    href: "/superadmin/login",
+    color: "bg-gradient-to-r from-blue-500 to-purple-600",
   },
   {
     icon: <Building2 className="w-8 h-8" />,
-    title: 'Tenant Management',
-    description: 'Create and manage tenant organizations with custom configurations and branding.',
-    action: 'Manage Tenants',
-    href: '/superadmin/tenants',
-    color: 'bg-gradient-to-r from-green-500 to-teal-600'
+    title: "Tenant Management",
+    description:
+      "Create and manage tenant organizations with custom configurations and branding.",
+    action: "Manage Tenants",
+    href: "/superadmin/tenants",
+    color: "bg-gradient-to-r from-green-500 to-teal-600",
   },
   {
     icon: <UserCheck className="w-8 h-8" />,
-    title: 'User Access',
-    description: 'Access tenant-specific dashboards with role-based permissions and features.',
-    action: 'View Demo Tenants',
-    href: '#demo-tenants',
-    color: 'bg-gradient-to-r from-purple-500 to-pink-600'
-  }
+    title: "User Access",
+    description:
+      "Access tenant-specific dashboards with role-based permissions and features.",
+    action: "View Demo Tenants",
+    href: "#demo-tenants",
+    color: "bg-gradient-to-r from-purple-500 to-pink-600",
+  },
 ];
 
 export default function LandingPage() {
@@ -154,7 +171,7 @@ export default function LandingPage() {
   // Auto-play slider
   useEffect(() => {
     if (!isPlaying) return;
-    
+
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % useCases.length);
     }, 5000);
@@ -163,8 +180,8 @@ export default function LandingPage() {
   }, [isPlaying, useCases.length]);
 
   const scrollToGettingStarted = () => {
-    document.getElementById('getting-started-section')?.scrollIntoView({ 
-      behavior: 'smooth' 
+    document.getElementById("getting-started-section")?.scrollIntoView({
+      behavior: "smooth",
     });
   };
 
@@ -195,16 +212,25 @@ export default function LandingPage() {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-8">
-              <a href="#features" className="text-gray-700 hover:text-blue-600 transition-colors">
+              <a
+                href="#features"
+                className="text-gray-700 hover:text-blue-600 transition-colors"
+              >
                 Features
               </a>
-              <a href="#use-cases" className="text-gray-700 hover:text-blue-600 transition-colors">
+              <a
+                href="#use-cases"
+                className="text-gray-700 hover:text-blue-600 transition-colors"
+              >
                 Use Cases
               </a>
-              <a href="#benefits" className="text-gray-700 hover:text-blue-600 transition-colors">
+              <a
+                href="#benefits"
+                className="text-gray-700 hover:text-blue-600 transition-colors"
+              >
                 Benefits
               </a>
-              <Link 
+              <Link
                 href="/superadmin/login"
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
               >
@@ -218,7 +244,11 @@ export default function LandingPage() {
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               aria-label="Toggle mobile menu"
             >
-              {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {isMobileMenuOpen ? (
+                <X className="w-6 h-6" />
+              ) : (
+                <Menu className="w-6 h-6" />
+              )}
             </button>
           </div>
 
@@ -226,16 +256,25 @@ export default function LandingPage() {
           {isMobileMenuOpen && (
             <div className="md:hidden py-4 border-t border-gray-200">
               <div className="flex flex-col space-y-4">
-                <a href="#features" className="text-gray-700 hover:text-blue-600 transition-colors">
+                <a
+                  href="#features"
+                  className="text-gray-700 hover:text-blue-600 transition-colors"
+                >
                   Features
                 </a>
-                <a href="#use-cases" className="text-gray-700 hover:text-blue-600 transition-colors">
+                <a
+                  href="#use-cases"
+                  className="text-gray-700 hover:text-blue-600 transition-colors"
+                >
                   Use Cases
                 </a>
-                <a href="#benefits" className="text-gray-700 hover:text-blue-600 transition-colors">
+                <a
+                  href="#benefits"
+                  className="text-gray-700 hover:text-blue-600 transition-colors"
+                >
                   Benefits
                 </a>
-                <Link 
+                <Link
                   href="/superadmin/login"
                   className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-center"
                 >
@@ -255,8 +294,8 @@ export default function LandingPage() {
               Multi-Tenant Management Platform
             </h1>
             <p className="text-xl sm:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto">
-              Manage tenants, roles, and users efficiently with a single dashboard. 
-              Built for scalability, security, and performance.
+              Manage tenants, roles, and users efficiently with a single
+              dashboard. Built for scalability, security, and performance.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
@@ -278,7 +317,10 @@ export default function LandingPage() {
       </section>
 
       {/* Getting Started Section */}
-      <section id="getting-started-section" className="py-16 bg-gray-50 px-4 sm:px-6 lg:px-8">
+      <section
+        id="getting-started-section"
+        className="py-16 bg-gray-50 px-4 sm:px-6 lg:px-8"
+      >
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
@@ -295,7 +337,9 @@ export default function LandingPage() {
                 key={index}
                 className="bg-white rounded-xl shadow-lg p-8 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100"
               >
-                <div className={`${step.color} w-16 h-16 rounded-lg flex items-center justify-center text-white mb-6 mx-auto`}>
+                <div
+                  className={`${step.color} w-16 h-16 rounded-lg flex items-center justify-center text-white mb-6 mx-auto`}
+                >
                   {step.icon}
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-4 text-center">
@@ -327,7 +371,7 @@ export default function LandingPage() {
                 Explore the platform with our demo tenant organizations
               </p>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
               {sampleTenants.map((tenant) => (
                 <div
@@ -343,8 +387,12 @@ export default function LandingPage() {
                         Demo tenant with sample data
                       </p>
                       <div className="text-xs text-gray-500 space-y-1">
-                        <p><strong>Admin:</strong> admin@{tenant.slug}.com</p>
-                        <p><strong>Password:</strong> AdminPass123</p>
+                        <p>
+                          <strong>Admin:</strong> admin@{tenant.slug}.com
+                        </p>
+                        <p>
+                          <strong>Password:</strong> AdminPass123
+                        </p>
                       </div>
                     </div>
                     <Link
@@ -369,7 +417,8 @@ export default function LandingPage() {
               Powerful Features
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Everything you need to manage your multi-tenant platform effectively
+              Everything you need to manage your multi-tenant platform
+              effectively
             </p>
           </div>
 
@@ -379,15 +428,11 @@ export default function LandingPage() {
                 key={index}
                 className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100"
               >
-                <div className={`${feature.color} mb-4`}>
-                  {feature.icon}
-                </div>
+                <div className={`${feature.color} mb-4`}>{feature.icon}</div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">
                   {feature.title}
                 </h3>
-                <p className="text-gray-600">
-                  {feature.description}
-                </p>
+                <p className="text-gray-600">{feature.description}</p>
               </div>
             ))}
           </div>
@@ -409,7 +454,7 @@ export default function LandingPage() {
           <div className="relative">
             {/* Slider Container */}
             <div className="overflow-hidden rounded-xl">
-              <div 
+              <div
                 className="flex transition-transform duration-500 ease-in-out"
                 style={{ transform: `translateX(-${currentSlide * 100}%)` }}
               >
@@ -426,7 +471,10 @@ export default function LandingPage() {
                           </p>
                           <ul className="space-y-2">
                             {useCase.features.map((feature, featureIndex) => (
-                              <li key={featureIndex} className="flex items-center text-gray-700">
+                              <li
+                                key={featureIndex}
+                                className="flex items-center text-gray-700"
+                              >
                                 <CheckCircle className="w-5 h-5 text-green-500 mr-3 flex-shrink-0" />
                                 {feature}
                               </li>
@@ -435,7 +483,9 @@ export default function LandingPage() {
                         </div>
                         <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg p-8 text-white text-center">
                           <Building2 className="w-16 h-16 mx-auto mb-4" />
-                          <h4 className="text-xl font-semibold mb-2">{useCase.title}</h4>
+                          <h4 className="text-xl font-semibold mb-2">
+                            {useCase.title}
+                          </h4>
                           <p className="text-blue-100">Perfect Solution</p>
                         </div>
                       </div>
@@ -465,9 +515,13 @@ export default function LandingPage() {
             <button
               onClick={() => setIsPlaying(!isPlaying)}
               className="absolute top-4 right-4 bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-shadow"
-              aria-label={isPlaying ? 'Pause slideshow' : 'Play slideshow'}
+              aria-label={isPlaying ? "Pause slideshow" : "Play slideshow"}
             >
-              {isPlaying ? <Pause className="w-5 h-5 text-gray-600" /> : <Play className="w-5 h-5 text-gray-600" />}
+              {isPlaying ? (
+                <Pause className="w-5 h-5 text-gray-600" />
+              ) : (
+                <Play className="w-5 h-5 text-gray-600" />
+              )}
             </button>
 
             {/* Navigation Dots */}
@@ -477,7 +531,7 @@ export default function LandingPage() {
                   key={index}
                   onClick={() => setCurrentSlide(index)}
                   className={`w-3 h-3 rounded-full transition-colors ${
-                    index === currentSlide ? 'bg-blue-600' : 'bg-gray-300'
+                    index === currentSlide ? "bg-blue-600" : "bg-gray-300"
                   }`}
                   aria-label={`Go to slide ${index + 1}`}
                 />
@@ -505,15 +559,15 @@ export default function LandingPage() {
                 key={index}
                 className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2"
               >
-                <div className={`${benefit.color} w-12 h-12 rounded-lg flex items-center justify-center text-white mb-4`}>
+                <div
+                  className={`${benefit.color} w-12 h-12 rounded-lg flex items-center justify-center text-white mb-4`}
+                >
                   {benefit.icon}
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">
                   {benefit.title}
                 </h3>
-                <p className="text-gray-600">
-                  {benefit.description}
-                </p>
+                <p className="text-gray-600">{benefit.description}</p>
               </div>
             ))}
           </div>
@@ -534,20 +588,36 @@ export default function LandingPage() {
                 className="h-8 w-auto mb-4"
               />
               <p className="text-gray-400 mb-4 max-w-md">
-                The ultimate multi-tenant management platform for modern businesses. 
-                Scalable, secure, and designed for performance.
+                The ultimate multi-tenant management platform for modern
+                businesses. Scalable, secure, and designed for performance.
               </p>
               <div className="flex space-x-4">
-                <a href="#" className="text-gray-400 hover:text-white transition-colors" aria-label="Facebook">
+                <a
+                  href="#"
+                  className="text-gray-400 hover:text-white transition-colors"
+                  aria-label="Facebook"
+                >
                   <Facebook className="w-5 h-5" />
                 </a>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors" aria-label="Twitter">
+                <a
+                  href="#"
+                  className="text-gray-400 hover:text-white transition-colors"
+                  aria-label="Twitter"
+                >
                   <Twitter className="w-5 h-5" />
                 </a>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors" aria-label="LinkedIn">
+                <a
+                  href="#"
+                  className="text-gray-400 hover:text-white transition-colors"
+                  aria-label="LinkedIn"
+                >
                   <Linkedin className="w-5 h-5" />
                 </a>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors" aria-label="GitHub">
+                <a
+                  href="#"
+                  className="text-gray-400 hover:text-white transition-colors"
+                  aria-label="GitHub"
+                >
                   <Github className="w-5 h-5" />
                 </a>
               </div>
@@ -557,10 +627,38 @@ export default function LandingPage() {
             <div>
               <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
               <ul className="space-y-2">
-                <li><a href="#features" className="text-gray-400 hover:text-white transition-colors">Features</a></li>
-                <li><a href="#use-cases" className="text-gray-400 hover:text-white transition-colors">Use Cases</a></li>
-                <li><a href="#benefits" className="text-gray-400 hover:text-white transition-colors">Benefits</a></li>
-                <li><Link href="/superadmin/login" className="text-gray-400 hover:text-white transition-colors">Superadmin</Link></li>
+                <li>
+                  <a
+                    href="#features"
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    Features
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#use-cases"
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    Use Cases
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#benefits"
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    Benefits
+                  </a>
+                </li>
+                <li>
+                  <Link
+                    href="/superadmin/login"
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    Superadmin
+                  </Link>
+                </li>
               </ul>
             </div>
 
@@ -585,10 +683,12 @@ export default function LandingPage() {
           </div>
 
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 Multi-Tenant Management Platform. All rights reserved.</p>
+            <p>
+              &copy; 2024 Multi-Tenant Management Platform. All rights reserved.
+            </p>
           </div>
         </div>
       </footer>
     </div>
   );
-} 
+}

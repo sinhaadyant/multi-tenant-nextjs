@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { Building2, Lock, Mail } from 'lucide-react';
 
-// Sample tenant data from installation guide
 const sampleTenants = [
   { slug: 'techcorp', name: 'TechCorp Solutions' },
   { slug: 'globalretail', name: 'Global Retail Inc' }
