@@ -1,17 +1,17 @@
-const puppeteer = require('puppeteer');
-const { TestHelper, TEST_CREDENTIALS } = require('./test-setup');
-const SuperAdminDatabaseHelper = require('./superadmin-db-helper');
+const puppeteer = require("puppeteer");
+const { TestHelper, TEST_CREDENTIALS } = require("./test-setup");
+const SuperAdminDatabaseHelper = require("./superadmin-db-helper");
 
 // Import individual test modules
-const SuperAdminAuthTester = require('./superadmin/auth-test');
-const SuperAdminDashboardTester = require('./superadmin/dashboard-test');
-const SuperAdminTenantTester = require('./superadmin/tenant-test');
-const SuperAdminUserTester = require('./superadmin/user-test');
-const SuperAdminRoleTester = require('./superadmin/role-test');
-const SuperAdminAuditTester = require('./superadmin/audit-test');
-const SuperAdminNotificationTester = require('./superadmin/notification-test');
-const SuperAdminSupportTester = require('./superadmin/support-test');
-const SuperAdminCrossVerificationTester = require('./superadmin/cross-verification-test');
+const SuperAdminAuthTester = require("./superadmin/auth-test");
+const SuperAdminDashboardTester = require("./superadmin/dashboard-test");
+const SuperAdminTenantTester = require("./superadmin/tenant-test");
+const SuperAdminUserTester = require("./superadmin/user-test");
+const SuperAdminRoleTester = require("./superadmin/role-test");
+const SuperAdminAuditTester = require("./superadmin/audit-test");
+const SuperAdminNotificationTester = require("./superadmin/notification-test");
+const SuperAdminSupportTester = require("./superadmin/support-test");
+const SuperAdminCrossVerificationTester = require("./superadmin/cross-verification-test");
 
 class SuperAdminComprehensiveTester {
   constructor() {
@@ -23,79 +23,112 @@ class SuperAdminComprehensiveTester {
       passed: 0,
       failed: 0,
       errors: [],
-      details: []
+      details: [],
     };
     this.createdTestData = {
       tenants: [],
       users: [],
       roles: [],
       notifications: [],
-      supportTickets: []
+      supportTickets: [],
     };
   }
 
   async initialize() {
     try {
-      console.log('🚀 Initializing SuperAdmin Comprehensive Test Suite...');
-      
+      console.log("🚀 Initializing SuperAdmin Comprehensive Test Suite...");
+
       // Connect to database
       await this.dbHelper.connect();
-      
+
       // Launch browser
       this.browser = await puppeteer.launch({
         headless: false,
         defaultViewport: null,
-        args: ['--start-maximized', '--no-sandbox', '--disable-setuid-sandbox']
+        args: ["--start-maximized", "--no-sandbox", "--disable-setuid-sandbox"],
       });
-      
+
       this.page = await this.browser.newPage();
       this.testHelper = new TestHelper(this.browser, this.page);
-      
-      console.log('✅ SuperAdmin test suite initialized successfully');
+
+      console.log("✅ SuperAdmin test suite initialized successfully");
     } catch (error) {
-      console.error('❌ Failed to initialize SuperAdmin test suite:', error);
+      console.error("❌ Failed to initialize SuperAdmin test suite:", error);
       throw error;
     }
   }
 
   async cleanup() {
     try {
-      console.log('🧹 Cleaning up SuperAdmin test data...');
-      
+      console.log("🧹 Cleaning up SuperAdmin test data...");
+
       // Clean up created test data
       await this.cleanupTestData();
-      
+
       // Disconnect from database
       await this.dbHelper.disconnect();
-      
+
       // Close browser
       if (this.browser) {
         await this.browser.close();
       }
-      
-      console.log('✅ SuperAdmin test suite cleanup completed');
+
+      console.log("✅ SuperAdmin test suite cleanup completed");
     } catch (error) {
-      console.error('❌ Error during cleanup:', error);
+      console.error("❌ Error during cleanup:", error);
     }
   }
 
   async runAllTests() {
     try {
       await this.initialize();
-      
-      console.log('\n🎯 Starting SuperAdmin Comprehensive Test Suite...\n');
-      
+
+      console.log("\n🎯 Starting SuperAdmin Comprehensive Test Suite...\n");
+
       // Test modules in order
       const testModules = [
-        { name: 'Authentication', tester: new SuperAdminAuthTester(this.testHelper, this.dbHelper) },
-        { name: 'Dashboard', tester: new SuperAdminDashboardTester(this.testHelper, this.dbHelper) },
-        { name: 'Tenant Management', tester: new SuperAdminTenantTester(this.testHelper, this.dbHelper) },
-        { name: 'User Management', tester: new SuperAdminUserTester(this.testHelper, this.dbHelper) },
-        { name: 'Role Management', tester: new SuperAdminRoleTester(this.testHelper, this.dbHelper) },
-        { name: 'Audit Logs', tester: new SuperAdminAuditTester(this.testHelper, this.dbHelper) },
-        { name: 'Notifications', tester: new SuperAdminNotificationTester(this.testHelper, this.dbHelper) },
-        { name: 'Support System', tester: new SuperAdminSupportTester(this.testHelper, this.dbHelper) },
-        { name: 'Cross Verification', tester: new SuperAdminCrossVerificationTester(this.testHelper, this.dbHelper) }
+        {
+          name: "Authentication",
+          tester: new SuperAdminAuthTester(this.testHelper, this.dbHelper),
+        },
+        {
+          name: "Dashboard",
+          tester: new SuperAdminDashboardTester(this.testHelper, this.dbHelper),
+        },
+        {
+          name: "Tenant Management",
+          tester: new SuperAdminTenantTester(this.testHelper, this.dbHelper),
+        },
+        {
+          name: "User Management",
+          tester: new SuperAdminUserTester(this.testHelper, this.dbHelper),
+        },
+        {
+          name: "Role Management",
+          tester: new SuperAdminRoleTester(this.testHelper, this.dbHelper),
+        },
+        {
+          name: "Audit Logs",
+          tester: new SuperAdminAuditTester(this.testHelper, this.dbHelper),
+        },
+        {
+          name: "Notifications",
+          tester: new SuperAdminNotificationTester(
+            this.testHelper,
+            this.dbHelper
+          ),
+        },
+        {
+          name: "Support System",
+          tester: new SuperAdminSupportTester(this.testHelper, this.dbHelper),
+        },
+        {
+          name: "Cross Verification",
+          tester: new SuperAdminCrossVerificationTester(
+            this.testHelper,
+            this.dbHelper
+          ),
+        },
       ];
 
       for (const module of testModules) {
@@ -112,9 +145,8 @@ class SuperAdminComprehensiveTester {
       }
 
       await this.generateFinalReport();
-      
     } catch (error) {
-      console.error('❌ SuperAdmin test suite failed:', error);
+      console.error("❌ SuperAdmin test suite failed:", error);
       this.testResults.errors.push(`Test Suite: ${error.message}`);
       this.testResults.failed++;
     } finally {
@@ -140,7 +172,10 @@ class SuperAdminComprehensiveTester {
         try {
           await this.dbHelper.deleteUserInDB(userId);
         } catch (error) {
-          console.warn(`Warning: Could not delete test user ${userId}:`, error.message);
+          console.warn(
+            `Warning: Could not delete test user ${userId}:`,
+            error.message
+          );
         }
       }
 
@@ -148,7 +183,10 @@ class SuperAdminComprehensiveTester {
         try {
           await this.dbHelper.prisma.role.delete({ where: { id: roleId } });
         } catch (error) {
-          console.warn(`Warning: Could not delete test role ${roleId}:`, error.message);
+          console.warn(
+            `Warning: Could not delete test role ${roleId}:`,
+            error.message
+          );
         }
       }
 
@@ -156,70 +194,93 @@ class SuperAdminComprehensiveTester {
         try {
           await this.dbHelper.deleteTenantInDB(tenantId);
         } catch (error) {
-          console.warn(`Warning: Could not delete test tenant ${tenantId}:`, error.message);
+          console.warn(
+            `Warning: Could not delete test tenant ${tenantId}:`,
+            error.message
+          );
         }
       }
 
       for (const notificationId of this.createdTestData.notifications) {
         try {
-          await this.dbHelper.prisma.notification.delete({ where: { id: notificationId } });
+          await this.dbHelper.prisma.notification.delete({
+            where: { id: notificationId },
+          });
         } catch (error) {
-          console.warn(`Warning: Could not delete test notification ${notificationId}:`, error.message);
+          console.warn(
+            `Warning: Could not delete test notification ${notificationId}:`,
+            error.message
+          );
         }
       }
 
       for (const ticketId of this.createdTestData.supportTickets) {
         try {
-          await this.dbHelper.prisma.supportTicket.delete({ where: { id: ticketId } });
+          await this.dbHelper.prisma.supportTicket.delete({
+            where: { id: ticketId },
+          });
         } catch (error) {
-          console.warn(`Warning: Could not delete test support ticket ${ticketId}:`, error.message);
+          console.warn(
+            `Warning: Could not delete test support ticket ${ticketId}:`,
+            error.message
+          );
         }
       }
 
-      console.log('✅ Test data cleanup completed');
+      console.log("✅ Test data cleanup completed");
     } catch (error) {
-      console.error('❌ Error during test data cleanup:', error);
+      console.error("❌ Error during test data cleanup:", error);
     }
   }
 
   async generateFinalReport() {
-    console.log('\n' + '='.repeat(80));
-    console.log('📊 SUPERADMIN COMPREHENSIVE TEST SUITE RESULTS');
-    console.log('='.repeat(80));
-    
+    console.log("\n" + "=".repeat(80));
+    console.log("📊 SUPERADMIN COMPREHENSIVE TEST SUITE RESULTS");
+    console.log("=".repeat(80));
+
     console.log(`✅ Passed: ${this.testResults.passed}`);
     console.log(`❌ Failed: ${this.testResults.failed}`);
-    console.log(`📈 Success Rate: ${((this.testResults.passed / (this.testResults.passed + this.testResults.failed)) * 100).toFixed(2)}%`);
-    
+    console.log(
+      `📈 Success Rate: ${(
+        (this.testResults.passed /
+          (this.testResults.passed + this.testResults.failed)) *
+        100
+      ).toFixed(2)}%`
+    );
+
     if (this.testResults.errors.length > 0) {
-      console.log('\n🚨 Errors:');
+      console.log("\n🚨 Errors:");
       this.testResults.errors.forEach((error, index) => {
         console.log(`${index + 1}. ${error}`);
       });
     }
-    
+
     if (this.testResults.details.length > 0) {
-      console.log('\n📋 Test Details:');
+      console.log("\n📋 Test Details:");
       this.testResults.details.forEach((detail, index) => {
         console.log(`${index + 1}. ${detail}`);
       });
     }
-    
-    console.log('\n' + '='.repeat(80));
-    
+
+    console.log("\n" + "=".repeat(80));
+
     // Save detailed report to file
     const reportData = {
       timestamp: new Date().toISOString(),
       summary: {
         passed: this.testResults.passed,
         failed: this.testResults.failed,
-        successRate: ((this.testResults.passed / (this.testResults.passed + this.testResults.failed)) * 100).toFixed(2)
+        successRate: (
+          (this.testResults.passed /
+            (this.testResults.passed + this.testResults.failed)) *
+          100
+        ).toFixed(2),
       },
       errors: this.testResults.errors,
-      details: this.testResults.details
+      details: this.testResults.details,
     };
-    
-    const fs = require('fs');
+
+    const fs = require("fs");
     const reportPath = `tests/e2e/reports/superadmin-test-report-${Date.now()}.json`;
     fs.writeFileSync(reportPath, JSON.stringify(reportData, null, 2));
     console.log(`📄 Detailed report saved to: ${reportPath}`);
@@ -232,4 +293,4 @@ if (require.main === module) {
   tester.runAllTests().catch(console.error);
 }
 
-module.exports = SuperAdminComprehensiveTester; 
+module.exports = SuperAdminComprehensiveTester;
