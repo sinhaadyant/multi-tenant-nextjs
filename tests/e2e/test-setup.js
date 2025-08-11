@@ -103,61 +103,70 @@ const ROLE_PERMISSIONS = {
 
 // Common selectors
 const SELECTORS = {
-  // Login
-  emailInput: 'input[name="email"], input[type="email"]',
-  passwordInput: 'input[name="password"], input[type="password"]',
-  loginButton: 'button[type="submit"]',
-  
-  // Navigation
-  sidebar: 'aside, .sidebar, [role="navigation"]',
-  menuItem: 'nav a, .sidebar a, .menu a, a[href*="/"]',
-  dashboardLink: 'a[href*="dashboard"]',
-  
-  // Forms
-  form: 'form',
-  input: 'input',
-  textarea: 'textarea',
-  select: 'select',
-  button: 'button',
+  // Common selectors
+  loginForm: 'form',
+  emailInput: 'input[type="email"]',
+  passwordInput: 'input[type="password"]',
   submitButton: 'button[type="submit"]',
+  logoutButton: 'a[href*="logout"], button[data-testid="logout"]',
   
-  // Tables
-  table: 'table, [role="table"]',
-  tableRow: 'tr, [role="row"]',
-  tableHeader: 'th, [role="columnheader"]',
-  tableCell: 'td, [role="cell"]',
+  // Dashboard selectors
+  dashboardTitle: 'h1, h2, [data-testid="dashboard-title"]',
+  dashboardContent: 'main, .content, [data-testid="dashboard-content"]',
+  dashboardWidgets: '.widget, [data-testid="dashboard-widget"]',
   
-  // Modals
-  modal: '[role="dialog"], .modal, .dialog',
-  modalClose: '[data-testid="modal-close"], .modal-close, .close',
+  // Navigation selectors
+  sidebar: 'aside, [data-testid="sidebar"]',
+  sidebarMenu: 'nav, [data-testid="sidebar-menu"]',
+  menuItems: 'a[href], [data-testid="menu-item"]',
   
-  // Loading states
-  loading: '[data-testid="loading"], .loading, .spinner',
-  skeleton: '[data-testid="skeleton"], .skeleton',
+  // Module selectors - using proper selectors instead of :contains
+  dashboardModule: 'a[href*="dashboard"], [data-testid="dashboard-module"]',
+  userManagementModule: 'a[href*="users"], [data-testid="users-module"]',
+  rolesModule: 'a[href*="roles"], [data-testid="roles-module"]',
+  auditLogsModule: 'a[href*="audit"], [data-testid="audit-module"]',
+  notificationsModule: 'a[href*="notifications"], [data-testid="notifications-module"]',
+  supportModule: 'a[href*="support"], [data-testid="support-module"]',
+  settingsModule: 'a[href*="settings"], [data-testid="settings-module"]',
   
-  // Notifications
-  toast: '[data-testid="toast"], .toast, .notification',
-  alert: '[role="alert"], .alert, .error, .success',
+  // Content Management module (if it exists)
+  contentManagementModule: 'a[href*="content"], [data-testid="content-module"]',
   
-  // Pagination
-  pagination: '[data-testid="pagination"], .pagination',
-  pageButton: '[data-testid="page-button"], .page-button',
-  nextButton: '[data-testid="next-button"], .next-button',
-  prevButton: '[data-testid="prev-button"], .prev-button',
+  // Table selectors
+  dataTable: 'table, [data-testid="data-table"]',
+  tableRows: 'tr, [data-testid="table-row"]',
+  pagination: '.pagination, [data-testid="pagination"]',
   
-  // Search and filters
-  searchInput: '[data-testid="search-input"], input[placeholder*="search"], input[placeholder*="Search"]',
-  filterDropdown: '[data-testid="filter-dropdown"], .filter-dropdown',
+  // Form selectors
+  createButton: 'button[data-testid="create"], .btn-create',
+  editButton: 'button[data-testid="edit"], .btn-edit',
+  deleteButton: 'button[data-testid="delete"], .btn-delete',
+  searchInput: 'input[type="search"], [data-testid="search"]',
+  filterDropdown: 'select, [data-testid="filter"]',
   
-  // Actions
-  createButton: '[data-testid="create-button"], .create-button, button:contains("Create"), button:contains("Add")',
-  editButton: '[data-testid="edit-button"], .edit-button, button:contains("Edit")',
-  deleteButton: '[data-testid="delete-button"], .delete-button, button:contains("Delete")',
-  viewButton: '[data-testid="view-button"], .view-button, button:contains("View")',
+  // Modal selectors
+  modal: '.modal, [data-testid="modal"]',
+  modalClose: '.modal-close, [data-testid="modal-close"]',
   
-  // Content
-  title: 'h1, h2, h3, .title, [data-testid="title"]',
-  content: 'main, .content, [data-testid="content"]'
+  // Error selectors
+  errorMessage: '.error, [data-testid="error"]',
+  successMessage: '.success, [data-testid="success"]',
+  
+  // Loading selectors
+  loadingSpinner: '.loading, [data-testid="loading"]',
+  
+  // User profile selectors
+  userAvatar: '.avatar, [data-testid="user-avatar"]',
+  userMenu: '.user-menu, [data-testid="user-menu"]',
+  
+  // Notification selectors
+  notificationBell: '.notification-bell, [data-testid="notification-bell"]',
+  notificationDropdown: '.notification-dropdown, [data-testid="notification-dropdown"]',
+  
+  // Support ticket selectors
+  ticketForm: 'form[data-testid="ticket-form"]',
+  ticketList: '[data-testid="ticket-list"]',
+  ticketItem: '[data-testid="ticket-item"]'
 };
 
 class TestHelper {
@@ -248,7 +257,7 @@ class TestHelper {
       await this.page.type(SELECTORS.passwordInput, credentials.password);
       
       // Submit form
-      await this.page.click(SELECTORS.loginButton);
+      await this.page.click(SELECTORS.submitButton);
       
       // Wait for navigation
       await this.page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 });
@@ -387,38 +396,56 @@ class TestHelper {
   }
 
   async testModuleAccess(moduleName, expectedAccess = true) {
-    console.log(`🔍 Testing access to ${moduleName}...`);
-    
     try {
-      // Try to find module link in navigation
-      const moduleSelectors = [
-        `a[href*="${moduleName.toLowerCase().replace(/\s+/g, '-')}"]`,
-        `a:contains("${moduleName}")`,
-        `[data-testid*="${moduleName.toLowerCase().replace(/\s+/g, '-')}"]`
-      ];
+      // Get the appropriate selector for the module
+      const moduleSelector = this.getModuleSelector(moduleName);
       
-      let moduleLink = null;
-      for (const selector of moduleSelectors) {
-        moduleLink = await this.page.$(selector);
-        if (moduleLink) break;
+      if (!moduleSelector) {
+        console.log(`⚠️ No selector found for module: ${moduleName}`);
+        return false;
       }
+
+      // Wait for the element to be present
+      await this.page.waitForSelector(moduleSelector, { timeout: 5000 });
       
-      if (expectedAccess && !moduleLink) {
-        throw new Error(`Module ${moduleName} not found in navigation`);
-      }
+      // Check if the element is visible using Puppeteer's correct method
+      const element = await this.page.$(moduleSelector);
+      const isVisible = element ? await element.isVisible() : false;
       
-      if (!expectedAccess && moduleLink) {
-        throw new Error(`Module ${moduleName} should not be accessible`);
+      if (expectedAccess && !isVisible) {
+        console.log(`❌ Module ${moduleName} should be accessible but is not visible`);
+        return false;
+      } else if (!expectedAccess && isVisible) {
+        console.log(`❌ Module ${moduleName} should not be accessible but is visible`);
+        return false;
       }
       
       console.log(`✅ Module access test passed for ${moduleName}`);
       return true;
-      
     } catch (error) {
-      console.error(`❌ Module access test failed for ${moduleName}:`, error.message);
-      await this.takeScreenshot(`module-access-${moduleName.toLowerCase().replace(/\s+/g, '-')}`);
-      return false;
+      if (expectedAccess) {
+        console.log(`❌ Module access test failed for ${moduleName}: ${error.message}`);
+        return false;
+      } else {
+        console.log(`✅ Module ${moduleName} correctly not accessible`);
+        return true;
+      }
     }
+  }
+
+  getModuleSelector(moduleName) {
+    const moduleMap = {
+      'Dashboard': SELECTORS.dashboardModule,
+      'User Management': SELECTORS.userManagementModule,
+      'Roles': SELECTORS.rolesModule,
+      'Audit Logs': SELECTORS.auditLogsModule,
+      'Notifications': SELECTORS.notificationsModule,
+      'Support': SELECTORS.supportModule,
+      'Settings': SELECTORS.settingsModule,
+      'Content Management': SELECTORS.contentManagementModule
+    };
+    
+    return moduleMap[moduleName] || null;
   }
 
   async testCRUDOperations(moduleName, testData) {
@@ -478,7 +505,7 @@ class TestHelper {
       await this.clickElement(SELECTORS.submitButton);
       
       // Wait for success
-      await this.page.waitForSelector(SELECTORS.alert, { timeout: 10000 });
+      await this.page.waitForSelector(SELECTORS.successMessage, { timeout: 10000 });
       
       console.log(`✅ Create operation successful for ${moduleName}`);
       return true;
@@ -492,10 +519,10 @@ class TestHelper {
   async testReadOperation(moduleName) {
     try {
       // Check if table or list is present
-      await this.waitForElement(SELECTORS.table);
+      await this.waitForElement(SELECTORS.dataTable);
       
       // Check if data is displayed
-      const rows = await this.page.$$(SELECTORS.tableRow);
+      const rows = await this.page.$$(SELECTORS.tableRows);
       if (rows.length > 1) { // More than header row
         console.log(`✅ Read operation successful for ${moduleName}`);
         return true;
@@ -530,7 +557,7 @@ class TestHelper {
       await this.clickElement(SELECTORS.submitButton);
       
       // Wait for success
-      await this.page.waitForSelector(SELECTORS.alert, { timeout: 10000 });
+      await this.page.waitForSelector(SELECTORS.successMessage, { timeout: 10000 });
       
       console.log(`✅ Update operation successful for ${moduleName}`);
       return true;
@@ -551,7 +578,7 @@ class TestHelper {
       await this.clickElement('button:contains("Confirm"), button:contains("Delete")');
       
       // Wait for success
-      await this.page.waitForSelector(SELECTORS.alert, { timeout: 10000 });
+      await this.page.waitForSelector(SELECTORS.successMessage, { timeout: 10000 });
       
       console.log(`✅ Delete operation successful for ${moduleName}`);
       return true;

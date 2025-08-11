@@ -18,6 +18,7 @@ export async function POST(
     response.cookies.delete('refresh_token');
     response.cookies.delete('superadmin_token');
     response.cookies.delete('tenant_token');
+    response.cookies.delete('tenant_auth_token');
 
     return response;
   } catch (error) {

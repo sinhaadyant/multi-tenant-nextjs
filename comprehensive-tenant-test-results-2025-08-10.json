@@ -1,0 +1,150 @@
+{
+  "summary": {
+    "total": 23,
+    "passed": 19,
+    "failed": 0,
+    "errors": 4,
+    "successRate": "82.6"
+  },
+  "results": [
+    {
+      "module": "admin Dashboard",
+      "status": "PASSED",
+      "message": "All dashboard functionality working",
+      "timestamp": "2025-08-10T22:24:20.532Z"
+    },
+    {
+      "module": "admin User Management",
+      "status": "PASSED",
+      "message": "All user management functionality working",
+      "timestamp": "2025-08-10T22:24:37.364Z"
+    },
+    {
+      "module": "admin Roles & Permissions",
+      "status": "PASSED",
+      "message": "All roles & permissions functionality working",
+      "timestamp": "2025-08-10T22:24:49.874Z"
+    },
+    {
+      "module": "admin Audit Logs",
+      "status": "PASSED",
+      "message": "All audit logs functionality working",
+      "timestamp": "2025-08-10T22:25:01.989Z"
+    },
+    {
+      "module": "admin Notifications",
+      "status": "PASSED",
+      "message": "All notifications functionality working",
+      "timestamp": "2025-08-10T22:25:14.185Z"
+    },
+    {
+      "module": "admin Settings",
+      "status": "PASSED",
+      "message": "All settings functionality working",
+      "timestamp": "2025-08-10T22:25:27.168Z"
+    },
+    {
+      "module": "admin Sidebar Menu",
+      "status": "PASSED",
+      "message": "All menu items correctly visible/hidden",
+      "timestamp": "2025-08-10T22:26:14.913Z"
+    },
+    {
+      "module": "admin",
+      "status": "ERROR",
+      "message": "this.testHelper.logout is not a function",
+      "timestamp": "2025-08-10T22:26:14.914Z"
+    },
+    {
+      "module": "manager Dashboard",
+      "status": "PASSED",
+      "message": "All dashboard functionality working",
+      "timestamp": "2025-08-10T22:27:01.398Z"
+    },
+    {
+      "module": "manager User Management",
+      "status": "PASSED",
+      "message": "All user management functionality working",
+      "timestamp": "2025-08-10T22:27:15.857Z"
+    },
+    {
+      "module": "manager Audit Logs",
+      "status": "PASSED",
+      "message": "All audit logs functionality working",
+      "timestamp": "2025-08-10T22:27:28.068Z"
+    },
+    {
+      "module": "manager Notifications",
+      "status": "PASSED",
+      "message": "All notifications functionality working",
+      "timestamp": "2025-08-10T22:27:41.917Z"
+    },
+    {
+      "module": "manager Settings",
+      "status": "PASSED",
+      "message": "All settings functionality working",
+      "timestamp": "2025-08-10T22:27:54.032Z"
+    },
+    {
+      "module": "manager Sidebar Menu",
+      "status": "PASSED",
+      "message": "All menu items correctly visible/hidden",
+      "timestamp": "2025-08-10T22:28:41.258Z"
+    },
+    {
+      "module": "manager",
+      "status": "ERROR",
+      "message": "this.testHelper.logout is not a function",
+      "timestamp": "2025-08-10T22:28:41.258Z"
+    },
+    {
+      "module": "user Dashboard",
+      "status": "PASSED",
+      "message": "All dashboard functionality working",
+      "timestamp": "2025-08-10T22:29:26.788Z"
+    },
+    {
+      "module": "user Notifications",
+      "status": "PASSED",
+      "message": "All notifications functionality working",
+      "timestamp": "2025-08-10T22:29:39.666Z"
+    },
+    {
+      "module": "user Sidebar Menu",
+      "status": "PASSED",
+      "message": "All menu items correctly visible/hidden",
+      "timestamp": "2025-08-10T22:30:27.013Z"
+    },
+    {
+      "module": "user",
+      "status": "ERROR",
+      "message": "this.testHelper.logout is not a function",
+      "timestamp": "2025-08-10T22:30:27.013Z"
+    },
+    {
+      "module": "viewer Dashboard",
+      "status": "PASSED",
+      "message": "All dashboard functionality working",
+      "timestamp": "2025-08-10T22:31:12.710Z"
+    },
+    {
+      "module": "viewer Notifications",
+      "status": "PASSED",
+      "message": "All notifications functionality working",
+      "timestamp": "2025-08-10T22:31:24.885Z"
+    },
+    {
+      "module": "viewer Sidebar Menu",
+      "status": "PASSED",
+      "message": "All menu items correctly visible/hidden",
+      "timestamp": "2025-08-10T22:32:19.037Z"
+    },
+    {
+      "module": "viewer",
+      "status": "ERROR",
+      "message": "this.testHelper.logout is not a function",
+      "timestamp": "2025-08-10T22:32:19.038Z"
+    }
+  ],
+  "timestamp": "2025-08-10T22:32:19.040Z"
+}
