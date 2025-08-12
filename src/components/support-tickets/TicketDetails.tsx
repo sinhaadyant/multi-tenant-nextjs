@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { format } from 'date-fns';
+import { useQueryClient } from '@tanstack/react-query';
 import { 
   ArrowLeft, 
   Edit, 
@@ -35,6 +36,7 @@ export const TicketDetails: React.FC<TicketDetailsProps> = ({
   const { success, error } = useToast();
   const { confirm } = useConfirmModalContext();
   const addReplyMutation = useAddReply();
+  const queryClient = useQueryClient();
 
   const [replyText, setReplyText] = useState('');
   const [replyAttachments, setReplyAttachments] = useState<AttachmentFile[]>([]);
@@ -79,6 +81,10 @@ export const TicketDetails: React.FC<TicketDetailsProps> = ({
       success('Reply added successfully!');
       setReplyText('');
       setReplyAttachments([]);
+      
+      // Force refresh the ticket data to update reply count
+      queryClient.invalidateQueries({ queryKey: ['superadmin-support-ticket', ticket.id] });
+      queryClient.invalidateQueries({ queryKey: ['superadmin-support-tickets'] });
     } catch (err: any) {
       error(err.message || 'An error occurred while adding the reply');
     } finally {
@@ -144,13 +150,32 @@ export const TicketDetails: React.FC<TicketDetailsProps> = ({
 
   const isSubmittingAny = isSubmitting || addReplyMutation.isPending;
 
+  // Handle missing ticket data
+  if (!ticket) {
+    return (
+      <div className={`max-w-6xl mx-auto ${className}`}>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <h2 className="text-lg font-medium text-red-800 mb-2">Ticket Not Found</h2>
+          <p className="text-red-600">The requested support ticket could not be found.</p>
+          <Link
+            href="/superadmin/support-tickets"
+            className="mt-4 inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Tickets
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`max-w-6xl mx-auto ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
           <Link
-            href="/support-tickets"
+            href="/superadmin/support-tickets"
             className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -214,7 +239,7 @@ export const TicketDetails: React.FC<TicketDetailsProps> = ({
         </div>
 
         {/* Original Attachments */}
-        {ticket?.attachments?.length || 0 > 0 && (
+        {ticket?.attachments && ticket.attachments.length > 0 && (
           <div className="mt-6">
             <p className="text-sm text-gray-500 mb-2">Attachments</p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -253,7 +278,7 @@ export const TicketDetails: React.FC<TicketDetailsProps> = ({
           Replies ({ticket?.comments?.length || 0})
         </h3>
         
-        {ticket?.comments?.length || 0 === 0 ? (
+        {(!ticket?.comments || ticket.comments.length === 0) ? (
           <div className="text-center py-8">
             <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600">No replies yet. Be the first to respond!</p>
@@ -283,7 +308,7 @@ export const TicketDetails: React.FC<TicketDetailsProps> = ({
                 </div>
 
                 {/* Comment Attachments */}
-                {comment?.attachments?.length || 0 > 0 && (
+                {comment?.attachments && comment.attachments.length > 0 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {comment.attachments.map((attachment) => (
                       <div

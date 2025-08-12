@@ -8,7 +8,10 @@ import { useNotifications, useMarkNotificationAsRead } from "@/hooks/useNotifica
 
 export default function NotificationDropdown() {
   const [isOpen, setIsOpen] = useState(false);
-  const { data: notificationsData, isLoading } = useNotifications({ limit: 10 });
+  const { data: notificationsData, isLoading } = useNotifications({ 
+    limit: 10,
+    status: ['sent'] // Only show sent notifications in header
+  });
   const markAsReadMutation = useMarkNotificationAsRead();
 
   const notifications = notificationsData?.notifications || [];

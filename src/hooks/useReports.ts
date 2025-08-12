@@ -7,6 +7,7 @@ export interface Report {
   type: string;
   name: string;
   data: string;
+  status?: string;
   tenantId?: string;
   superAdminId?: string;
   createdAt: string;
@@ -57,17 +58,21 @@ export interface ReportsResponse {
 }
 
 export interface GenerateReportData {
-  type: string;
+  reportType: string;
   name: string;
-  data: string;
+  dateFrom: string;
+  dateTo: string;
   tenantId?: string;
+  format: 'csv' | 'excel' | 'pdf';
+  filters?: Record<string, any>;
 }
 
 export interface ReportsFilters {
   page?: number;
   limit?: number;
   search?: string;
-  type?: string;
+  reportType?: string;
+  status?: string;
   dateFrom?: string;
   dateTo?: string;
   sortBy?: 'createdAt' | 'type' | 'name';
@@ -80,7 +85,7 @@ export const useReportsOverview = () => {
     queryKey: ['reports-overview'],
     queryFn: async (): Promise<{ overview: ReportsOverview; platformStats: PlatformStats }> => {
       const response = await api.get('/superadmin/reports/overview');
-      return response.data;
+      return response.data.data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -93,14 +98,44 @@ export const useReports = (filters: ReportsFilters = {}) => {
     queryFn: async (): Promise<ReportsResponse> => {
       const params = new URLSearchParams();
       
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== '') {
+      // Map filter names to API expected parameters
+      const apiParams = {
+        page: filters.page,
+        limit: filters.limit,
+        search: filters.search,
+        reportType: filters.reportType, // API expects reportType, not type
+        dateFrom: filters.dateFrom,
+        dateTo: filters.dateTo,
+        sortBy: filters.sortBy,
+        sortOrder: filters.sortOrder
+      };
+      
+      Object.entries(apiParams).forEach(([key, value]) => {
+        if (value !== undefined && value !== '' && value !== null) {
           params.append(key, value.toString());
         }
       });
 
       const response = await api.get(`/superadmin/reports?${params.toString()}`);
-      return response.data;
+      
+      // The API returns data wrapped in createSuccessResponse format
+      const data = response.data.data;
+      
+      if (!data) {
+        throw new Error('Invalid response structure from reports API');
+      }
+      
+      return {
+        reports: data.reports || [],
+        pagination: data.pagination || {
+          page: 1,
+          limit: 10,
+          totalPages: 1,
+          totalCount: 0,
+          hasNextPage: false,
+          hasPrevPage: false
+        }
+      };
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
@@ -113,7 +148,7 @@ export const useGenerateReport = () => {
   return useMutation({
     mutationFn: async (data: GenerateReportData): Promise<{ report: Report; message: string }> => {
       const response = await api.post('/superadmin/reports', data);
-      return response.data;
+      return response.data.data;
     },
     onSuccess: (data) => {
       toast.success(data.message || 'Report generation initiated successfully');
@@ -163,8 +198,21 @@ export const useExportReports = () => {
     mutationFn: async (filters: ReportsFilters & { format: 'csv' | 'excel' | 'pdf' }): Promise<Blob> => {
       const params = new URLSearchParams();
       
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== '') {
+      // Map filter names to API expected parameters
+      const apiParams = {
+        page: filters.page,
+        limit: filters.limit,
+        search: filters.search,
+        reportType: filters.reportType,
+        dateFrom: filters.dateFrom,
+        dateTo: filters.dateTo,
+        sortBy: filters.sortBy,
+        sortOrder: filters.sortOrder,
+        format: filters.format
+      };
+      
+      Object.entries(apiParams).forEach(([key, value]) => {
+        if (value !== undefined && value !== '' && value !== null) {
           params.append(key, value.toString());
         }
       });

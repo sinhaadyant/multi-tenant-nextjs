@@ -62,7 +62,10 @@ export async function POST(
       });
     }
 
-    return NextResponse.json({ comment }, { status: 201 });
+    return NextResponse.json({ 
+      message: 'Comment added successfully',
+      comment 
+    }, { status: 201 });
   } catch (error) {
     console.error('Error creating comment:', error);
     return NextResponse.json(

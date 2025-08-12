@@ -5,6 +5,7 @@ import { requireSuperAdmin } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit';
 
 export async function GET(req: NextRequest) {
+  let filters: any;
   try {
     // Verify authentication
     const authResult = await requireSuperAdmin(req);
@@ -16,13 +17,20 @@ export async function GET(req: NextRequest) {
     console.log('Authentication successful for user:', authResult.user?.email);
 
     const { searchParams } = new URL(req.url);
-    const filters = {
+    filters = {
       search: searchParams.get('search') || undefined,
       type: searchParams.getAll('type'),
       status: searchParams.getAll('status'),
       priority: searchParams.getAll('priority'),
       targetType: searchParams.getAll('targetType'),
-      dateRange: searchParams.get('dateRange') ? JSON.parse(searchParams.get('dateRange')!) : undefined,
+      dateRange: searchParams.get('dateRange') ? (() => {
+        try {
+          return JSON.parse(searchParams.get('dateRange')!);
+        } catch (e) {
+          console.warn('Invalid dateRange JSON:', searchParams.get('dateRange'));
+          return undefined;
+        }
+      })() : undefined,
       sortBy: searchParams.get('sortBy') || 'createdAt',
       sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc',
       page: parseInt(searchParams.get('page') || '1'),
@@ -34,11 +42,15 @@ export async function GET(req: NextRequest) {
       isActive: true,
     };
 
-    if (filters.search) {
-      where.OR = [
-        { title: { contains: filters.search, mode: 'insensitive' } },
-        { message: { contains: filters.search, mode: 'insensitive' } },
-      ];
+    if (filters.search && filters.search.trim() && filters.search.length > 0) {
+      const searchTerm = filters.search.trim();
+      // Sanitize search term to prevent SQL injection
+      if (searchTerm.length <= 100) { // Limit search term length
+        where.OR = [
+          { title: { contains: searchTerm } },
+          { message: { contains: searchTerm } },
+        ];
+      }
     }
 
     if (filters.type && filters.type.length > 0) {
@@ -158,7 +170,12 @@ export async function GET(req: NextRequest) {
     return createSuccessResponse(response, 'Notifications retrieved successfully');
   } catch (error: any) {
     console.error('Error fetching notifications:', error);
-    return createErrorResponse('Internal server error', 500);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      filters: filters
+    });
+    return createErrorResponse(`Internal server error: ${error.message}`, 500);
   }
 }
 

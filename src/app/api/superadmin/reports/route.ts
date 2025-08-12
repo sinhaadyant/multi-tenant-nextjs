@@ -21,6 +21,7 @@ const listReportsSchema = z.object({
   limit: z.string().transform(Number).pipe(z.number().min(1).max(100)).optional(),
   search: z.string().optional(),
   reportType: z.string().optional(),
+  status: z.string().optional(),
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
   sortBy: z.enum(['createdAt', 'name', 'type']).optional(),
@@ -51,6 +52,7 @@ export const GET = asyncHandler(async (req: NextRequest) => {
     limit = 10,
     search,
     reportType,
+    status,
     dateFrom,
     dateTo,
     sortBy = 'createdAt',
@@ -64,14 +66,19 @@ export const GET = asyncHandler(async (req: NextRequest) => {
 
   if (search) {
     where.OR = [
-      { name: { contains: search } },
-      { type: { contains: search } },
-      { superAdmin: { name: { contains: search } } }
+      { name: { contains: search, mode: 'insensitive' } },
+      { type: { contains: search, mode: 'insensitive' } },
+      { superAdmin: { name: { contains: search, mode: 'insensitive' } } }
     ];
   }
 
   if (reportType) {
     where.type = reportType;
+  }
+
+  // Handle status filtering (if status field exists in the database)
+  if (status) {
+    where.status = status;
   }
 
   if (dateFrom || dateTo) {
@@ -109,7 +116,13 @@ export const GET = asyncHandler(async (req: NextRequest) => {
     const hasPrevPage = page > 1;
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('✅ Reports fetched successfully:', { count: reports.length, totalCount });
+      console.log('✅ Reports fetched successfully:', { 
+        count: reports.length, 
+        totalCount, 
+        page, 
+        limit,
+        filters: { search, reportType, status, dateFrom, dateTo }
+      });
     }
 
     return createSuccessResponse({
@@ -156,6 +169,7 @@ export const POST = asyncHandler(async (req: NextRequest) => {
       data: {
         name: `${validatedData.reportType}_${new Date().toISOString().split('T')[0]}`,
         type: validatedData.reportType,
+        status: 'generating', // Add status field
         data: JSON.stringify({
           dateFrom: validatedData.dateFrom,
           dateTo: validatedData.dateTo,

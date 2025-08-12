@@ -152,7 +152,7 @@ export const TicketList: React.FC<TicketListProps> = ({
           <p className="text-gray-600">Manage and track support requests</p>
         </div>
         <Link
-          href="/support-tickets/new"
+          href="/superadmin/support-tickets/new"
           className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           <Plus className="w-4 h-4 mr-2" />
@@ -276,7 +276,7 @@ export const TicketList: React.FC<TicketListProps> = ({
             </p>
             {!filters.search && !filters.status && !filters.priority && !filters.category && (
               <Link
-                href="/support-tickets/new"
+                href="/superadmin/support-tickets/new"
                 className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -329,7 +329,7 @@ export const TicketList: React.FC<TicketListProps> = ({
                               <MessageSquare className="w-3 h-3 mr-1" />
                               {ticket?._count?.comments || 0} replies
                             </span>
-                            {ticket?._count?.attachments || 0 > 0 && (
+                            {ticket?._count?.attachments && ticket._count.attachments > 0 && (
                               <span className="flex items-center">
                                 <Paperclip className="w-3 h-3 mr-1" />
                                 {ticket?._count?.attachments || 0} files
@@ -355,20 +355,20 @@ export const TicketList: React.FC<TicketListProps> = ({
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end space-x-2">
-                          <button
-                            onClick={() => onViewTicket?.(ticket)}
+                          <Link
+                            href={`/superadmin/support-tickets/${ticket.id}`}
                             className="text-blue-600 hover:text-blue-900"
                             title="View Details"
                           >
                             <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => onEditTicket?.(ticket)}
+                          </Link>
+                          <Link
+                            href={`/superadmin/support-tickets/${ticket.id}?mode=edit`}
                             className="text-gray-600 hover:text-gray-900"
                             title="Edit Ticket"
                           >
                             <Edit className="w-4 h-4" />
-                          </button>
+                          </Link>
                           <button
                             onClick={() => handleDeleteTicket(ticket)}
                             className="text-red-600 hover:text-red-900"

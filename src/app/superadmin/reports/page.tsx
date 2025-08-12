@@ -46,7 +46,8 @@ export default function ReportsPage() {
     filters.sortBy,
     filters.sortOrder,
     filters.search,
-    filters.type,
+    filters.reportType,
+    filters.status,
     filters.dateFrom,
     filters.dateTo
   ]);
@@ -100,7 +101,7 @@ export default function ReportsPage() {
       }
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig];
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.generating;
     const Icon = config.icon;
 
     return (
@@ -120,6 +121,15 @@ export default function ReportsPage() {
       system_health: 'System Health'
     };
     return typeLabels[type as keyof typeof typeLabels] || type;
+  };
+
+  const getReportFormat = (report: any) => {
+    try {
+      const data = JSON.parse(report.data);
+      return data.format || 'Unknown';
+    } catch {
+      return 'Unknown';
+    }
   };
 
   if (overviewError || reportsError) {
@@ -309,8 +319,11 @@ export default function ReportsPage() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
+                            {getStatusBadge(report.status || 'generating')}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <span className="text-sm text-gray-900 dark:text-white">
-                              {report.type}
+                              {getReportFormat(report)}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">

@@ -42,7 +42,7 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
   };
 
   const handleStatusChange = (value: string) => {
-    onFiltersChange({ status: value as any || undefined });
+    onFiltersChange({ status: value || undefined });
   };
 
   const handleSortByChange = (value: string) => {
@@ -219,12 +219,23 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
                 </button>
               </span>
             )}
-            {filters.type && (
+            {filters.reportType && (
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                Type: {filters.type}
+                Type: {filters.reportType}
                 <button
-                  onClick={() => onFiltersChange({ type: undefined })}
+                  onClick={() => onFiltersChange({ reportType: undefined })}
                   className="ml-1 text-green-600 hover:text-green-800"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {filters.status && (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                Status: {filters.status}
+                <button
+                  onClick={() => onFiltersChange({ status: undefined })}
+                  className="ml-1 text-purple-600 hover:text-purple-800"
                 >
                   <X className="w-3 h-3" />
                 </button>

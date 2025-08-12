@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, Shield } from 'lucide-react';
 import { Role, CreateRoleData, UpdateRoleData } from '@/hooks/useRolesPermissionsAPI';
 import Button from '@/components/ui/button/Button';
-import { Input } from '@/components/form/input/InputField';
+import Input from '@/components/form/input/InputField';
 import TextArea from '@/components/form/input/TextArea';
 
 interface RoleFormProps {

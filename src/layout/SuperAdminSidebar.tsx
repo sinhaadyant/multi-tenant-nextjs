@@ -118,12 +118,6 @@ const superAdminNavElements: NavItem[] = [
     ]
   },
   {
-    id: "support",
-    label: "Support / Logs",
-    icon: "life-ring",
-    path: "/superadmin/support"
-  },
-  {
     id: "profile",
     label: "Profile",
     icon: "user-circle",

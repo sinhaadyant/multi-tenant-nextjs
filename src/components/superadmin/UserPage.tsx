@@ -182,7 +182,7 @@ const UserPage: React.FC = () => {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
+          <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
               User Management
             </h1>
@@ -193,7 +193,7 @@ const UserPage: React.FC = () => {
               }
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             {filters.tenantId && (
               <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                 <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
@@ -248,6 +248,8 @@ const UserPage: React.FC = () => {
               </div>
             </div>
           )}
+          
+          {/* Total Users Card */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-center">
               <div className="p-2 bg-blue-100 rounded-lg dark:bg-blue-900">
@@ -255,13 +257,18 @@ const UserPage: React.FC = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {stats.total}
-                </p>
+                {isLoading ? (
+                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                ) : (
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {stats.total}
+                  </p>
+                )}
               </div>
             </div>
           </div>
 
+          {/* Active Users Card */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-center">
               <div className="p-2 bg-green-100 rounded-lg dark:bg-green-900">
@@ -269,13 +276,18 @@ const UserPage: React.FC = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Users</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {stats.active}
-                </p>
+                {isLoading ? (
+                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                ) : (
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {stats.active}
+                  </p>
+                )}
               </div>
             </div>
           </div>
 
+          {/* Inactive Users Card */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-center">
               <div className="p-2 bg-red-100 rounded-lg dark:bg-red-900">
@@ -283,13 +295,18 @@ const UserPage: React.FC = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Inactive Users</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {stats.inactive}
-                </p>
+                {isLoading ? (
+                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                ) : (
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {stats.inactive}
+                  </p>
+                )}
               </div>
             </div>
           </div>
 
+          {/* Showing Card */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-center">
               <div className="p-2 bg-purple-100 rounded-lg dark:bg-purple-900">
@@ -297,9 +314,13 @@ const UserPage: React.FC = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Showing</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {users.length}
-                </p>
+                {isLoading ? (
+                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                ) : (
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {users.length}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -315,7 +336,7 @@ const UserPage: React.FC = () => {
 
         {/* Results Summary */}
         {users.length > 0 && (
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <div className="text-sm text-gray-700 dark:text-gray-300">
               Showing {users.length} of {pagination.totalRecords} users
               {filters.search && (
@@ -324,7 +345,7 @@ const UserPage: React.FC = () => {
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {filters.status && (
                 <Badge variant="light" color="info">
                   Status: {filters.status === 'active' ? 'Active' : 'Inactive'}

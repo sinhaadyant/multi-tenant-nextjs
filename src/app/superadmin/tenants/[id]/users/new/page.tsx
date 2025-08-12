@@ -15,7 +15,7 @@ interface CreateUserFormData {
   password: string;
   confirmPassword: string;
   contactNumber?: string;
-  roleIds: string[];
+  roleId: string;
   isActive: boolean;
 }
 
@@ -40,7 +40,7 @@ export default function CreateUserPage() {
     password: '',
     confirmPassword: '',
     contactNumber: '',
-    roleIds: [],
+    roleId: '',
     isActive: true
   });
 
@@ -63,7 +63,7 @@ export default function CreateUserPage() {
       try {
         const response = await fetch(`/api/superadmin/tenants/${tenantId}/roles`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')}`,
+            'Authorization': `Bearer ${localStorage.getItem('superadmin_token') || localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')}`,
           },
         });
         if (response.ok) {
@@ -104,8 +104,8 @@ export default function CreateUserPage() {
       errors.push('Passwords do not match');
     }
 
-    if (formData.roleIds.length === 0) {
-      errors.push('At least one role must be selected');
+    if (!formData.roleId) {
+      errors.push('A role must be selected');
     }
 
     return { isValid: errors.length === 0, errors };
@@ -114,7 +114,11 @@ export default function CreateUserPage() {
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    await submitForm();
+  };
 
+  // Submit form data
+  const submitForm = async () => {
     const validation = validateForm();
     if (!validation.isValid) {
       validation.errors.forEach(error => toast.error(error));
@@ -128,14 +132,14 @@ export default function CreateUserPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('superadmin_token') || localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')}`,
         },
         body: JSON.stringify({
           name: formData.name,
           email: formData.email,
           password: formData.password,
           contactNumber: formData.contactNumber || undefined,
-          roleIds: formData.roleIds,
+          roleIds: [formData.roleId],
           isActive: formData.isActive
         }),
       });
@@ -161,12 +165,10 @@ export default function CreateUserPage() {
   };
 
   // Handle role selection
-  const handleRoleToggle = (roleId: string) => {
+  const handleRoleSelect = (roleId: string) => {
     setFormData(prev => ({
       ...prev,
-      roleIds: prev.roleIds.includes(roleId)
-        ? prev.roleIds.filter(id => id !== roleId)
-        : [...prev.roleIds, roleId]
+      roleId: roleId
     }));
   };
 
@@ -252,7 +254,7 @@ export default function CreateUserPage() {
         </div>
         <div className="flex items-center space-x-3">
           <Button
-            onClick={() => handleSubmit}
+            onClick={submitForm}
             disabled={isSubmitting}
             className="bg-blue-600 hover:bg-blue-700 text-white"
           >

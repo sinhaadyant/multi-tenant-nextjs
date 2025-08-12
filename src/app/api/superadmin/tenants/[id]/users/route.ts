@@ -5,11 +5,11 @@ import { withSuperAdminAuth } from '@/lib/authMiddleware';
 import bcrypt from 'bcryptjs';
 import { createAuditLogFromRequest } from '@/lib/audit';
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withSuperAdminAuth(async (req: NextRequest, user: any) => {
     try {
       const { searchParams } = new URL(req.url);
-      const tenantId = params.id;
+      const { id: tenantId } = await params;
 
       // Extract query parameters
       const page = parseInt(searchParams.get('page') || '1');
@@ -135,10 +135,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   })(req);
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withSuperAdminAuth(async (req: NextRequest, user: any) => {
     try {
-      const tenantId = params.id;
+      const { id: tenantId } = await params;
       const body = await req.json();
 
       // Validate required fields

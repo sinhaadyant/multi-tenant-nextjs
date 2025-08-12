@@ -45,12 +45,17 @@ export const GET = asyncHandler(async (req: NextRequest) => {
 
   try {
     // Build the where clause for checking subdomain availability
-    const whereClause: any = { slug: subdomain };
+    let whereClause: any = { slug: subdomain };
     
     // If excludeTenantId is provided, exclude that tenant from the check
     // This allows a tenant to keep its own subdomain when editing
     if (excludeTenantId) {
-      whereClause.NOT = { id: excludeTenantId };
+      whereClause = {
+        AND: [
+          { slug: subdomain },
+          { NOT: { id: excludeTenantId } }
+        ]
+      };
     }
 
     // Check if subdomain already exists (excluding the current tenant if editing)

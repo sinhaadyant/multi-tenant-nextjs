@@ -121,7 +121,7 @@ export interface ReplyData {
 // Fetch support tickets list
 export const useSupportTickets = (filters: SupportTicketsFilters = {}) => {
   return useQuery({
-    queryKey: ['support-tickets', filters],
+    queryKey: ['superadmin-support-tickets', filters],
     queryFn: async (): Promise<SupportTicketsResponse> => {
       const params = new URLSearchParams();
       
@@ -131,8 +131,8 @@ export const useSupportTickets = (filters: SupportTicketsFilters = {}) => {
         }
       });
 
-      const response = await api.get(`/support-tickets?${params.toString()}`);
-      return response.data?.data;
+      const response = await api.get(`/superadmin/support-tickets?${params.toString()}`);
+      return response.data;
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
@@ -141,9 +141,9 @@ export const useSupportTickets = (filters: SupportTicketsFilters = {}) => {
 // Fetch single support ticket
 export const useSupportTicket = (id: string) => {
   return useQuery({
-    queryKey: ['support-ticket', id],
+    queryKey: ['superadmin-support-ticket', id],
     queryFn: async (): Promise<{ ticket: SupportTicket }> => {
-      const response = await api.get(`/support-tickets/${id}`);
+      const response = await api.get(`/superadmin/support-tickets/${id}`);
       return response.data;
     },
     enabled: !!id,
@@ -157,11 +157,11 @@ export const useCreateSupportTicket = () => {
   
   return useMutation({
     mutationFn: async (data: CreateTicketData): Promise<{ message: string; ticket: SupportTicket }> => {
-      const response = await api.post('/support-tickets', data);
+      const response = await api.post('/superadmin/support-tickets', data);
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['support-tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['superadmin-support-tickets'] });
     },
   });
 };
@@ -172,12 +172,12 @@ export const useUpdateSupportTicket = () => {
   
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateTicketData }): Promise<{ message: string; ticket: SupportTicket }> => {
-      const response = await api.put(`/support-tickets/${id}`, data);
+      const response = await api.put(`/superadmin/support-tickets/${id}`, data);
       return response.data;
     },
     onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: ['support-tickets'] });
-      queryClient.invalidateQueries({ queryKey: ['support-ticket', id] });
+      queryClient.invalidateQueries({ queryKey: ['superadmin-support-tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['superadmin-support-ticket', id] });
     },
   });
 };
@@ -188,11 +188,11 @@ export const useDeleteSupportTicket = () => {
   
   return useMutation({
     mutationFn: async (id: string): Promise<{ message: string }> => {
-      const response = await api.delete(`/support-tickets/${id}`);
+      const response = await api.delete(`/superadmin/support-tickets/${id}`);
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['support-tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['superadmin-support-tickets'] });
     },
   });
 };
@@ -203,12 +203,12 @@ export const useAddReply = () => {
   
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: ReplyData }): Promise<{ message: string; comment: SupportTicketComment }> => {
-      const response = await api.post(`/support-tickets/${id}/reply`, data);
+      const response = await api.post(`/superadmin/support-tickets/${id}/comments`, data);
       return response.data;
     },
     onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: ['support-ticket', id] });
-      queryClient.invalidateQueries({ queryKey: ['support-tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['superadmin-support-ticket', id] });
+      queryClient.invalidateQueries({ queryKey: ['superadmin-support-tickets'] });
     },
   });
 }; 

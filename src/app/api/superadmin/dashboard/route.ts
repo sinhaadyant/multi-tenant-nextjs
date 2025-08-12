@@ -158,8 +158,14 @@ async function getDashboardData(range: string): Promise<DashboardData> {
     case '30d':
       startDate.setDate(now.getDate() - 30);
       break;
+    case '60d':
+      startDate.setDate(now.getDate() - 60);
+      break;
     case '90d':
       startDate.setDate(now.getDate() - 90);
+      break;
+    case 'all':
+      startDate = new Date(0); // Beginning of time
       break;
     default:
       startDate.setDate(now.getDate() - 7);
@@ -207,7 +213,9 @@ async function getDashboardData(range: string): Promise<DashboardData> {
       case '1d': return 'hour';
       case '7d': return 'day';
       case '30d': return 'day';
+      case '60d': return 'week';
       case '90d': return 'week';
+      case 'all': return 'month';
       default: return 'day';
     }
   };
@@ -369,11 +377,112 @@ async function getDashboardData(range: string): Promise<DashboardData> {
   const totalUsers = userStats.reduce((sum, stat) => sum + (stat._count?.id || 0), 0);
   const activeUsers = userStats.find(stat => stat.isActive)?._count?.id || 0;
 
-  // Mock growth metrics (replace with actual calculations)
+  // Calculate real growth metrics by comparing with previous period
+  let previousStartDate: Date;
+  let previousEndDate: Date;
+  
+  if (range === 'all') {
+    // For 'all' range, compare with the last 30 days vs the 30 days before that
+    previousEndDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    previousStartDate = new Date(previousEndDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+  } else {
+    // Calculate previous period (same duration as current period)
+    previousStartDate = new Date(startDate);
+    previousEndDate = new Date(startDate);
+    const currentPeriodDays = Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    previousStartDate.setDate(previousStartDate.getDate() - currentPeriodDays);
+    previousEndDate.setDate(previousEndDate.getDate() - currentPeriodDays);
+  }
+
+  // Get previous period data
+  const [
+    previousTenantStats,
+    previousUserStats,
+  ] = await Promise.all([
+    // Previous tenant statistics
+    prisma.tenant.groupBy({
+      by: ['isActive'],
+      _count: {
+        id: true,
+      },
+      where: {
+        createdAt: {
+          gte: previousStartDate,
+          lt: previousEndDate,
+        },
+      },
+    }),
+
+    // Previous user statistics
+    prisma.user.groupBy({
+      by: ['isActive'],
+      _count: {
+        id: true,
+      },
+      where: {
+        createdAt: {
+          gte: previousStartDate,
+          lt: previousEndDate,
+        },
+      },
+    }),
+  ]);
+
+  // Calculate current period totals
+  let currentTenants: number;
+  let currentUsers: number;
+  
+  if (range === 'all') {
+    // For 'all' range, use the last 30 days as current period
+    const currentPeriodEnd = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const currentPeriodStart = new Date(0);
+    
+    const [currentTenantStats, currentUserStats] = await Promise.all([
+      prisma.tenant.groupBy({
+        by: ['isActive'],
+        _count: {
+          id: true,
+        },
+        where: {
+          createdAt: {
+            gte: currentPeriodEnd,
+          },
+        },
+      }),
+      prisma.user.groupBy({
+        by: ['isActive'],
+        _count: {
+          id: true,
+        },
+        where: {
+          createdAt: {
+            gte: currentPeriodEnd,
+          },
+        },
+      }),
+    ]);
+    
+    currentTenants = currentTenantStats.reduce((sum, stat) => sum + (stat._count?.id || 0), 0);
+    currentUsers = currentUserStats.reduce((sum, stat) => sum + (stat._count?.id || 0), 0);
+  } else {
+    currentTenants = totalTenants;
+    currentUsers = totalUsers;
+  }
+
+  // Calculate previous period totals
+  const previousTenants = previousTenantStats.reduce((sum, stat) => sum + (stat._count?.id || 0), 0);
+  const previousUsers = previousUserStats.reduce((sum, stat) => sum + (stat._count?.id || 0), 0);
+
+  // Calculate growth percentages
+  const calculateGrowth = (current: number, previous: number): number => {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return Math.round(((current - previous) / previous) * 100 * 10) / 10; // Round to 1 decimal place
+  };
+
   const growthMetrics = {
-    tenantGrowth: 12.5,
-    userGrowth: 15.2,
-    revenueGrowth: 8.7,
+    tenantGrowth: calculateGrowth(currentTenants, previousTenants),
+    userGrowth: calculateGrowth(currentUsers, previousUsers),
+    revenueGrowth: 8.7, // Keep mock for now as revenue data isn't available
   };
 
   // Mock system health data (replace with actual system monitoring)

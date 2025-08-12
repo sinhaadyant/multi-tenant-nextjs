@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Download, Database, Users, Building2, FileText, Clock, CheckCircle, AlertCircle, History, Trash2, Calendar, RefreshCw } from 'lucide-react';
 import { useBackupData, useBackupHistory, useDeleteBackup } from '@/hooks/useBackupData';
 import Button from '@/components/ui/button/Button';
@@ -16,9 +16,9 @@ export default function BackupPage() {
     excludeSensitiveData: true
   });
 
-  const { mutate: createBackup, isLoading: isCreatingBackup, error } = useBackupData();
+  const { mutate: createBackup, isPending: isCreatingBackup, error } = useBackupData();
   const { data: backupHistory, isLoading: isLoadingHistory, error: historyError, refetch } = useBackupHistory();
-  const { mutate: deleteBackup, isLoading: isDeleting } = useDeleteBackup();
+  const { mutate: deleteBackup, isPending: isDeleting } = useDeleteBackup();
 
   const backups = backupHistory?.backups || [];
 
@@ -70,6 +70,31 @@ export default function BackupPage() {
     }
   };
 
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'failed':
+        return <AlertCircle className="h-4 w-4" />;
+      case 'processing':
+        return <Clock className="h-4 w-4" />;
+      default:
+        return <Clock className="h-4 w-4" />;
+    }
+  };
+
+  // Auto-refresh the backup list when a backup is being created
+  useEffect(() => {
+    if (isCreatingBackup) {
+      // Start polling for updates every 2 seconds while backup is being created
+      const interval = setInterval(() => {
+        refetch();
+      }, 2000);
+
+      return () => clearInterval(interval);
+    }
+  }, [isCreatingBackup, refetch]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -87,9 +112,9 @@ export default function BackupPage() {
             variant="outline"
             size="sm"
             onClick={() => refetch()}
-            disabled={isLoadingHistory}
+            disabled={isLoadingHistory || isCreatingBackup}
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingHistory ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingHistory || isCreatingBackup ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
           <Button
@@ -158,196 +183,6 @@ export default function BackupPage() {
                 {isLoadingHistory ? '...' : backups.filter(b => b.status === 'completed').length}
               </p>
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Backup Options */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Backup Configuration */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center mb-4">
-            <Database className="h-6 w-6 text-blue-600 mr-3" />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Backup Configuration
-            </h2>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <Building2 className="h-5 w-5 text-gray-500 mr-3" />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Tenants Data
-                </span>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={backupOptions.includeTenants}
-                  onChange={() => handleOptionChange('includeTenants')}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-              </label>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <Users className="h-5 w-5 text-gray-500 mr-3" />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Users Data
-                </span>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={backupOptions.includeUsers}
-                  onChange={() => handleOptionChange('includeUsers')}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-              </label>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <FileText className="h-5 w-5 text-gray-500 mr-3" />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Support Tickets
-                </span>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={backupOptions.includeSupportTickets}
-                  onChange={() => handleOptionChange('includeSupportTickets')}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-              </label>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <Clock className="h-5 w-5 text-gray-500 mr-3" />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Audit Logs
-                </span>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={backupOptions.includeAuditLogs}
-                  onChange={() => handleOptionChange('includeAuditLogs')}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-              </label>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <CheckCircle className="h-5 w-5 text-gray-500 mr-3" />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  System Settings
-                </span>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={backupOptions.includeSystemSettings}
-                  onChange={() => handleOptionChange('includeSystemSettings')}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-              </label>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <AlertCircle className="h-5 w-5 text-gray-500 mr-3" />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Exclude Sensitive Data
-                </span>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={backupOptions.excludeSensitiveData}
-                  onChange={() => handleOptionChange('excludeSensitiveData')}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        {/* Backup Actions */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center mb-4">
-            <Download className="h-6 w-6 text-green-600 mr-3" />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Create Backup
-            </h2>
-          </div>
-
-          <div className="space-y-4">
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <Database className="h-5 w-5 text-blue-400" />
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                    Backup Information
-                  </h3>
-                  <div className="mt-2 text-sm text-blue-700 dark:text-blue-300">
-                    <p>• Backup will be downloaded as a SQL file</p>
-                    <p>• File will contain all selected data types</p>
-                    <p>• Backup is encrypted and secure</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <Button
-              onClick={handleBackup}
-              disabled={isCreatingBackup}
-              className="w-full"
-              size="md"
-            >
-              {isCreatingBackup ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Creating Backup...
-                </>
-              ) : (
-                <>
-                  <Download className="w-4 h-4 mr-2" />
-                  Create Backup
-                </>
-              )}
-            </Button>
-
-            {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <AlertCircle className="h-5 w-5 text-red-400" />
-                  </div>
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
-                      Backup Failed
-                    </h3>
-                    <div className="mt-2 text-sm text-red-700 dark:text-red-300">
-                      {error instanceof Error ? error.message : 'An unexpected error occurred'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -426,7 +261,8 @@ export default function BackupPage() {
                           {backup.filename}
                         </h3>
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(backup.status)}`}>
-                          {backup.status}
+                          {getStatusIcon(backup.status)}
+                          <span className="ml-1">{backup.status}</span>
                         </span>
                       </div>
                       <div className="flex items-center space-x-4 mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -455,6 +291,7 @@ export default function BackupPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => window.open(`/api/superadmin/backup/${backup.id}/download`, '_blank')}
+                      disabled={backup.status !== 'completed'}
                     >
                       <Download className="h-4 w-4 mr-1" />
                       Download
@@ -474,6 +311,202 @@ export default function BackupPage() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Backup Options */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Backup Configuration */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center mb-4">
+            <Database className="h-6 w-6 text-blue-600 mr-3" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Backup Configuration
+            </h2>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Building2 className="h-5 w-5 text-gray-500 mr-3" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Tenants Data
+                </span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={backupOptions.includeTenants}
+                  onChange={() => handleOptionChange('includeTenants')}
+                  className="sr-only peer"
+                  disabled={isCreatingBackup}
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Users className="h-5 w-5 text-gray-500 mr-3" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Users Data
+                </span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={backupOptions.includeUsers}
+                  onChange={() => handleOptionChange('includeUsers')}
+                  className="sr-only peer"
+                  disabled={isCreatingBackup}
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <FileText className="h-5 w-5 text-gray-500 mr-3" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Support Tickets
+                </span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={backupOptions.includeSupportTickets}
+                  onChange={() => handleOptionChange('includeSupportTickets')}
+                  className="sr-only peer"
+                  disabled={isCreatingBackup}
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Clock className="h-5 w-5 text-gray-500 mr-3" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Audit Logs
+                </span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={backupOptions.includeAuditLogs}
+                  onChange={() => handleOptionChange('includeAuditLogs')}
+                  className="sr-only peer"
+                  disabled={isCreatingBackup}
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <CheckCircle className="h-5 w-5 text-gray-500 mr-3" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  System Settings
+                </span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={backupOptions.includeSystemSettings}
+                  onChange={() => handleOptionChange('includeSystemSettings')}
+                  className="sr-only peer"
+                  disabled={isCreatingBackup}
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <AlertCircle className="h-5 w-5 text-gray-500 mr-3" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Exclude Sensitive Data
+                </span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={backupOptions.excludeSensitiveData}
+                  onChange={() => handleOptionChange('excludeSensitiveData')}
+                  className="sr-only peer"
+                  disabled={isCreatingBackup}
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Backup Actions */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center mb-4">
+            <Download className="h-6 w-6 text-green-600 mr-3" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Create Backup
+            </h2>
+          </div>
+
+          <div className="space-y-4">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <Database className="h-5 w-5 text-blue-400" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                    Backup Information
+                  </h3>
+                  <div className="mt-2 text-sm text-blue-700 dark:text-blue-300">
+                    <p>• Backup will be downloaded as a SQL file</p>
+                    <p>• File will contain all selected data types</p>
+                    <p>• Backup is encrypted and secure</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <Button
+              onClick={handleBackup}
+              disabled={isCreatingBackup}
+              className="w-full"
+              size="md"
+            >
+              {isCreatingBackup ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Generating Backup...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 mr-2" />
+                  Create Backup
+                </>
+              )}
+            </Button>
+
+            {error && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <AlertCircle className="h-5 w-5 text-red-400" />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
+                      Backup Failed
+                    </h3>
+                    <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+                      {error instanceof Error ? error.message : 'An unexpected error occurred'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
