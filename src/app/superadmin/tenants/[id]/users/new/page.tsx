@@ -417,11 +417,11 @@ export default function CreateUserPage() {
                 <div
                   key={role.id}
                   className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                    formData.roleIds.includes(role.id)
+                    formData.roleId === role.id
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                       : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                   }`}
-                  onClick={() => handleRoleToggle(role.id)}
+                  onClick={() => handleRoleSelect(role.id)}
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -431,11 +431,11 @@ export default function CreateUserPage() {
                       )}
                     </div>
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                      formData.roleIds.includes(role.id)
+                      formData.roleId === role.id
                         ? 'border-blue-500 bg-blue-500'
                         : 'border-gray-300 dark:border-gray-600'
                     }`}>
-                      {formData.roleIds.includes(role.id) && (
+                      {formData.roleId === role.id && (
                         <Check className="w-3 h-3 text-white" />
                       )}
                     </div>

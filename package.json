@@ -55,7 +55,9 @@
     "test:tenant-fix-errors": "node scripts/fix-tenant-console-errors.js",
     "test:tenant-e2e": "node scripts/run-tenant-e2e-tests.js",
     "test:tenant-setup": "npm run test:tenant-add-ids && npm run test:tenant-module-comprehensive",
-    "test:tenant-full": "npm run test:tenant-fix-errors && npm run test:tenant-add-ids && npm run test:tenant-module-comprehensive"
+    "test:tenant-full": "npm run test:tenant-fix-errors && npm run test:tenant-add-ids && npm run test:tenant-module-comprehensive",
+    "migrate:roles": "tsx scripts/migrate-role-system.ts",
+    "clear-and-reseed": "tsx scripts/clear-and-reseed.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.30.0",

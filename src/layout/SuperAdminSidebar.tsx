@@ -65,7 +65,8 @@ const superAdminNavElements: NavItem[] = [
     label: "Roles & Permissions",
     icon: "shield",
     children: [
-      { id: "rolesManagement", label: "Roles Management", path: "/superadmin/roles" },
+      { id: "globalRoles", label: "Global Roles", path: "/superadmin/global-roles" },
+      { id: "rolesManagement", label: "Tenant Roles", path: "/superadmin/roles" },
       { id: "permissionGroups", label: "Permission Groups", path: "/superadmin/roles?tab=permissions" },
       { id: "roleAssignment", label: "Role Assignment", path: "/superadmin/roles?tab=assignment" }
     ]

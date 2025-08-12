@@ -45,6 +45,8 @@ model Tenant {
   notifications     Notification[]
   reports           Report[]
   roles             Role[]
+  roleOverrides     TenantRoleOverride[]
+  rolePermissions   RolePermission[]
   supportTickets    SupportTicket[]
   tenantModules     TenantModule[]
   userNotifications UserNotification[]
@@ -89,14 +91,21 @@ model Role {
   createdBy   String?
   isSystem    Boolean          @default(false)
   priority    Int              @default(0)
+  scope       String           @default("TENANT") // GLOBAL or TENANT
+  roleScope   String           @default("tenant") // global or tenant
+  tenantIdNew String?          // New tenant_id field for role scope
   permissions RolePermission[]
+  tenantOverrides TenantRoleOverride[]
   tenant      Tenant?          @relation(fields: [tenantId], references: [id])
   userRoles   UserRole[]
 
-  @@unique([name, tenantId])
+  @@unique([name, tenantIdNew])
   @@index([tenantId], map: "roles_tenantId_fkey")
+  @@index([tenantIdNew], map: "roles_tenant_id_fkey")
   @@index([isActive])
   @@index([isTemplate])
+  @@index([scope])
+  @@index([roleScope], map: "roles_role_scope_fkey")
   @@map("roles")
 }
 
@@ -156,7 +165,7 @@ model Permission {
   id              String           @id @default(cuid())
   name            String           @unique
   description     String?
-  action          String
+  action          String           // view, create, edit, delete, export
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   isActive        Boolean          @default(true)
@@ -167,6 +176,7 @@ model Permission {
   resource        String?
   module          Module           @relation(fields: [moduleKey], references: [moduleKey])
   rolePermissions RolePermission[]
+  tenantOverrides TenantRoleOverride[]
 
   @@unique([moduleKey, action, resource])
   @@index([action])
@@ -178,12 +188,39 @@ model RolePermission {
   id           String     @id @default(cuid())
   roleId       String
   permissionId String
+  tenantId     String?
+  isAllowed    Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
   role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  tenant       Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@unique([roleId, permissionId])
+  @@unique([roleId, permissionId, tenantId])
   @@index([permissionId], map: "role_permissions_permissionId_fkey")
+  @@index([tenantId], map: "role_permissions_tenantId_fkey")
+  @@index([isAllowed], map: "role_permissions_isAllowed_fkey")
   @@map("role_permissions")
+}
+
+model TenantRoleOverride {
+  id           String     @id @default(cuid())
+  tenantId     String
+  roleId       String
+  permissionId String
+  isGranted    Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  createdBy    String?
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, roleId, permissionId])
+  @@index([tenantId], map: "tenant_role_overrides_tenantId_fkey")
+  @@index([roleId], map: "tenant_role_overrides_roleId_fkey")
+  @@index([permissionId], map: "tenant_role_overrides_permissionId_fkey")
+  @@map("tenant_role_overrides")
 }
 
 model UserRole {
