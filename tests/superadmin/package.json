@@ -1,0 +1,41 @@
+{
+  "name": "superadmin-test-suite",
+  "version": "1.0.0",
+  "description": "Comprehensive test suite for SuperAdmin modules including authentication, roles, tenants, users, audit logs, and dashboard",
+  "main": "run-all-tests.js",
+  "scripts": {
+    "test": "mocha --timeout 30000 --reporter spec tests/superadmin/**/*.test.js",
+    "test:auth": "mocha --timeout 30000 --reporter spec tests/superadmin/auth.test.js",
+    "test:roles": "mocha --timeout 30000 --reporter spec tests/superadmin/roles.test.js",
+    "test:tenants": "mocha --timeout 30000 --reporter spec tests/superadmin/tenants.test.js",
+    "test:users": "mocha --timeout 30000 --reporter spec tests/superadmin/users.test.js",
+    "test:audit-logs": "mocha --timeout 30000 --reporter spec tests/superadmin/audit-logs.test.js",
+    "test:dashboard": "mocha --timeout 30000 --reporter spec tests/superadmin/dashboard.test.js",
+    "test:integration": "mocha --timeout 30000 --reporter spec tests/superadmin/run-all-tests.js",
+    "test:watch": "mocha --timeout 30000 --reporter spec --watch tests/superadmin/**/*.test.js",
+    "test:coverage": "nyc mocha --timeout 30000 --reporter spec tests/superadmin/**/*.test.js"
+  },
+  "keywords": [
+    "testing",
+    "superadmin",
+    "api",
+    "authentication",
+    "roles",
+    "tenants",
+    "users",
+    "audit-logs",
+    "dashboard"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "mocha": "^10.2.0",
+    "chai": "^4.3.7",
+    "axios": "^1.6.0",
+    "nyc": "^15.1.0"
+  },
+  "dependencies": {},
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

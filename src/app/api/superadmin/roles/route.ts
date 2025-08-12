@@ -1,178 +1,191 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireSuperAdmin } from '@/middleware/auth';
-import { asyncHandler } from '@/lib/errorHandler';
-import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-import { createAuditLogFromRequest } from '@/lib/audit';
+import { z } from 'zod';
 
-// GET /api/superadmin/roles - Get all roles (for tenant management)
-export const GET = asyncHandler(async (req: NextRequest) => {
-  const authResult = await requireSuperAdmin(req);
-  if (authResult instanceof NextResponse) {
-    return authResult;
-  }
+// Validation schemas
+const createGlobalRoleSchema = z.object({
+  name: z.string().min(1, 'Role name is required').max(100, 'Role name must be less than 100 characters'),
+  description: z.string().max(500, 'Description must be less than 500 characters').optional(),
+  permissions: z.array(z.object({
+    module_id: z.string(),
+    actions: z.array(z.string())
+  })).optional(),
+  color: z.string().optional(),
+  priority: z.number().int().min(0).max(100).default(0),
+  isDefault: z.boolean().default(false),
+  isTemplate: z.boolean().default(false)
+});
 
-  const { searchParams } = new URL(req.url);
-  const tenantId = searchParams.get('tenantId');
-  const search = searchParams.get('search');
-  const status = searchParams.get('status');
-  const sortBy = searchParams.get('sortBy') || 'createdAt';
-  const sortOrder = searchParams.get('sortOrder') || 'desc';
-  const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '10');
-  const offset = (page - 1) * limit;
-
+// GET /api/superadmin/roles - List all global roles
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+    const search = searchParams.get('search') || '';
+    const status = searchParams.get('status') || 'all';
+    const sortBy = searchParams.get('sortBy') || 'createdAt';
+    const sortOrder = searchParams.get('sortOrder') || 'desc';
+
+    const skip = (page - 1) * limit;
+
     // Build where clause
-    const where: any = {};
-    
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
-    
+    const where: any = {
+      roleScope: 'global',
+      tenantId: null
+    };
+
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } }
       ];
     }
-    
-    if (status && status !== 'all') {
+
+    if (status !== 'all') {
       where.isActive = status === 'active';
     }
 
-    // Build orderBy clause
+    // Build order by clause
     const orderBy: any = {};
     orderBy[sortBy] = sortOrder;
 
-    const roles = await prisma.role.findMany({
-      where,
-      include: {
-        permissions: {
-          include: {
-            permission: true
+    // Fetch roles with user count
+    const [roles, totalCount] = await Promise.all([
+      prisma.role.findMany({
+        where,
+        include: {
+          userRoles: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  tenantId: true
+                }
+              }
+            }
           }
         },
-        _count: {
-          select: { userRoles: true }
-        }
-      },
-      orderBy,
-      skip: offset,
-      take: limit
-    });
+        orderBy,
+        skip,
+        take: limit
+      }),
+      prisma.role.count({ where })
+    ]);
 
-    // Get total count for pagination
-    const totalRoles = await prisma.role.count({ where });
-    const totalPages = Math.ceil(totalRoles / limit);
-
-    // Transform the data to match the expected format
+    // Transform data for response
     const transformedRoles = roles.map(role => ({
       id: role.id,
       name: role.name,
       description: role.description,
-      isGlobal: role.isGlobal,
+      roleScope: role.roleScope,
       isActive: role.isActive,
-      createdAt: role.createdAt.toISOString(),
-      updatedAt: role.updatedAt.toISOString(),
-      userCount: role._count.userRoles,
-      permissions: role.permissions.map(rp => ({
-        id: rp.permission.id,
-        name: rp.permission.name,
-        description: rp.permission.description,
-        module: rp.permission.module,
-        action: rp.permission.action
+      isDefault: role.isDefault,
+      isTemplate: role.isTemplate,
+      isSystem: role.isSystem,
+      color: role.color,
+      priority: role.priority,
+      createdAt: role.createdAt,
+      updatedAt: role.updatedAt,
+      userCount: role.userRoles.length,
+      assignedUsers: role.userRoles.map(ur => ({
+        id: ur.user.id,
+        name: ur.user.name,
+        email: ur.user.email,
+        tenantId: ur.user.tenantId
       }))
     }));
 
-    await createAuditLogFromRequest(req, authResult, 'role.list', {
-      rolesCount: transformedRoles.length,
-      tenantId,
-      filters: { search, status, sortBy, sortOrder, page, limit }
+    return NextResponse.json({
+      success: true,
+      data: {
+        roles: transformedRoles,
+        pagination: {
+          page,
+          limit,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limit)
+        }
+      }
     });
 
-    return createSuccessResponse({ 
-      roles: transformedRoles,
-      pagination: {
-        page,
-        limit,
-        totalRoles,
-        totalPages,
-        hasNext: page < totalPages,
-        hasPrev: page > 1
-      }
-    }, 'Roles retrieved successfully');
   } catch (error) {
-    console.error('Error fetching roles:', error);
-    throw error;
+    console.error('Error fetching global roles:', error);
+    return NextResponse.json(
+      { success: false, message: 'Failed to fetch global roles' },
+      { status: 500 }
+    );
   }
-});
+}
 
-// POST /api/superadmin/roles - Create new role (for tenant management)
-export const POST = asyncHandler(async (req: NextRequest) => {
-  const authResult = await requireSuperAdmin(req);
-  if (authResult instanceof NextResponse) {
-    return authResult;
-  }
-
-  const { name, description, isTemplate = false, permissions = [], tenantId } = await req.json();
-
-  // Validation
-  if (!name || name.trim().length === 0) {
-    return createErrorResponse('Role name is required', 400, [
-      { field: 'name', message: 'Role name is required' }
-    ]);
-  }
-
-  if (name.trim().length < 3) {
-    return createErrorResponse('Role name must be at least 3 characters', 400, [
-      { field: 'name', message: 'Role name must be at least 3 characters' }
-    ]);
-  }
-
-  if (name.trim().length > 50) {
-    return createErrorResponse('Role name must be less than 50 characters', 400, [
-      { field: 'name', message: 'Role name must be less than 50 characters' }
-    ]);
-  }
-
+// POST /api/superadmin/roles - Create global role
+export async function POST(request: NextRequest) {
   try {
-    // Check for duplicate role name within the same tenant
+    const body = await request.json();
+    const validatedData = createGlobalRoleSchema.parse(body);
+
+    // Check if role name already exists globally
     const existingRole = await prisma.role.findFirst({
-      where: { 
-        name: name.trim(),
-        tenantId: tenantId || null
+      where: {
+        name: validatedData.name,
+        roleScope: 'global',
+        tenantId: null
       }
     });
 
     if (existingRole) {
-      return createErrorResponse('Role name already exists', 409, [
-        { field: 'name', message: 'Role name already exists' }
-      ]);
+      return NextResponse.json(
+        { success: false, message: 'Role name already exists globally' },
+        { status: 400 }
+      );
     }
 
-    // Create role with permissions in a transaction
+    // Create role and permissions in a transaction
     const result = await prisma.$transaction(async (tx) => {
+      // Create the role
       const role = await tx.role.create({
         data: {
-          name: name.trim(),
-          description: description?.trim() || null,
-          isTemplate,
-          isActive: true,
-          tenantId: tenantId || null
+          name: validatedData.name,
+          description: validatedData.description,
+          roleScope: 'global',
+          tenantId: null,
+          color: validatedData.color,
+          priority: validatedData.priority,
+          isDefault: validatedData.isDefault,
+          isTemplate: validatedData.isTemplate,
+          isSystem: false,
+          createdBy: 'superadmin' // You might want to get this from auth context
         }
       });
 
       // Assign permissions if provided
-      if (permissions && permissions.length > 0) {
-        const rolePermissions = permissions.map((permissionId: string) => ({
-          roleId: role.id,
-          permissionId
-        }));
+      if (validatedData.permissions && validatedData.permissions.length > 0) {
+        for (const perm of validatedData.permissions) {
+          // Find or create permissions for this module and actions
+          const permissions = await tx.permission.findMany({
+            where: {
+              moduleKey: perm.module_id,
+              action: { in: perm.actions },
+              isActive: true
+            }
+          });
 
-        await tx.rolePermission.createMany({
-          data: rolePermissions
-        });
+          // Create role permissions
+          const rolePermissions = permissions.map(permission => ({
+            roleId: role.id,
+            permissionId: permission.id,
+            tenantId: null, // Global permissions
+            isAllowed: true
+          }));
+
+          if (rolePermissions.length > 0) {
+            await tx.rolePermission.createMany({
+              data: rolePermissions
+            });
+          }
+        }
       }
 
       return role;
@@ -182,50 +195,54 @@ export const POST = asyncHandler(async (req: NextRequest) => {
     const createdRole = await prisma.role.findUnique({
       where: { id: result.id },
       include: {
-        permissions: {
+        userRoles: {
           include: {
-            permission: true
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                tenantId: true
+              }
+            }
           }
-        },
-        _count: {
-          select: { userRoles: true }
         }
       }
     });
 
-    if (!createdRole) {
-      throw new Error('Failed to fetch created role');
-    }
-
-    // Transform the data
-    const transformedRole = {
-      id: createdRole.id,
-      name: createdRole.name,
-      description: createdRole.description,
-      isGlobal: createdRole.isGlobal,
-      isActive: createdRole.isActive,
-      createdAt: createdRole.createdAt.toISOString(),
-      updatedAt: createdRole.updatedAt.toISOString(),
-      userCount: createdRole._count.userRoles,
-      permissions: createdRole.permissions.map(rp => ({
-        id: rp.permission.id,
-        name: rp.permission.name,
-        description: rp.permission.description,
-        module: rp.permission.module,
-        action: rp.permission.action
-      }))
-    };
-
-    await createAuditLogFromRequest(req, authResult, 'role.create', {
-      roleId: result.id,
-      roleName: result.name,
-      permissionsCount: permissions.length,
-      isTemplate: result.isTemplate
+    return NextResponse.json({
+      success: true,
+      message: 'Global role created successfully',
+      data: {
+        role: {
+          id: createdRole!.id,
+          name: createdRole!.name,
+          description: createdRole!.description,
+          roleScope: createdRole!.roleScope,
+          isActive: createdRole!.isActive,
+          isDefault: createdRole!.isDefault,
+          isTemplate: createdRole!.isTemplate,
+          color: createdRole!.color,
+          priority: createdRole!.priority,
+          createdAt: createdRole!.createdAt,
+          updatedAt: createdRole!.updatedAt,
+          userCount: createdRole!.userRoles.length
+        }
+      }
     });
 
-    return createSuccessResponse({ role: transformedRole }, 'Role created successfully', 201);
   } catch (error) {
-    console.error('Error creating role:', error);
-    throw error;
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { success: false, message: 'Validation error', errors: error.errors },
+        { status: 400 }
+      );
+    }
+
+    console.error('Error creating global role:', error);
+    return NextResponse.json(
+      { success: false, message: 'Failed to create global role' },
+      { status: 500 }
+    );
   }
-}); 
+} 

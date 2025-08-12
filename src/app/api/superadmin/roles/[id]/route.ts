@@ -1,29 +1,205 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireSuperAdmin } from '@/middleware/auth';
-import { createAuditLogFromRequest } from '@/lib/audit';
-import { asyncHandler } from '@/lib/errorHandler';
-import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
+import { z } from 'zod';
 
-// GET /api/superadmin/roles/[id] - Get a single role
-export const GET = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
-  if (process.env.NODE_ENV === 'development') {
-    console.log('👥 Fetching role:', params.id);
-  }
+// Validation schema for updating global role
+const updateGlobalRoleSchema = z.object({
+  name: z.string().min(1, 'Role name is required').max(100, 'Role name must be less than 100 characters').optional(),
+  description: z.string().max(500, 'Description must be less than 500 characters').optional(),
+  permissions: z.array(z.string()).optional(),
+  color: z.string().optional(),
+  priority: z.number().int().min(0).max(100).optional(),
+  isDefault: z.boolean().optional(),
+  isTemplate: z.boolean().optional(),
+  isActive: z.boolean().optional()
+});
 
-  // Authenticate SuperAdmin
-  const authResult = await requireSuperAdmin(req);
-  if (authResult instanceof NextResponse) {
-    return authResult;
-  }
-
+// GET /api/superadmin/roles/[id] - Get specific global role
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
-    const role = await prisma.role.findUnique({
-      where: { id: params.id },
+    const roleId = params.id;
+
+    const role = await prisma.role.findFirst({
+      where: {
+        id: roleId,
+        roleScope: 'global',
+        tenantIdNew: null
+      },
       include: {
-        _count: {
-          select: { userRoles: true }
+        permissions: {
+          include: {
+            permission: true
+          }
         },
+        userRoles: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                tenantId: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!role) {
+      return NextResponse.json(
+        { success: false, message: 'Global role not found' },
+        { status: 404 }
+      );
+    }
+
+    const transformedRole = {
+      id: role.id,
+      name: role.name,
+      description: role.description,
+      roleScope: role.roleScope,
+      isActive: role.isActive,
+      isDefault: role.isDefault,
+      isTemplate: role.isTemplate,
+      isSystem: role.isSystem,
+      color: role.color,
+      priority: role.priority,
+      createdAt: role.createdAt,
+      updatedAt: role.updatedAt,
+      permissions: role.permissions.map(rp => ({
+        id: rp.permission.id,
+        name: rp.permission.name,
+        action: rp.permission.action,
+        moduleKey: rp.permission.moduleKey,
+        isAllowed: rp.isAllowed
+      })),
+      users: role.userRoles.map(ur => ({
+        id: ur.user.id,
+        name: ur.user.name,
+        email: ur.user.email,
+        tenantId: ur.user.tenantId
+      })),
+      userCount: role.userRoles.length
+    };
+
+    return NextResponse.json({
+      success: true,
+      data: { role: transformedRole }
+    });
+
+  } catch (error) {
+    console.error('Error fetching global role:', error);
+    return NextResponse.json(
+      { success: false, message: 'Failed to fetch global role' },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT /api/superadmin/roles/[id] - Update global role
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const roleId = params.id;
+    const body = await request.json();
+    const validatedData = updateGlobalRoleSchema.parse(body);
+
+    // Check if role exists and is global
+    const existingRole = await prisma.role.findFirst({
+      where: {
+        id: roleId,
+        roleScope: 'global',
+        tenantIdNew: null
+      }
+    });
+
+    if (!existingRole) {
+      return NextResponse.json(
+        { success: false, message: 'Global role not found' },
+        { status: 404 }
+      );
+    }
+
+    // Check if system role is being modified
+    if (existingRole.isSystem && (validatedData.isActive === false || validatedData.isTemplate === false)) {
+      return NextResponse.json(
+        { success: false, message: 'Cannot modify system role properties' },
+        { status: 400 }
+      );
+    }
+
+    // Check for name conflict if name is being updated
+    if (validatedData.name && validatedData.name !== existingRole.name) {
+      const nameConflict = await prisma.role.findFirst({
+        where: {
+          name: validatedData.name,
+          roleScope: 'global',
+          tenantIdNew: null,
+          id: { not: roleId }
+        }
+      });
+
+      if (nameConflict) {
+        return NextResponse.json(
+          { success: false, message: 'Role name already exists globally' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Update role and permissions in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Update the role
+      const updatedRole = await tx.role.update({
+        where: { id: roleId },
+        data: {
+          name: validatedData.name,
+          description: validatedData.description,
+          color: validatedData.color,
+          priority: validatedData.priority,
+          isDefault: validatedData.isDefault,
+          isTemplate: validatedData.isTemplate,
+          isActive: validatedData.isActive
+        }
+      });
+
+      // Update permissions if provided
+      if (validatedData.permissions !== undefined) {
+        // Remove existing permissions
+        await tx.rolePermission.deleteMany({
+          where: {
+            roleId,
+            tenantId: null // Only global permissions
+          }
+        });
+
+        // Add new permissions
+        if (validatedData.permissions.length > 0) {
+          const permissionAssignments = validatedData.permissions.map(permissionId => ({
+            roleId,
+            permissionId,
+            tenantId: null, // Global permissions
+            isAllowed: true
+          }));
+
+          await tx.rolePermission.createMany({
+            data: permissionAssignments
+          });
+        }
+      }
+
+      return updatedRole;
+    });
+
+    // Fetch the updated role with permissions
+    const updatedRole = await prisma.role.findUnique({
+      where: { id: roleId },
+      include: {
         permissions: {
           include: {
             permission: true
@@ -32,229 +208,126 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
       }
     });
 
-    if (!role) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Role not found:', params.id);
+    return NextResponse.json({
+      success: true,
+      message: 'Global role updated successfully',
+      data: {
+        role: {
+          id: updatedRole!.id,
+          name: updatedRole!.name,
+          description: updatedRole!.description,
+          roleScope: updatedRole!.roleScope,
+          isActive: updatedRole!.isActive,
+          isDefault: updatedRole!.isDefault,
+          isTemplate: updatedRole!.isTemplate,
+          color: updatedRole!.color,
+          priority: updatedRole!.priority,
+          createdAt: updatedRole!.createdAt,
+          updatedAt: updatedRole!.updatedAt,
+          permissions: updatedRole!.permissions.map(rp => ({
+            id: rp.permission.id,
+            name: rp.permission.name,
+            action: rp.permission.action,
+            moduleKey: rp.permission.moduleKey,
+            isAllowed: rp.isAllowed
+          }))
+        }
       }
-      return createErrorResponse('Role not found', 404);
-    }
+    });
 
-    if (process.env.NODE_ENV === 'development') {
-      console.log('✅ Role fetched successfully:', role.name);
-    }
-
-    return createSuccessResponse({
-      role: {
-        id: role.id,
-        name: role.name,
-        description: role.description,
-        isGlobal: role.isGlobal,
-        isActive: role.isActive,
-        createdAt: role.createdAt,
-        updatedAt: role.updatedAt,
-        userCount: role._count.userRoles,
-        permissions: role.permissions.map(rp => ({
-          id: rp.permission.id,
-          name: rp.permission.name,
-          description: rp.permission.description,
-          module: rp.permission.module,
-          action: rp.permission.action
-        }))
-      }
-    }, 'Role fetched successfully');
   } catch (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('❌ Error fetching role:', error);
-    }
-    throw error;
-  }
-});
-
-// PUT /api/superadmin/roles/[id] - Update a role
-export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
-  if (process.env.NODE_ENV === 'development') {
-    console.log('👥 Updating role:', params.id);
-  }
-
-  // Authenticate SuperAdmin
-  const authResult = await requireSuperAdmin(req);
-  if (authResult instanceof NextResponse) {
-    return authResult;
-  }
-
-  const { name, description, isGlobal, isActive, permissions } = await req.json();
-
-  try {
-    // Check if role exists
-    const existingRole = await prisma.role.findUnique({
-      where: { id: params.id }
-    });
-
-    if (!existingRole) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Role not found:', params.id);
-      }
-      return createErrorResponse('Role not found', 404);
-    }
-
-    // Check if new name conflicts with existing role
-    if (name && name !== existingRole.name) {
-      const nameConflict = await prisma.role.findFirst({
-        where: { 
-          name,
-          id: { not: params.id }
-        }
-      });
-
-      if (nameConflict) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('❌ Role name already exists:', name);
-        }
-        return createErrorResponse(
-          'Role name already exists',
-          409,
-          [{ field: 'name', message: 'Role name already exists' }]
-        );
-      }
-    }
-
-    // Update role with permissions in a transaction
-    const result = await prisma.$transaction(async (tx) => {
-      // Update role
-      const updatedRole = await tx.role.update({
-        where: { id: params.id },
-        data: {
-          name: name || existingRole.name,
-          description: description !== undefined ? description : existingRole.description,
-          isGlobal: isGlobal !== undefined ? isGlobal : existingRole.isGlobal,
-          isActive: isActive !== undefined ? isActive : existingRole.isActive
-        }
-      });
-
-      // Update permissions if provided
-      if (permissions !== undefined) {
-        // Remove existing permissions
-        await tx.rolePermission.deleteMany({
-          where: { roleId: params.id }
-        });
-
-        // Add new permissions
-        if (permissions && permissions.length > 0) {
-          const rolePermissions = permissions.map((permissionId: string) => ({
-            roleId: params.id,
-            permissionId
-          }));
-
-          await tx.rolePermission.createMany({
-            data: rolePermissions
-          });
-        }
-      }
-
-      return updatedRole;
-    });
-
-    // Create audit log
-    await createAuditLogFromRequest(
-      req,
-      authResult,
-      'role.update',
-      {
-        roleId: result.id,
-        roleName: result.name,
-        permissions: permissions || []
-      }
-    );
-
-    if (process.env.NODE_ENV === 'development') {
-      console.log('✅ Role updated successfully:', result.name);
-    }
-
-    return createSuccessResponse({
-      role: {
-        id: result.id,
-        name: result.name,
-        description: result.description,
-        isGlobal: result.isGlobal,
-        isActive: result.isActive,
-        createdAt: result.createdAt,
-        updatedAt: result.updatedAt
-      }
-    }, 'Role updated successfully');
-  } catch (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('❌ Error updating role:', error);
-    }
-    throw error;
-  }
-});
-
-// DELETE /api/superadmin/roles/[id] - Delete a role
-export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
-  if (process.env.NODE_ENV === 'development') {
-    console.log('👥 Deleting role:', params.id);
-  }
-
-  // Authenticate SuperAdmin
-  const authResult = await requireSuperAdmin(req);
-  if (authResult instanceof NextResponse) {
-    return authResult;
-  }
-
-  try {
-    // Check if role exists and get user count
-    const existingRole = await prisma.role.findUnique({
-      where: { id: params.id },
-      include: {
-        _count: {
-          select: { userRoles: true }
-        }
-      }
-    });
-
-    if (!existingRole) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Role not found:', params.id);
-      }
-      return createErrorResponse('Role not found', 404);
-    }
-
-    // Check if role is assigned to any users
-    if (existingRole._count.userRoles > 0) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Role is assigned to users, cannot delete:', params.id);
-      }
-      return createErrorResponse(
-        `Cannot delete role that is assigned to ${existingRole._count.userRoles} user(s). Please reassign or remove users from this role first.`,
-        409
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { success: false, message: 'Validation error', errors: error.errors },
+        { status: 400 }
       );
     }
 
-    // Delete role (permissions will be cascaded due to foreign key constraints)
-    await prisma.role.delete({
-      where: { id: params.id }
+    console.error('Error updating global role:', error);
+    return NextResponse.json(
+      { success: false, message: 'Failed to update global role' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/superadmin/roles/[id] - Delete global role
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const roleId = params.id;
+
+    // Check if role exists and is global
+    const existingRole = await prisma.role.findFirst({
+      where: {
+        id: roleId,
+        roleScope: 'global',
+        tenantIdNew: null
+      },
+      include: {
+        userRoles: true,
+        permissions: {
+          where: {
+            tenantId: { not: null } // Check for tenant overrides
+          }
+        }
+      }
     });
 
-    // Create audit log
-    await createAuditLogFromRequest(
-      req,
-      authResult,
-      'role.delete',
-      {
-        roleId: existingRole.id,
-        roleName: existingRole.name
-      }
-    );
-
-    if (process.env.NODE_ENV === 'development') {
-      console.log('✅ Role deleted successfully:', existingRole.name);
+    if (!existingRole) {
+      return NextResponse.json(
+        { success: false, message: 'Global role not found' },
+        { status: 404 }
+      );
     }
 
-    return createSuccessResponse({}, 'Role deleted successfully');
+    // Check if it's a system role
+    if (existingRole.isSystem) {
+      return NextResponse.json(
+        { success: false, message: 'Cannot delete system role' },
+        { status: 400 }
+      );
+    }
+
+    // Check if role is assigned to users
+    if (existingRole.userRoles.length > 0) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: `Cannot delete role that is assigned to ${existingRole.userRoles.length} user(s)` 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Check if role has tenant overrides
+    if (existingRole.permissions.length > 0) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: 'Cannot delete global role that has tenant-specific overrides' 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Delete the role (permissions will be cascaded)
+    await prisma.role.delete({
+      where: { id: roleId }
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Global role deleted successfully'
+    });
+
   } catch (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('❌ Error deleting role:', error);
-    }
-    throw error;
+    console.error('Error deleting global role:', error);
+    return NextResponse.json(
+      { success: false, message: 'Failed to delete global role' },
+      { status: 500 }
+    );
   }
-}); 
+} 

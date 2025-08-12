@@ -29,26 +29,26 @@ model SuperAdmin {
 }
 
 model Tenant {
-  id                String             @id @default(cuid())
+  id                String               @id @default(cuid())
   name              String
-  slug              String             @unique
+  slug              String               @unique
   domain            String?
   description       String?
-  isActive          Boolean            @default(true)
-  plan              String             @default("starter")
-  region            String             @default("US East")
-  features          String             @db.LongText
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  metadata          String?            @db.LongText
+  isActive          Boolean              @default(true)
+  plan              String               @default("starter")
+  region            String               @default("US East")
+  features          String               @db.LongText
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  metadata          String?              @db.LongText
   auditLogs         AuditLog[]
   notifications     Notification[]
   reports           Report[]
-  roles             Role[]
-  roleOverrides     TenantRoleOverride[]
   rolePermissions   RolePermission[]
+  roles             Role[]
   supportTickets    SupportTicket[]
   tenantModules     TenantModule[]
+  roleOverrides     TenantRoleOverride[]
   userNotifications UserNotification[]
   users             User[]
 
@@ -78,30 +78,29 @@ model User {
 }
 
 model Role {
-  id          String           @id @default(cuid())
-  name        String
-  description String?
-  isActive    Boolean          @default(true)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  isDefault   Boolean          @default(false)
-  isTemplate  Boolean          @default(false)
-  tenantId    String?
-  color       String?
-  createdBy   String?
-  isSystem    Boolean          @default(false)
-  priority    Int              @default(0)
-  scope       String           @default("TENANT") // GLOBAL or TENANT
-  roleScope   String           @default("tenant") // global or tenant
-  tenantIdNew String?          // New tenant_id field for role scope
-  permissions RolePermission[]
+  id              String               @id @default(cuid())
+  name            String
+  description     String?
+  isActive        Boolean              @default(true)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  isDefault       Boolean              @default(false)
+  isTemplate      Boolean              @default(false)
+  tenantId        String?
+  color           String?
+  createdBy       String?
+  isSystem        Boolean              @default(false)
+  priority        Int                  @default(0)
+  scope           String               @default("TENANT")
+  roleScope       String               @default("tenant")
+  isGlobal        Boolean              @default(false)  // true if created by SuperAdmin, visible to all tenants
+  tenant          Tenant?              @relation(fields: [tenantId], references: [id])
   tenantOverrides TenantRoleOverride[]
-  tenant      Tenant?          @relation(fields: [tenantId], references: [id])
-  userRoles   UserRole[]
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
 
-  @@unique([name, tenantIdNew])
+  @@unique([name, tenantId], map: "roles_name_tenant_unique")
   @@index([tenantId], map: "roles_tenantId_fkey")
-  @@index([tenantIdNew], map: "roles_tenant_id_fkey")
   @@index([isActive])
   @@index([isTemplate])
   @@index([scope])
@@ -162,19 +161,19 @@ model TenantModule {
 }
 
 model Permission {
-  id              String           @id @default(cuid())
-  name            String           @unique
+  id              String               @id @default(cuid())
+  name            String               @unique
   description     String?
-  action          String           // view, create, edit, delete, export
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  isActive        Boolean          @default(true)
+  action          String
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  isActive        Boolean              @default(true)
   submodule       String?
   moduleKey       String
   category        String?
-  isSystem        Boolean          @default(false)
+  isSystem        Boolean              @default(false)
   resource        String?
-  module          Module           @relation(fields: [moduleKey], references: [moduleKey])
+  module          Module               @relation(fields: [moduleKey], references: [moduleKey])
   rolePermissions RolePermission[]
   tenantOverrides TenantRoleOverride[]
 
@@ -191,12 +190,12 @@ model RolePermission {
   tenantId     String?
   isAllowed    Boolean    @default(true)
   createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  updatedAt    DateTime   @default(now()) @updatedAt
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
   role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
   tenant       Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@unique([roleId, permissionId, tenantId])
+  @@unique([roleId, permissionId, tenantId], map: "role_permissions_role_permission_tenant_unique")
   @@index([permissionId], map: "role_permissions_permissionId_fkey")
   @@index([tenantId], map: "role_permissions_tenantId_fkey")
   @@index([isAllowed], map: "role_permissions_isAllowed_fkey")
@@ -212,9 +211,9 @@ model TenantRoleOverride {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
   createdBy    String?
-  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, roleId, permissionId])
   @@index([tenantId], map: "tenant_role_overrides_tenantId_fkey")
@@ -439,9 +438,9 @@ model Report {
   createdAt    DateTime    @default(now())
   data         String      @db.LongText
   name         String
-  status       String      @default("generating") // generating, ready, failed
   superAdminId String?
   type         String
+  status       String      @default("generating")
   superAdmin   SuperAdmin? @relation(fields: [superAdminId], references: [id])
   tenant       Tenant?     @relation(fields: [tenantId], references: [id])
 
@@ -487,18 +486,18 @@ model RefreshToken {
 }
 
 model Backup {
-  id          String      @id @default(cuid())
+  id          String     @id @default(cuid())
   filename    String
-  status      String      @default("processing") // processing, completed, failed
-  fileSize    Int         @default(0)
-  duration    Int         @default(0) // in milliseconds
+  status      String     @default("processing")
+  fileSize    Int        @default(0)
+  duration    Int        @default(0)
   description String?
-  createdAt   DateTime    @default(now())
+  createdAt   DateTime   @default(now())
   completedAt DateTime?
   createdById String
-  options     Json?       // Backup options as JSON
-  filePath    String?     // Path to the backup file
-  createdBy   SuperAdmin  @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  options     String?    @db.LongText
+  filePath    String?
+  createdBy   SuperAdmin @relation(fields: [createdById], references: [id], onDelete: Cascade)
 
   @@index([createdById], map: "backups_createdById_fkey")
   @@index([status])
