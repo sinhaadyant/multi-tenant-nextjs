@@ -81,7 +81,7 @@ export const useTenantsManagement = () => {
         if (response.data.success) {
           setState(prev => ({
             ...prev,
-            tenants: response.data.data.tenants || [],
+            tenants: response.data.tenants || [],
             loading: false
           }));
         } else {

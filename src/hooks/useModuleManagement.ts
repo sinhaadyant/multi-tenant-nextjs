@@ -98,8 +98,8 @@ export const useModuleManagement = (tenantSlug: string) => {
       if (response.data?.success) {
         setState(prev => ({
           ...prev,
-          modules: response.data.data.modules,
-          permissions: response.data.data.permissions,
+          modules: response.data.modules,
+          permissions: response.data.permissions,
           loading: false,
           includeAnalytics
         }));
@@ -125,7 +125,7 @@ export const useModuleManagement = (tenantSlug: string) => {
       if (response.data?.success) {
         // Refresh modules to get updated state
         await fetchModules(state.includeAnalytics);
-        return response.data.data;
+        return response.data;
       } else {
         throw new Error(response.data?.message || 'Failed to perform module action');
       }

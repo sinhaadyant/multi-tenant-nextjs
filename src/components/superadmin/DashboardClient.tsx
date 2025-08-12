@@ -44,7 +44,7 @@ const useRealTimeStats = () => {
       setLoading(true);
       const response = await api.get('/superadmin/dashboard/stats');
       if (response.data.success) {
-        setStats(response.data.data);
+        setStats(response.data);
       } else {
         throw new Error(response.data.message || 'Failed to fetch stats');
       }
@@ -66,13 +66,15 @@ const useRealTimeStats = () => {
 
 export const DashboardClient: React.FC = () => {
   const router = useRouter();
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const {
     data,
     isLoading,
     error,
     selectedRange,
     setSelectedRange,
-    refetch
+    refetch,
+    forceRefresh
   } = useSuperadminDashboard();
 
   const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useRealTimeStats();
@@ -94,6 +96,16 @@ export const DashboardClient: React.FC = () => {
       setLastUpdated(new Date());
     }
   }, [data, stats]);
+
+  // Periodic refresh every 2 minutes to ensure data stays fresh
+  useEffect(() => {
+    const interval = setInterval(() => {
+      forceRefresh();
+      refetchStats();
+    }, 2 * 60 * 1000); // 2 minutes
+
+    return () => clearInterval(interval);
+  }, [forceRefresh, refetchStats]);
 
   // Handle authentication errors
   useEffect(() => {
@@ -174,19 +186,30 @@ export const DashboardClient: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-3">
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            Last updated: {lastUpdated.toLocaleTimeString()}
+          </div>
           <DateFilterDropdown 
             selectedRange={selectedRange}
             onRangeChange={setSelectedRange}
           />
           <button
-            onClick={() => {
-              refetch();
-              refetchStats();
+            onClick={async () => {
+              setIsRefreshing(true);
+              try {
+                await Promise.all([forceRefresh(), refetchStats()]);
+                toast.success('Dashboard data refreshed successfully!');
+              } catch (error) {
+                toast.error('Failed to refresh dashboard data');
+              } finally {
+                setIsRefreshing(false);
+              }
             }}
-            className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+            disabled={isRefreshing}
+            className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
           </button>
           {process.env.NODE_ENV === 'development' && (
             <button

@@ -98,7 +98,7 @@ const dashboardHandler = async (req: NextRequest): Promise<NextResponse> => {
       });
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       data: dashboardData,
       timestamp: new Date().toISOString(),
@@ -107,6 +107,13 @@ const dashboardHandler = async (req: NextRequest): Promise<NextResponse> => {
         queries: ENABLE_PRISMA_LOGGING ? 'logged in console' : 'logging disabled',
       },
     });
+
+    // Add cache control headers to prevent caching
+    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    
+    return response;
   } catch (error) {
     const duration = Date.now() - startTime;
     

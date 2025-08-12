@@ -1,31 +1,19 @@
 import { NextRequest } from 'next/server';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-import { updateNotificationSchema, sendNotificationSchema } from '@/lib/validations/superadmin';
 import { prisma } from '@/lib/prisma';
-import { verifySuperAdminToken } from '@/lib/auth';
-import { checkPermission } from '@/lib/permissions';
+import { requireSuperAdmin } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit';
 
+// GET /api/superadmin/notifications/[id] - Get single notification
 export async function GET(
-  req: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     // Verify authentication
-    const token = req.headers.get('authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return createErrorResponse('Unauthorized', 401);
-    }
-
-    const superAdmin = await verifySuperAdminToken(token);
-    if (!superAdmin) {
-      return createErrorResponse('Unauthorized', 401);
-    }
-
-    // Check permission to view notifications
-    const hasPermission = await checkPermission(superAdmin.id, 'notifications', 'view');
-    if (!hasPermission) {
-      return createErrorResponse('Insufficient permissions', 403);
+    const authResult = await requireSuperAdmin(request);
+    if (!authResult.success) {
+      return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
     }
 
     const notification = await prisma.notification.findUnique({
@@ -43,24 +31,6 @@ export async function GET(
             id: true,
             name: true,
             slug: true,
-          },
-        },
-        userNotifications: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-            tenant: {
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-              },
-            },
           },
         },
         _count: {
@@ -82,59 +52,66 @@ export async function GET(
   }
 }
 
+// PUT /api/superadmin/notifications/[id] - Update notification
 export async function PUT(
-  req: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     // Verify authentication
-    const token = req.headers.get('authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return createErrorResponse('Unauthorized', 401);
+    const authResult = await requireSuperAdmin(request);
+    if (!authResult.success) {
+      return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
     }
 
-    const superAdmin = await verifySuperAdminToken(token);
-    if (!superAdmin) {
-      return createErrorResponse('Unauthorized', 401);
-    }
+    const body = await request.json();
 
-    // Check permission to edit notifications
-    const hasPermission = await checkPermission(superAdmin.id, 'notifications', 'edit');
-    if (!hasPermission) {
-      return createErrorResponse('Insufficient permissions', 403);
-    }
-
-    const body = await req.json();
-    const validatedData = updateNotificationSchema.parse(body);
-
-    // Check if notification exists and is editable
+    // Check if notification exists
     const existingNotification = await prisma.notification.findUnique({
-      where: { id: params.id },
+      where: { id: params.id }
     });
 
     if (!existingNotification) {
       return createErrorResponse('Notification not found', 404);
     }
 
-    if (existingNotification.status === 'sent') {
-      return createErrorResponse('Cannot edit sent notifications', 400);
+    // Prepare update data
+    const updateData: any = {};
+
+    if (body.title !== undefined) updateData.title = body.title;
+    if (body.message !== undefined) updateData.message = body.message;
+    if (body.type !== undefined) updateData.type = body.type;
+    if (body.priority !== undefined) updateData.priority = body.priority;
+    if (body.targetType !== undefined) updateData.targetType = body.targetType;
+    if (body.scheduledAt !== undefined) {
+      updateData.scheduledAt = body.scheduledAt ? new Date(body.scheduledAt) : null;
+    }
+    if (body.attachments !== undefined) {
+      updateData.attachments = body.attachments ? JSON.stringify(body.attachments) : null;
+    }
+    if (body.metadata !== undefined) {
+      updateData.metadata = body.metadata ? JSON.stringify(body.metadata) : null;
+    }
+
+    // Handle targetTenantId based on targetType
+    if (body.targetType === 'tenant' && body.targetTenantId) {
+      // Verify tenant exists
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: body.targetTenantId }
+      });
+      if (!tenant) {
+        return createErrorResponse('Target tenant not found', 400);
+      }
+      updateData.targetTenantId = body.targetTenantId;
+    } else if (body.targetType !== undefined) {
+      // For superadmin, all, or other types, set targetTenantId to null
+      updateData.targetTenantId = null;
     }
 
     // Update notification
     const notification = await prisma.notification.update({
       where: { id: params.id },
-      data: {
-        title: validatedData.title,
-        message: validatedData.message,
-        type: validatedData.type,
-        priority: validatedData.priority,
-        targetType: validatedData.targetType,
-        targetTenantId: validatedData.targetTenantId,
-        scheduledAt: validatedData.scheduledAt ? new Date(validatedData.scheduledAt) : null,
-        attachments: validatedData.attachments ? JSON.stringify(validatedData.attachments) : null,
-        metadata: validatedData.metadata ? JSON.stringify(validatedData.metadata) : null,
-        status: validatedData.scheduledAt ? 'scheduled' : 'draft',
-      },
+      data: updateData,
       include: {
         superAdmin: {
           select: {
@@ -156,156 +133,121 @@ export async function PUT(
     // Create audit log
     await createAuditLog({
       action: 'notification_updated',
+      superAdminId: authResult.user.id,
+      resourceType: 'NOTIFICATION',
+      resourceId: notification.id,
       details: `Updated notification: ${notification.title}`,
-      superAdminId: superAdmin.id,
-      metadata: {
-        notificationId: notification.id,
-        targetType: notification.targetType,
-        type: notification.type,
-        priority: notification.priority,
-      },
     });
 
     return createSuccessResponse({ notification }, 'Notification updated successfully');
   } catch (error: any) {
     console.error('Error updating notification:', error);
-    if (error.name === 'ZodError') {
-      return createErrorResponse('Validation error', 400, error.errors);
-    }
     return createErrorResponse('Internal server error', 500);
   }
 }
 
+// DELETE /api/superadmin/notifications/[id] - Delete notification
 export async function DELETE(
-  req: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     // Verify authentication
-    const token = req.headers.get('authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return createErrorResponse('Unauthorized', 401);
-    }
-
-    const superAdmin = await verifySuperAdminToken(token);
-    if (!superAdmin) {
-      return createErrorResponse('Unauthorized', 401);
-    }
-
-    // Check permission to delete notifications
-    const hasPermission = await checkPermission(superAdmin.id, 'notifications', 'delete');
-    if (!hasPermission) {
-      return createErrorResponse('Insufficient permissions', 403);
+    const authResult = await requireSuperAdmin(request);
+    if (!authResult.success) {
+      return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
     }
 
     // Check if notification exists
-    const existingNotification = await prisma.notification.findUnique({
-      where: { id: params.id },
+    const notification = await prisma.notification.findUnique({
+      where: { id: params.id }
     });
 
-    if (!existingNotification) {
+    if (!notification) {
       return createErrorResponse('Notification not found', 404);
     }
 
-    // Soft delete notification
-    const notification = await prisma.notification.update({
-      where: { id: params.id },
-      data: { isActive: false },
+    // Delete notification
+    await prisma.notification.delete({
+      where: { id: params.id }
     });
 
     // Create audit log
     await createAuditLog({
       action: 'notification_deleted',
+      superAdminId: authResult.user.id,
+      resourceType: 'NOTIFICATION',
+      resourceId: notification.id,
       details: `Deleted notification: ${notification.title}`,
-      superAdminId: superAdmin.id,
-      metadata: {
-        notificationId: notification.id,
-        targetType: notification.targetType,
-        type: notification.type,
-        priority: notification.priority,
-      },
     });
 
-    return createSuccessResponse({ message: 'Notification deleted successfully' }, 'Notification deleted successfully');
+    return createSuccessResponse(null, 'Notification deleted successfully');
   } catch (error: any) {
     console.error('Error deleting notification:', error);
     return createErrorResponse('Internal server error', 500);
   }
 }
 
+// PATCH /api/superadmin/notifications/[id] - Send notification
 export async function PATCH(
-  req: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     // Verify authentication
-    const token = req.headers.get('authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return createErrorResponse('Unauthorized', 401);
+    const authResult = await requireSuperAdmin(request);
+    if (!authResult.success) {
+      return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
     }
 
-    const superAdmin = await verifySuperAdminToken(token);
-    if (!superAdmin) {
-      return createErrorResponse('Unauthorized', 401);
+    const body = await request.json();
+
+    // Check if notification exists
+    const notification = await prisma.notification.findUnique({
+      where: { id: params.id }
+    });
+
+    if (!notification) {
+      return createErrorResponse('Notification not found', 404);
     }
 
-    const body = await req.json();
-    const { action } = body;
-
-    if (action === 'send') {
-      // Check permission to send notifications
-      const hasPermission = await checkPermission(superAdmin.id, 'notifications', 'send');
-      if (!hasPermission) {
-        return createErrorResponse('Insufficient permissions', 403);
-      }
-
-      const validatedData = sendNotificationSchema.parse(body);
-
-      // Check if notification exists and can be sent
-      const existingNotification = await prisma.notification.findUnique({
-        where: { id: params.id },
-      });
-
-      if (!existingNotification) {
-        return createErrorResponse('Notification not found', 404);
-      }
-
-      if (existingNotification.status === 'sent') {
-        return createErrorResponse('Notification already sent', 400);
-      }
-
-      // Send notification logic here
-      // This would involve creating UserNotification records for target users
-      const notification = await prisma.notification.update({
-        where: { id: params.id },
-        data: {
-          status: 'sent',
-          sentAt: new Date(),
+    // Update notification status to sent
+    const updatedNotification = await prisma.notification.update({
+      where: { id: params.id },
+      data: {
+        status: 'sent',
+        sentAt: new Date(),
+      },
+      include: {
+        superAdmin: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
         },
-      });
-
-      // Create audit log
-      await createAuditLog({
-        action: 'notification_sent',
-        details: `Sent notification: ${notification.title}`,
-        superAdminId: superAdmin.id,
-        metadata: {
-          notificationId: notification.id,
-          targetType: notification.targetType,
-          type: notification.type,
-          priority: notification.priority,
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
         },
-      });
+      },
+    });
 
-      return createSuccessResponse({ notification }, 'Notification sent successfully');
-    }
+    // Create audit log
+    await createAuditLog({
+      action: 'notification_sent',
+      superAdminId: authResult.user.id,
+      resourceType: 'NOTIFICATION',
+      resourceId: notification.id,
+      details: `Sent notification: ${notification.title}`,
+    });
 
-    return createErrorResponse('Invalid action', 400);
+    return createSuccessResponse({ notification: updatedNotification }, 'Notification sent successfully');
   } catch (error: any) {
-    console.error('Error processing notification action:', error);
-    if (error.name === 'ZodError') {
-      return createErrorResponse('Validation error', 400, error.errors);
-    }
+    console.error('Error sending notification:', error);
     return createErrorResponse('Internal server error', 500);
   }
 } 

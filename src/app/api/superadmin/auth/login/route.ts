@@ -11,7 +11,7 @@ export const POST = asyncHandler(async (req: NextRequest) => {
     console.log('🔐 SuperAdmin login attempt');
   }
 
-  const { email, password } = await req.json();
+  const { email, password, rememberMe } = await req.json();
 
   if (!email || !password) {
     if (process.env.NODE_ENV === 'development') {
@@ -68,12 +68,12 @@ export const POST = asyncHandler(async (req: NextRequest) => {
     );
   }
 
-  // Generate token pair (access + refresh)
+  // Generate token pair (access + refresh) with "Remember Me" support
   const tokenPair = generateTokenPair({
     id: superAdmin.id,
     email: superAdmin.email,
     role: 'superadmin'
-  });
+  }, rememberMe === true);
 
   // Get request info for device tracking
   const userAgent = req.headers.get('user-agent') || 'Unknown';
@@ -105,12 +105,13 @@ export const POST = asyncHandler(async (req: NextRequest) => {
       email: superAdmin.email,
       deviceInfo: userAgent,
       ipAddress: ipAddress || 'Unknown',
-      tokenId: refreshTokenPayload.tokenId
+      tokenId: refreshTokenPayload.tokenId,
+      rememberMe: rememberMe === true
     }
   );
 
   if (process.env.NODE_ENV === 'development') {
-    console.log('✅ SuperAdmin login successful:', email);
+    console.log('✅ SuperAdmin login successful:', email, 'rememberMe:', rememberMe);
   }
 
   // Create response with success data
@@ -118,6 +119,7 @@ export const POST = asyncHandler(async (req: NextRequest) => {
     token: tokenPair.accessToken,
     refreshToken: tokenPair.refreshToken,
     expiresAt: tokenPair.expiresAt,
+    refreshExpiresAt: tokenPair.refreshExpiresAt,
     user: {
       id: superAdmin.id,
       email: superAdmin.email,
@@ -127,12 +129,13 @@ export const POST = asyncHandler(async (req: NextRequest) => {
     }
   }, 'Login successful');
 
-  // Set cookie for middleware authentication
+  // Set cookie for middleware authentication with appropriate expiration
+  const cookieMaxAge = rememberMe ? 30 * 24 * 60 * 60 : 7 * 24 * 60 * 60; // 30 days or 7 days
   response.cookies.set('superadmin_token', tokenPair.accessToken, {
     httpOnly: false, // Allow JS access
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 15 * 60, // 15 minutes (same as access token)
+    maxAge: cookieMaxAge,
     path: '/',
   });
 

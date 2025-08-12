@@ -1,38 +1,34 @@
 "use client";
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { 
-  ArrowLeft, 
-  Edit, 
-  Users, 
-  Globe, 
-  MapPin, 
+import {
+  ArrowLeft,
+  Edit,
+  Users,
+  Globe,
+  MapPin,
   Settings,
   Activity,
   Trash2,
-  Eye,
-  UserCheck,
-  UserX,
-  Key,
-  Search
+  Eye, Search
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
-  useTenant, 
-  useTenantUsers, 
+  useTenant,
+  useTenantUsers,
   useTenantActivityLogs,
-  useToggleTenantStatus, 
+  useToggleTenantStatus,
   useDeleteTenant,
   useToggleUserStatus,
   useResetUserPassword,
   TenantUser
 } from '@/hooks/useTenantsAPI';
 import TenantSkeleton from '@/components/superadmin/TenantSkeleton';
+import TenantUserManagement from '@/components/superadmin/TenantUserManagement';
 import { useConfirmModalContext } from '@/components/common/ConfirmModalProvider';
 import { useToast } from '@/hooks/useToast';
-
 
 export default function TenantDetailsPage() {
   const params = useParams();
@@ -51,6 +47,7 @@ export default function TenantDetailsPage() {
       tenantIdLength: tenantId?.length
     });
   }
+  
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'settings' | 'activity'>('overview');
 
   // Users pagination and search state
@@ -62,6 +59,8 @@ export default function TenantDetailsPage() {
     sortBy: 'createdAt',
     sortOrder: 'desc' as 'asc' | 'desc'
   });
+
+  const [isExporting, setIsExporting] = useState(false);
 
   // Activity logs pagination and search state
   const [activityFilters, setActivityFilters] = useState({
@@ -75,13 +74,14 @@ export default function TenantDetailsPage() {
 
   // API hooks
   const { data: tenantData, isLoading: tenantLoading, error: tenantError } = useTenant(tenantId);
-  const { data: usersData, isLoading: usersLoading, error: usersError } = useTenantUsers(tenantId, userFilters);
-  const { data: activityData, isLoading: activityLoading, error: activityError } = useTenantActivityLogs(tenantId, activityFilters);
+  let { data: usersData, isLoading: usersLoading, error: usersError } = useTenantUsers(tenantId, userFilters);
+  let { data: activityData, isLoading: activityLoading, error: activityError } = useTenantActivityLogs(tenantId, activityFilters);
   const toggleStatusMutation = useToggleTenantStatus();
   const deleteMutation = useDeleteTenant();
   const toggleUserStatusMutation = useToggleUserStatus();
   const resetPasswordMutation = useResetUserPassword();
-
+  usersData = usersData?.data;
+  activityData = activityData?.data;
   const tenant = tenantData?.data?.tenant;
   const users = usersData?.data?.users || [];
   const userStats = usersData?.data?.stats || { total: 0, active: 0, inactive: 0 };
@@ -97,6 +97,7 @@ export default function TenantDetailsPage() {
       tenant,
       usersData,
       users,
+      userStats,
       tenantLoading,
       tenantError,
       usersLoading,
@@ -105,26 +106,6 @@ export default function TenantDetailsPage() {
       activityData,
       activities: activities.length
     });
-    
-    // Debug tenant features
-    if (tenant) {
-      console.log('🔍 Tenant Features Debug:', {
-        features: tenant.features,
-        featuresType: typeof tenant.features,
-        isArray: Array.isArray(tenant.features),
-        featuresLength: Array.isArray(tenant.features) ? tenant.features.length : 'N/A'
-      });
-    }
-    
-    // Debug authentication
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
-      console.log('🔐 Auth Debug:', {
-        hasToken: !!token,
-        tokenLength: token?.length,
-        currentPath: window.location.pathname
-      });
-    }
   }
 
   const getStatusBadge = (isActive: boolean) => {
@@ -199,7 +180,11 @@ export default function TenantDetailsPage() {
     });
   };
 
-  // User pagination handlers
+  // User management handlers
+  const handleUserFiltersChange = (newFilters: Partial<typeof userFilters>) => {
+    setUserFilters(prev => ({ ...prev, ...newFilters }));
+  };
+
   const handleUserPageChange = (page: number) => {
     setUserFilters(prev => ({ ...prev, page }));
   };
@@ -208,16 +193,51 @@ export default function TenantDetailsPage() {
     setUserFilters(prev => ({ ...prev, limit, page: 1 }));
   };
 
-  const handleUserSearchChange = (search: string) => {
-    setUserFilters(prev => ({ ...prev, search, page: 1 }));
+  const handleAddUser = () => {
+    router.push(`/superadmin/tenants/${tenantId}/users/new`);
   };
 
-  const handleUserStatusFilter = (status: string) => {
-    setUserFilters(prev => ({ ...prev, status, page: 1 }));
-  };
+  const handleExportUsers = async () => {
+    setIsExporting(true);
+    try {
+      // Create URL with current filters
+      const params = new URLSearchParams();
+      Object.entries(userFilters).forEach(([key, value]) => {
+        if (value !== undefined && value !== '') {
+          params.append(key, value.toString());
+        }
+      });
 
-  const handleUserSort = (sortBy: string, sortOrder: 'asc' | 'desc') => {
-    setUserFilters(prev => ({ ...prev, sortBy, sortOrder, page: 1 }));
+      // Create download link
+      const response = await fetch(`/api/superadmin/tenants/${tenantId}/users/export?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to export users');
+      }
+
+      // Get the blob and create download link
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `users-${tenant.slug}-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success('Users exported successfully!');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export users. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Activity pagination handlers
@@ -364,7 +384,7 @@ export default function TenantDetailsPage() {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {userStats.total}
+                {tenant.userCount}
               </p>
             </div>
           </div>
@@ -450,7 +470,6 @@ export default function TenantDetailsPage() {
                         <dd className="text-sm text-gray-900 dark:text-white">{tenant.domain}</dd>
                       </div>
                     )}
-                    
                   </dl>
                 </div>
 
@@ -487,251 +506,23 @@ export default function TenantDetailsPage() {
 
           {/* Users Tab */}
           {activeTab === 'users' && (
-            <div className="space-y-6">
-              {/* Users Header */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">Users</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Showing {users.length} of {userStats.total} users
-                  </p>
-                </div>
-                <button className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
-                  <Users className="w-4 h-4 mr-2 inline" />
-                  Add User
-                </button>
-              </div>
-
-              {/* Users Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <Users className="w-5 h-5 text-blue-600 dark:text-blue-400 mr-2" />
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</span>
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{userStats.total}</p>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <UserCheck className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Users</span>
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{userStats.active}</p>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <UserX className="w-5 h-5 text-red-600 dark:text-red-400 mr-2" />
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Inactive Users</span>
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{userStats.inactive}</p>
-                </div>
-              </div>
-
-              {/* Users Search and Filters */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-                <div className="flex flex-col md:flex-row gap-4">
-                  {/* Search */}
-                  <div className="flex-1">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <input
-                        type="text"
-                        placeholder="Search users by name or email..."
-                        value={userFilters.search}
-                        onChange={(e) => handleUserSearchChange(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Status Filter */}
-                  <div className="md:w-48">
-                    <select
-                      value={userFilters.status}
-                      onChange={(e) => handleUserStatusFilter(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                    >
-                      <option value="">All Status</option>
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </div>
-
-                  {/* Sort */}
-                  <div className="md:w-48">
-                    <select
-                      value={`${userFilters.sortBy}-${userFilters.sortOrder}`}
-                      onChange={(e) => {
-                        const [sortBy, sortOrder] = e.target.value.split('-');
-                        handleUserSort(sortBy, sortOrder as 'asc' | 'desc');
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                    >
-                      <option value="createdAt-desc">Newest First</option>
-                      <option value="createdAt-asc">Oldest First</option>
-                      <option value="name-asc">Name A-Z</option>
-                      <option value="name-desc">Name Z-A</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Users Table */}
-              {usersLoading ? (
-                <TenantSkeleton type="table" />
-              ) : usersError ? (
-                <div className="text-center py-8">
-                  <div className="text-red-600 dark:text-red-400 mb-2">
-                    <Users className="w-12 h-12 mx-auto mb-4 text-red-300 dark:text-red-600" />
-                    <p className="text-lg font-medium">Unable to load users</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      Please try refreshing the page or contact support if the problem persists.
-                    </p>
-                    {process.env.NODE_ENV === 'development' && (
-                      <details className="mt-4 text-left">
-                        <summary className="cursor-pointer text-sm text-gray-600 dark:text-gray-400">
-                          Technical Details (Development)
-                        </summary>
-                        <pre className="mt-2 text-xs bg-gray-100 dark:bg-gray-800 p-2 rounded overflow-auto">
-                          {usersError.message}
-                        </pre>
-                      </details>
-                    )}
-                  </div>
-                </div>
-              ) : users.length === 0 ? (
-                <div className="text-center text-gray-500 dark:text-gray-400 py-8">
-                  <Users className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
-                  <p>No users found for this tenant.</p>
-                </div>
-              ) : (
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                      <thead className="bg-gray-50 dark:bg-gray-700">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            User
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Role
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Status
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Last Login
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                        {users.map((user: TenantUser) => (
-                          <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="flex items-center">
-                                <div className="flex-shrink-0 h-10 w-10">
-                                  <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold">
-                                    {user.name.charAt(0).toUpperCase()}
-                                  </div>
-                                </div>
-                                <div className="ml-4">
-                                  <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                    {user.name}
-                                  </div>
-                                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                                    {user.email}
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="text-sm text-gray-900 dark:text-white">
-                                {user.role?.name || 'No Role'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              {getStatusBadge(user.isActive)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                              {user.lastLogin 
-                                ? format(new Date(user.lastLogin), 'MMM dd, yyyy HH:mm')
-                                : 'Never'
-                              }
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                              <div className="flex items-center space-x-2">
-                                <button
-                                  onClick={() => handleToggleUserStatus(user)}
-                                  className={`${
-                                    user.isActive 
-                                      ? 'text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300'
-                                      : 'text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300'
-                                  }`}
-                                  title={user.isActive ? 'Suspend User' : 'Activate User'}
-                                >
-                                  {user.isActive ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-                                </button>
-                                <button
-                                  onClick={() => handleResetPassword(user)}
-                                  className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                                  title="Reset Password"
-                                >
-                                  <Key className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Users Pagination */}
-                  <div className="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Show:</span>
-                      <select
-                        value={userPagination.limit}
-                        onChange={(e) => handleUserPageSizeChange(Number(e.target.value))}
-                        className="border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 text-sm dark:bg-gray-700 dark:text-white"
-                      >
-                        <option value={10}>10</option>
-                        <option value={25}>25</option>
-                        <option value={50}>50</option>
-                        <option value={100}>100</option>
-                      </select>
-                      <span className="text-sm text-gray-700 dark:text-gray-300">per page</span>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-700 dark:text-gray-300">
-                        Showing {((userPagination.page - 1) * userPagination.limit) + 1} to {Math.min(userPagination.page * userPagination.limit, userPagination.totalRecords)} of {userPagination.totalRecords} results
-                      </span>
-                      
-                      <div className="flex space-x-1">
-                        <button
-                          onClick={() => handleUserPageChange(userPagination.page - 1)}
-                          disabled={userPagination.page <= 1}
-                          className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
-                        >
-                          Previous
-                        </button>
-                        <button
-                          onClick={() => handleUserPageChange(userPagination.page + 1)}
-                          disabled={userPagination.page >= userPagination.totalPages}
-                          className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
-                        >
-                          Next
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+            <TenantUserManagement
+              tenantId={tenantId}
+              users={users}
+              userStats={userStats}
+              pagination={userPagination}
+              isLoading={usersLoading}
+              error={usersError}
+              filters={userFilters}
+              onFiltersChange={handleUserFiltersChange}
+              onPageChange={handleUserPageChange}
+              onPageSizeChange={handleUserPageSizeChange}
+              onToggleUserStatus={handleToggleUserStatus}
+              onResetPassword={handleResetPassword}
+              onAddUser={handleAddUser}
+              onExportUsers={handleExportUsers}
+              isExporting={isExporting}
+            />
           )}
 
           {/* Settings Tab */}
@@ -830,58 +621,67 @@ export default function TenantDetailsPage() {
                 </div>
               ) : (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                      <thead className="bg-gray-50 dark:bg-gray-700">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Action
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Details
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            User
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            IP Address
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Date
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                        {activities.map((activity: any) => (
-                          <tr key={activity.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                {activity.action}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="text-sm text-gray-900 dark:text-white">
-                                {activity.details}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900 dark:text-white">
-                                {activity.user?.name || 'System'}
-                              </div>
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
-                                {activity.user?.email || 'N/A'}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                              {activity.ipAddress || 'N/A'}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                              {format(new Date(activity.createdAt), 'MMM dd, yyyy HH:mm')}
-                            </td>
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col h-full">
+                    {/* Table Header - Fixed */}
+                    <div className="flex-shrink-0 overflow-x-auto">
+                      <table className="w-full min-w-[800px]">
+                        <thead className="bg-gray-50 dark:bg-gray-700">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                              Action
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                              Details
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                              User
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                              IP Address
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                              Date
+                            </th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                      </table>
+                    </div>
+
+                    {/* Scrollable Table Body */}
+                    <div className="flex-1 overflow-y-auto overflow-x-auto">
+                      <table className="w-full min-w-[800px]">
+                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                          {activities.map((activity: any) => (
+                            <tr key={activity.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                  {activity.action}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="text-sm text-gray-900 dark:text-white">
+                                  {activity.details}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900 dark:text-white">
+                                  {activity.user?.name || 'System'}
+                                </div>
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                  {activity.user?.email || 'N/A'}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                {activity.ipAddress || 'N/A'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                {format(new Date(activity.createdAt), 'MMM dd, yyyy HH:mm')}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
 
                   {/* Activity Pagination */}

@@ -45,7 +45,7 @@ export default function ResetPasswordPage() {
         console.log('✅ Token is valid');
         setTokenValidation({
           isValid: true,
-          email: response.data.data.email
+          email: response.data.email
         });
       } else {
         console.log('❌ Token is invalid:', response.data.message);

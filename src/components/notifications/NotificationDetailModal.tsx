@@ -79,7 +79,7 @@ const NotificationDetailModal: React.FC<NotificationDetailModalProps> = ({
       });
 
       if (response.data.success) {
-        setNotification(response.data.data.notification);
+        setNotification(response.data.notification);
       } else {
         setError('Failed to fetch notification');
       }

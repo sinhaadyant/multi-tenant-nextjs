@@ -139,7 +139,7 @@ export const useUnifiedAuth = () => {
       const response = await api.post(endpoint, credentials);
       
       if (response.data.success) {
-        const { user, token, refreshToken, expiresAt } = response.data.data;
+        const { user, token, refreshToken, expiresAt } = response.data;
         
         if (credentials.tenantSlug) {
           // Tenant login
@@ -257,7 +257,7 @@ export const useUnifiedAuth = () => {
       const response = await api.post(endpoint, { refreshToken });
       
       if (response.data.success) {
-        const { token, refreshToken: newRefreshToken, expiresAt } = response.data.data;
+        const { token, refreshToken: newRefreshToken, expiresAt } = response.data;
         
         if (userType === 'superadmin') {
           // Update superadmin tokens

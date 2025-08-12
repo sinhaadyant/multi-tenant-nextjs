@@ -1,23 +1,23 @@
 "use client";
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import CreateTenantForm from '@/components/superadmin/CreateTenantForm';
 
 export default function CreateTenantPage() {
   const router = useRouter();
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     router.push('/superadmin/tenants');
-  };
+  }, [router]);
 
-  const handleSuccess = (data: any) => {
+  const handleSuccess = useCallback((data: any) => {
     // Show success message with admin credentials
     if (data.adminCredentials) {
       alert(`Tenant created successfully!\n\nAdmin Credentials:\nEmail: ${data.adminCredentials.email}\nPassword: ${data.adminCredentials.password}\n\nPlease save these credentials securely.`);
     }
     router.push('/superadmin/tenants');
-  };
+  }, [router]);
 
   return (
     <div className="space-y-6">

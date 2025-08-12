@@ -256,7 +256,7 @@ export const useCheckSubdomain = (subdomain: string, excludeTenantId?: string) =
         params.append('excludeTenantId', excludeTenantId);
       }
       const response = await api.get(`/superadmin/tenants/check-subdomain?${params.toString()}`);
-      return response.data.data; // Access the actual data from the API response
+              return response.data; // Access the actual data from the API response
     },
     enabled: !!subdomain && subdomain.length >= 3,
     staleTime: 5 * 60 * 1000,
@@ -376,7 +376,7 @@ export const useTenantActivityLogs = (tenantId: string, filters: {
       });
 
       const response = await api.get(`/superadmin/tenants/${tenantId}/activity?${params.toString()}`);
-      return response.data;
+              return response.data;
     },
     enabled: !!tenantId,
     staleTime: 2 * 60 * 1000, // 2 minutes

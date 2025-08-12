@@ -77,16 +77,6 @@ const tenantAuthSlice = createSlice({
     setTenantLogin: (state, action: PayloadAction<TenantLoginPayload>) => {
       const { user, token, refreshToken, email, tenantSlug } = action.payload;
       
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔄 Tenant Redux: setTenantLogin called with payload:', {
-          email: email,
-          tenantSlug: tenantSlug,
-          hasToken: !!token,
-          hasRefreshToken: !!refreshToken,
-          hasUser: !!user,
-        });
-      }
-      
       state.user = user;
       state.token = token;
       state.refreshToken = refreshToken;
@@ -95,24 +85,9 @@ const tenantAuthSlice = createSlice({
       state.isLoggedIn = true;
       state.lastValidatedAt = Date.now();
       state.isInitialized = true;
-      state.isHydrated = true;
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔄 Tenant Redux: setTenantLogin completed, new state:', {
-          isLoggedIn: state.isLoggedIn,
-          hasUser: !!state.user,
-          hasToken: !!state.token,
-          hasRefreshToken: !!state.refreshToken,
-          email: state.email,
-          tenantSlug: state.tenantSlug,
-        });
-      }
+      state.isHydrated = true; // Mark as hydrated after successful login
     },
     setTenantLogout: (state) => {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔄 Tenant Redux: setTenantLogout called');
-      }
-      
       state.user = null;
       state.token = null;
       state.refreshToken = null;
@@ -122,7 +97,7 @@ const tenantAuthSlice = createSlice({
       state.lastValidatedAt = null;
       state.sessionExpiresAt = null;
       state.isInitialized = true;
-      state.isHydrated = false;
+      state.isHydrated = false; // Reset hydration state on logout
       state.permissions = null;
     },
     setTenantUser: (state, action: PayloadAction<TenantUser>) => {

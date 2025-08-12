@@ -42,18 +42,13 @@ export default function SuperAdminLogin() {
     resolver: zodResolver(loginSchema),
   });
 
-  const handleLoginSuccess = async (result: any) => {
-    console.log('🎉 Login successful, processing response:', {
-      hasUser: !!result.data.user,
-      hasToken: !!result.data.token,
-      hasRefreshToken: !!result.data.refreshToken,
-    });
 
+
+
+
+  const handleLoginSuccess = async (result: any) => {
     try {
       // Validate token before storing (skip validation in browser for now)
-      console.log('🔍 Token validation skipped in browser (will validate on server)');
-
-      console.log('✅ Token validation passed');
 
       // Store in Redux (which will persist automatically)
       const loginPayload = {
@@ -64,55 +59,38 @@ export default function SuperAdminLogin() {
         expiresAt: result.data.expiresAt,
       };
       
-      console.log('📦 Dispatching login payload:', {
-        user: loginPayload.user?.email,
-        hasToken: !!loginPayload.token,
-        hasRefreshToken: !!loginPayload.refreshToken,
-      });
-      
       dispatch(setLogin(loginPayload));
-      console.log('✅ Redux login dispatched');
       
       // Debug: Check Redux state immediately after dispatch
       setTimeout(() => {
-        console.log('🔍 Checking Redux state after dispatch...');
         // We can't access store directly here, but we can check localStorage
         const persistedState = localStorage.getItem('persist:superadmin-root');
         if (persistedState) {
           try {
             const parsed = JSON.parse(persistedState);
             const authData = parsed.auth ? JSON.parse(parsed.auth) : null;
-            console.log('📊 Redux persisted state:', {
-              isLoggedIn: authData?.isLoggedIn,
-              hasUser: !!authData?.user,
-              hasToken: !!authData?.token,
-              hasRefreshToken: !!authData?.refreshToken,
-            });
+            // Clear corrupted persisted state
+            if (!authData) {
+              localStorage.removeItem('persist:superadmin-root');
+            }
           } catch (parseError) {
-            console.error('❌ Error parsing persisted state:', parseError);
             // Clear corrupted persisted state
             localStorage.removeItem('persist:superadmin-root');
-            console.log('🧹 Cleared corrupted persisted state');
           }
         }
       }, 100);
 
       // Store tokens in multiple locations for redundancy
       try {
-        console.log('💾 Storing tokens in browser storage...');
-        
         // Store access token in localStorage (primary location for API)
         localStorage.setItem('auth_token', result.data.token);
         localStorage.setItem('superadmin_token', result.data.token);
-        console.log('✅ Access token stored in localStorage as auth_token and superadmin_token');
         
         // Store access token in sessionStorage (backup)
         sessionStorage.setItem('access_token', result.data.token);
-        console.log('✅ Access token stored in sessionStorage as access_token');
         
         // Store refresh token in localStorage
         localStorage.setItem('refresh_token', result.data.refreshToken);
-        console.log('✅ Refresh token stored in localStorage');
         
         // Verify storage
         const storedAuthToken = localStorage.getItem('auth_token');
@@ -120,40 +98,25 @@ export default function SuperAdminLogin() {
         const storedAccessToken = sessionStorage.getItem('access_token');
         const storedRefreshToken = localStorage.getItem('refresh_token');
         
-        console.log('🔍 Storage verification:');
-        console.log('📦 localStorage auth_token:', storedAuthToken ? 'EXISTS' : 'NOT FOUND');
-        console.log('📦 localStorage superadmin_token:', storedSuperadminToken ? 'EXISTS' : 'NOT FOUND');
-        console.log('📦 sessionStorage access_token:', storedAccessToken ? 'EXISTS' : 'NOT FOUND');
-        console.log('📦 localStorage refresh_token:', storedRefreshToken ? 'EXISTS' : 'NOT FOUND');
-        console.log('📦 localStorage persist:superadmin-root:', localStorage.getItem('persist:superadmin-root') ? 'EXISTS' : 'NOT FOUND');
-        
         if (!storedAuthToken || !storedSuperadminToken || !storedRefreshToken) {
           throw new Error('Failed to store tokens in browser storage');
         }
         
       } catch (storageError) {
-        console.error('❌ Failed to store tokens in browser storage:', storageError);
         throw storageError;
       }
 
       toast.success('Login successful!');
       
       // Redirect immediately after successful login
-      console.log('🔄 Redirecting to dashboard...');
-      console.log('📍 Current pathname:', window.location.pathname);
-      console.log('🎯 Target pathname: /superadmin/dashboard');
-      
       try {
         router.replace('/superadmin/dashboard');
-        console.log('✅ Router.replace called successfully');
       } catch (error) {
-        console.error('❌ Router.replace failed:', error);
         // Fallback to window.location
         window.location.href = '/superadmin/dashboard';
       }
 
     } catch (error: any) {
-      console.error('❌ Error processing login success:', error);
       setError(error.message || 'Failed to process login');
       toast.error('Login failed. Please try again.');
     }
@@ -164,7 +127,6 @@ export default function SuperAdminLogin() {
     setError(null);
 
     try {
-      console.log('🔐 Attempting login with auth service');
       const result = await login(data);
 
       if (result.success && result.data) {
@@ -206,6 +168,8 @@ export default function SuperAdminLogin() {
     );
   }
 
+
+
   return (
     <div className="mx-auto w-full max-w-[400px]">
       <div className="mb-8 text-center">
@@ -215,6 +179,42 @@ export default function SuperAdminLogin() {
         <p className="text-base text-gray-600 dark:text-gray-400">
           Welcome back! Please sign in to your account.
         </p>
+      </div>
+
+      {/* Social Login Buttons - Design Only */}
+      <div className="mb-6 space-y-3">
+        <button
+          disabled
+          className="flex w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+          </svg>
+          Continue with Google (Coming Soon)
+        </button>
+        
+        <button
+          disabled
+          className="flex w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z"/>
+          </svg>
+          Continue with Apple (Coming Soon)
+        </button>
+      </div>
+
+      {/* Divider */}
+      <div className="relative mb-6">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+        </div>
+        <div className="relative flex justify-center text-sm">
+          <span className="bg-white px-2 text-gray-500 dark:bg-gray-900 dark:text-gray-400">Or continue with email</span>
+        </div>
       </div>
 
       <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>

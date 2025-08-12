@@ -1,44 +1,34 @@
-import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { simpleStorage } from '@/lib/simpleStorage';
+import { api } from '@/lib/api';
 
+// Types
 export interface SupportTicket {
   id: string;
   title: string;
   description: string;
-  category: string;
-  status: 'open' | 'in_progress' | 'resolved' | 'closed';
-  priority: 'low' | 'medium' | 'high';
-  isForwarded: boolean;
+  status: 'open' | 'pending' | 'closed';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  category: 'general' | 'technical' | 'billing' | 'feature-request' | 'bug-report';
   createdAt: string;
   updatedAt: string;
-  tenantId?: string;
   userId?: string;
-  tenant?: {
-    id: string;
-    name: string;
-    slug: string;
-  };
+  tenantId?: string;
   user?: {
     id: string;
     name: string;
     email: string;
   };
-  _count?: {
+  tenant?: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  attachments: SupportTicketAttachment[];
+  comments: SupportTicketComment[];
+  _count: {
     comments: number;
     attachments: number;
   };
-}
-
-export interface SupportTicketComment {
-  id: string;
-  text: string;
-  createdAt: string;
-  updatedAt: string;
-  ticketId: string;
-  commentedBy: string;
-  commenterType: 'user' | 'tenant' | 'superadmin';
-  attachments: SupportTicketAttachment[];
 }
 
 export interface SupportTicketAttachment {
@@ -51,57 +41,100 @@ export interface SupportTicketAttachment {
   createdAt: string;
 }
 
-export interface SupportTicketFilters {
-  page: number;
-  limit: number;
+export interface SupportTicketComment {
+  id: string;
+  text: string;
+  createdAt: string;
+  updatedAt: string;
+  ticketId: string;
+  commentedBy: string;
+  commenterType: 'user' | 'admin';
+  attachments: SupportTicketCommentAttachment[];
+}
+
+export interface SupportTicketCommentAttachment {
+  id: string;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  path: string;
+  createdAt: string;
+}
+
+export interface SupportTicketsFilters {
+  page?: number;
+  limit?: number;
+  search?: string;
   status?: string;
   priority?: string;
   category?: string;
-  search?: string;
-  sortBy?: string;
+  sortBy?: 'createdAt' | 'updatedAt' | 'title' | 'status' | 'priority';
   sortOrder?: 'asc' | 'desc';
-  isForwarded?: boolean;
 }
 
-export interface SupportTicketResponse {
+export interface SupportTicketsResponse {
   tickets: SupportTicket[];
   pagination: {
     page: number;
     limit: number;
-    total: number;
+    totalCount: number;
     totalPages: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
   };
 }
 
-const API_BASE = '/api/superadmin/support-tickets';
+export interface CreateTicketData {
+  title: string;
+  description: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  category?: 'general' | 'technical' | 'billing' | 'feature-request' | 'bug-report';
+  attachments?: Array<{
+    filename: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+    path: string;
+  }>;
+}
 
-// Fetch support tickets
-export const useSupportTickets = (filters: SupportTicketFilters) => {
+export interface UpdateTicketData {
+  title?: string;
+  description?: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  category?: 'general' | 'technical' | 'billing' | 'feature-request' | 'bug-report';
+  status?: 'open' | 'pending' | 'closed';
+}
+
+export interface ReplyData {
+  text: string;
+  attachments?: Array<{
+    filename: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+    path: string;
+  }>;
+}
+
+// Fetch support tickets list
+export const useSupportTickets = (filters: SupportTicketsFilters = {}) => {
   return useQuery({
     queryKey: ['support-tickets', filters],
-    queryFn: async (): Promise<SupportTicketResponse> => {
-      const token = simpleStorage.getAuthToken();
+    queryFn: async (): Promise<SupportTicketsResponse> => {
       const params = new URLSearchParams();
       
       Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
+        if (value !== undefined && value !== '') {
           params.append(key, value.toString());
         }
       });
 
-      const response = await fetch(`${API_BASE}?${params.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch support tickets');
-      }
-
-      return response.json();
+      const response = await api.get(`/support-tickets?${params.toString()}`);
+      return response.data?.data;
     },
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 };
 
@@ -109,22 +142,12 @@ export const useSupportTickets = (filters: SupportTicketFilters) => {
 export const useSupportTicket = (id: string) => {
   return useQuery({
     queryKey: ['support-ticket', id],
-    queryFn: async (): Promise<{ ticket: SupportTicket & { comments: SupportTicketComment[] } }> => {
-      const token = storage.getToken();
-      const response = await fetch(`${API_BASE}/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch support ticket');
-      }
-
-      return response.json();
+    queryFn: async (): Promise<{ ticket: SupportTicket }> => {
+      const response = await api.get(`/support-tickets/${id}`);
+      return response.data;
     },
     enabled: !!id,
+    staleTime: 1 * 60 * 1000, // 1 minute
   });
 };
 
@@ -133,30 +156,9 @@ export const useCreateSupportTicket = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (data: {
-      title: string;
-      description: string;
-      category?: string;
-      priority?: string;
-      tenantId?: string;
-      userId?: string;
-    }) => {
-      const token = storage.getToken();
-      const response = await fetch(API_BASE, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create support ticket');
-      }
-
-      return response.json();
+    mutationFn: async (data: CreateTicketData): Promise<{ message: string; ticket: SupportTicket }> => {
+      const response = await api.post('/support-tickets', data);
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['support-tickets'] });
@@ -169,23 +171,9 @@ export const useUpdateSupportTicket = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<SupportTicket> }) => {
-      const token = storage.getToken();
-      const response = await fetch(`${API_BASE}/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update support ticket');
-      }
-
-      return response.json();
+    mutationFn: async ({ id, data }: { id: string; data: UpdateTicketData }): Promise<{ message: string; ticket: SupportTicket }> => {
+      const response = await api.put(`/support-tickets/${id}`, data);
+      return response.data;
     },
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['support-tickets'] });
@@ -199,22 +187,9 @@ export const useDeleteSupportTicket = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (id: string) => {
-      const token = storage.getToken();
-      const response = await fetch(`${API_BASE}/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to delete support ticket');
-      }
-
-      return response.json();
+    mutationFn: async (id: string): Promise<{ message: string }> => {
+      const response = await api.delete(`/support-tickets/${id}`);
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['support-tickets'] });
@@ -222,61 +197,18 @@ export const useDeleteSupportTicket = () => {
   });
 };
 
-// Add comment to support ticket
-export const useAddComment = () => {
+// Add reply to support ticket
+export const useAddReply = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ ticketId, text }: { ticketId: string; text: string }) => {
-      const token = storage.getToken();
-      const response = await fetch(`${API_BASE}/${ticketId}/comments`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to add comment');
-      }
-
-      return response.json();
+    mutationFn: async ({ id, data }: { id: string; data: ReplyData }): Promise<{ message: string; comment: SupportTicketComment }> => {
+      const response = await api.post(`/support-tickets/${id}/reply`, data);
+      return response.data;
     },
-    onSuccess: (_, { ticketId }) => {
-      queryClient.invalidateQueries({ queryKey: ['support-ticket', ticketId] });
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ['support-ticket', id] });
       queryClient.invalidateQueries({ queryKey: ['support-tickets'] });
-    },
-  });
-};
-
-// Forward support ticket
-export const useForwardTicket = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async (ticketId: string) => {
-      const token = storage.getToken();
-      const response = await fetch(`${API_BASE}/${ticketId}/forward`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to forward ticket');
-      }
-
-      return response.json();
-    },
-    onSuccess: (_, ticketId) => {
-      queryClient.invalidateQueries({ queryKey: ['support-tickets'] });
-      queryClient.invalidateQueries({ queryKey: ['support-ticket', ticketId] });
     },
   });
 }; 

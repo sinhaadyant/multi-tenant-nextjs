@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 
 
@@ -54,6 +54,7 @@ interface UseSuperadminDashboardReturn {
   selectedRange: string;
   setSelectedRange: (range: string) => void;
   refetch: () => void;
+  forceRefresh: () => void;
 }
 
 const fetchDashboardData = async (range: string): Promise<DashboardData> => {
@@ -62,9 +63,14 @@ const fetchDashboardData = async (range: string): Promise<DashboardData> => {
       console.log('📊 Fetching dashboard data for range:', range);
     }
 
-
-
-    const response = await api.get(`/superadmin/dashboard?range=${range}`);
+    // Add cache-busting parameter to ensure fresh data
+    const timestamp = Date.now();
+    const response = await api.get(`/superadmin/dashboard?range=${range}&_t=${timestamp}`, {
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
     
     if (response.data.success) {
       if (process.env.NODE_ENV === 'development') {
@@ -73,7 +79,7 @@ const fetchDashboardData = async (range: string): Promise<DashboardData> => {
       
 
       
-      return response.data.data;
+      return response.data?.data;
     } else {
       throw new Error(response.data.message || 'Failed to fetch dashboard data');
     }
@@ -96,6 +102,7 @@ const fetchDashboardData = async (range: string): Promise<DashboardData> => {
 
 export const useSuperadminDashboard = (): UseSuperadminDashboardReturn => {
   const [selectedRange, setSelectedRange] = useState('7d');
+  const queryClient = useQueryClient();
 
   const {
     data,
@@ -105,8 +112,10 @@ export const useSuperadminDashboard = (): UseSuperadminDashboardReturn => {
   } = useQuery({
     queryKey: ['superadmin-dashboard', selectedRange],
     queryFn: () => fetchDashboardData(selectedRange),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+    staleTime: 30 * 1000, // 30 seconds - much shorter to ensure fresh data
+    gcTime: 5 * 60 * 1000, // 5 minutes (formerly cacheTime)
+    refetchOnWindowFocus: true, // Refetch when window regains focus
+    refetchOnMount: true, // Always refetch when component mounts
     retry: (failureCount, error) => {
       // Don't retry on authentication errors
       if (error.message.includes('Authentication required')) {
@@ -124,12 +133,19 @@ export const useSuperadminDashboard = (): UseSuperadminDashboardReturn => {
     setSelectedRange(range);
   }, []);
 
+  const forceRefresh = useCallback(() => {
+    // Invalidate and refetch to ensure fresh data
+    queryClient.invalidateQueries({ queryKey: ['superadmin-dashboard'] });
+    refetch();
+  }, [queryClient, refetch]);
+
   return {
     data,
     isLoading,
     error: error as Error | null,
     selectedRange,
     setSelectedRange: handleRangeChange,
-    refetch
+    refetch,
+    forceRefresh
   };
 }; 

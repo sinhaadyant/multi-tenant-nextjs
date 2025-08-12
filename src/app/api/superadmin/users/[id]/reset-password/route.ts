@@ -49,8 +49,12 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
         tenant: {
           select: { name: true, slug: true }
         },
-        role: {
-          select: { name: true, description: true }
+        userRoles: {
+          include: {
+            role: {
+              select: { name: true, description: true }
+            }
+          }
         }
       }
     });
@@ -85,10 +89,10 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
           name: user.tenant.name,
           slug: user.tenant.slug
         } : null,
-        role: user.role ? {
-          id: user.roleId,
-          name: user.role.name,
-          description: user.role.description
+        role: user.userRoles[0]?.role ? {
+          id: user.userRoles[0].role.id,
+          name: user.userRoles[0].role.name,
+          description: user.userRoles[0].role.description
         } : null
       },
       tempPassword: process.env.NODE_ENV === 'development' ? tempPassword : undefined

@@ -7,6 +7,7 @@ import { instantLogout } from '@/lib/instantAuth';
 import { persistor } from '@/store/store';
 import toast from 'react-hot-toast';
 
+
 export const useLogout = () => {
   const dispatch = useAppDispatch();
   const router = useRouter();
@@ -19,7 +20,7 @@ export const useLogout = () => {
     const { 
       redirect = true, 
       redirectTo = '/superadmin/login', 
-      showToast = true 
+      showToast = true
     } = options || {};
 
     try {

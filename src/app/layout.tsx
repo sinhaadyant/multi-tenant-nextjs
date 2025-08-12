@@ -5,7 +5,9 @@ import { SidebarProvider } from '@/context/SidebarContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { ToastProvider } from '@/context/ToastContext';
 import { ConfirmModalProvider } from '@/components/common/ConfirmModalProvider';
+
 import Providers from '@/providers/Providers';
+import Script from 'next/script';
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -30,6 +32,10 @@ export default function RootLayout({
             </ToastProvider>
           </ThemeProvider>
         </Providers>
+        <Script
+          src="/scripts/cleanup-localStorage.js"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );

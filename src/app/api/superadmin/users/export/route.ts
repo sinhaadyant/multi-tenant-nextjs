@@ -37,7 +37,11 @@ export const GET = asyncHandler(async (req: NextRequest) => {
   }
 
   if (roleId) {
-    where.roleId = roleId;
+    where.userRoles = {
+      some: {
+        roleId: roleId
+      }
+    };
   }
 
   if (status) {

@@ -82,6 +82,15 @@ const superAdminNavElements: NavItem[] = [
     ]
   },
   {
+    id: "dataManagement",
+    label: "Data Management",
+    icon: "hard-drive",
+    children: [
+      { id: "insertSampleData", label: "Insert Sample Data", path: "/superadmin/data-management/insert" },
+      { id: "clearData", label: "Clear Data", path: "/superadmin/data-management/clear" }
+    ]
+  },
+  {
     id: "audit",
     label: "Audit Logs",
     icon: "clipboard-list",
@@ -98,6 +107,15 @@ const superAdminNavElements: NavItem[] = [
     label: "Notifications",
     icon: "bell",
     path: "/superadmin/notifications"
+  },
+  {
+    id: "supportTickets",
+    label: "Support Tickets",
+    icon: "life-ring",
+    children: [
+      { id: "allTickets", label: "All Tickets", path: "/superadmin/support-tickets" },
+      { id: "createTicket", label: "Create Ticket", path: "/superadmin/support-tickets/new" }
+    ]
   },
   {
     id: "support",
@@ -127,6 +145,7 @@ const getIcon = (iconName: string) => {
     "life-ring": <LifeBuoy className="w-5 h-5" />,
     "user-circle": <User className="w-5 h-5" />,
     database: <Database className="w-5 h-5" />,
+    "hard-drive": <HardDrive className="w-5 h-5" />,
   };
   return iconMap[iconName] || <Activity className="w-5 h-5" />;
 };

@@ -98,7 +98,7 @@ export const useUser = (id: string) => {
     queryKey: ['user', id],
     queryFn: async () => {
       const response = await api.get(`/superadmin/users/${id}`);
-      return response.data.data.user;
+      return response.data.user;
     },
     enabled: !!id,
   });
@@ -111,7 +111,7 @@ export const useCreateUser = () => {
   return useMutation({
     mutationFn: async (data: CreateUserData) => {
       const response = await api.post('/superadmin/users', data);
-      return response.data.data;
+      return response.data;
     },
     onSuccess: (data) => {
       toast.success('User created successfully!');
@@ -132,7 +132,7 @@ export const useUpdateUser = () => {
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateUserData }) => {
       const response = await api.put(`/superadmin/users/${id}`, data);
-      return response.data.data;
+      return response.data;
     },
     onSuccess: (data, variables) => {
       toast.success('User updated successfully!');
@@ -153,7 +153,7 @@ export const useToggleUserStatus = () => {
   return useMutation({
     mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
       const response = await api.patch(`/superadmin/users/${id}/status`, { isActive });
-      return response.data.data;
+      return response.data;
     },
     onSuccess: (data, variables) => {
       const status = variables.isActive ? 'activated' : 'suspended';
@@ -174,7 +174,7 @@ export const useDeleteUser = () => {
   return useMutation({
     mutationFn: async (id: string) => {
       const response = await api.delete(`/superadmin/users/${id}`);
-      return response.data.data;
+      return response.data;
     },
     onSuccess: () => {
       toast.success('User deleted successfully!');
@@ -192,7 +192,7 @@ export const useResetUserPassword = () => {
   return useMutation({
     mutationFn: async (id: string) => {
       const response = await api.post(`/superadmin/users/${id}/reset-password`);
-      return response.data.data;
+      return response.data;
     },
     onSuccess: (data) => {
       toast.success('Password reset successfully!');

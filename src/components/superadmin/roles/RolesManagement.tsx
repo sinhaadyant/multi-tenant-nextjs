@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Edit, Trash2, Eye, MoreHorizontal, Users, Calendar, Shield } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, Search, Edit, Trash2, Eye, MoreHorizontal, Users, Calendar, Shield } from 'lucide-react';
 import Button from '@/components/ui/button/Button';
 import Input from '@/components/form/input/InputField';
-import Badge from '@/components/ui/badge/Badge';
 import { useToast } from '@/context/ToastContext';
 import { useRolesAPI, Role } from '@/hooks/useRolesAPI';
 import RolesSkeleton from './RolesSkeleton';
@@ -36,6 +35,7 @@ const RolesManagement: React.FC = () => {
     deleteRole,
     refetch
   } = useRolesAPI();
+  console.log('🔍 Roles Management Debug:', roles);
 
   // Filter and sort roles
   const filteredRoles = React.useMemo(() => {

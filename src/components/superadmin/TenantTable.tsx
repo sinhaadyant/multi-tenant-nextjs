@@ -11,7 +11,9 @@ import {
   Users,
   Globe,
   Calendar,
-  MapPin
+  MapPin,
+  Power,
+  PowerOff
 } from 'lucide-react';
 import { Tenant } from '@/hooks/useTenantsAPI';
 import { format } from 'date-fns';
@@ -35,15 +37,40 @@ interface TenantTableProps {
 }
 
 // Memoized Status Badge Component
-const StatusBadge = memo(({ isActive }: { isActive: boolean }) => (
-  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-    isActive 
-      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-  }`}>
-    {isActive ? 'Active' : 'Inactive'}
-  </span>
-));
+const StatusBadge = memo(({ status }: { status: string }) => {
+  const getStatusConfig = (status: string) => {
+    switch (status) {
+      case 'active':
+        return {
+          className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+          label: 'Active'
+        };
+      case 'pending':
+        return {
+          className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+          label: 'Pending'
+        };
+      case 'suspended':
+        return {
+          className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+          label: 'Suspended'
+        };
+      default:
+        return {
+          className: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
+          label: 'Unknown'
+        };
+    }
+  };
+
+  const config = getStatusConfig(status);
+  
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.className}`}>
+      {config.label}
+    </span>
+  );
+});
 
 StatusBadge.displayName = 'StatusBadge';
 
@@ -126,7 +153,7 @@ const TenantRow = memo(({
         </td>
         
         <td className="px-6 py-4 whitespace-nowrap">
-          <StatusBadge isActive={tenant.isActive} />
+          <StatusBadge status={tenant.status} />
         </td>
         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
           <div className="flex items-center">
@@ -141,33 +168,41 @@ const TenantRow = memo(({
           <div className="flex items-center justify-end space-x-2">
             <button
               onClick={() => handleAction('view')}
-              className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+              className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-700 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
               disabled={isPending}
+              title="View Tenant"
             >
               <Eye className="w-4 h-4" />
             </button>
             <button
               onClick={() => handleAction('edit')}
-              className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
+              className="flex items-center justify-center w-8 h-8 rounded-md bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 dark:bg-green-900/20 dark:hover:bg-green-900/30 dark:text-green-400 dark:hover:text-green-300 transition-colors"
               disabled={isPending}
+              title="Edit Tenant"
             >
               <Edit className="w-4 h-4" />
             </button>
             <button
               onClick={() => handleAction('toggle')}
-              className={`${
-                tenant.isActive 
-                  ? 'text-orange-600 hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-300'
-                  : 'text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300'
+              className={`flex items-center justify-center w-8 h-8 rounded-md transition-colors ${
+                tenant.status === 'active'
+                  ? 'bg-orange-50 hover:bg-orange-100 text-orange-600 hover:text-orange-700 dark:bg-orange-900/20 dark:hover:bg-orange-900/30 dark:text-orange-400 dark:hover:text-orange-300'
+                  : 'bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 dark:bg-green-900/20 dark:hover:bg-green-900/30 dark:text-green-400 dark:hover:text-green-300'
               }`}
               disabled={isPending}
+              title={tenant.status === 'active' ? 'Suspend Tenant' : 'Activate Tenant'}
             >
-              {tenant.isActive ? <Trash2 className="w-4 h-4" /> : <Edit className="w-4 h-4" />}
+              {tenant.status === 'active' ? (
+                <PowerOff className="w-4 h-4" />
+              ) : (
+                <Power className="w-4 h-4" />
+              )}
             </button>
             <button
               onClick={() => handleAction('delete')}
-              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+              className="flex items-center justify-center w-8 h-8 rounded-md bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 dark:bg-red-900/20 dark:hover:bg-red-900/30 dark:text-red-400 dark:hover:text-red-300 transition-colors"
               disabled={isPending}
+              title="Delete Tenant"
             >
               <Trash2 className="w-4 h-4" />
             </button>

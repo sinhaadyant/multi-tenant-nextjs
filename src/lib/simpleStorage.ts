@@ -4,7 +4,7 @@
  * Basic localStorage wrapper for essential functionality only
  */
 
-// Simple localStorage wrapper for auth tokens with 3-month persistence
+// Simple localStorage wrapper for auth tokens with configurable persistence
 export const simpleStorage = {
   // Auth operations
   getAuthToken: (): string | null => {
@@ -34,7 +34,7 @@ export const simpleStorage = {
       const token = superadminTokenCookie.split('=')[1];
       if (token) {
         // Store it in localStorage for consistency
-        simpleStorage.setAuthToken(token);
+        simpleStorage.setAuthToken(token, false); // Default to session storage
         return token;
       }
     }
@@ -42,62 +42,49 @@ export const simpleStorage = {
     return null;
   },
   
-  setAuthToken: (token: string): void => {
+  setAuthToken: (token: string, rememberMe: boolean = false): void => {
     if (typeof window === 'undefined') return;
     
-    // Store with expiration date (3 months from now)
+    // Store with expiration date based on "Remember Me" preference
     const expirationDate = new Date();
-    expirationDate.setMonth(expirationDate.getMonth() + 3);
+    if (rememberMe) {
+      // 30 days for "Remember Me"
+      expirationDate.setDate(expirationDate.getDate() + 30);
+    } else {
+      // 7 days for regular session
+      expirationDate.setDate(expirationDate.getDate() + 7);
+    }
     
     const itemWithExpiry = {
       value: token,
       expiry: expirationDate.getTime(),
+      rememberMe: rememberMe
     };
     
     localStorage.setItem('auth_token', JSON.stringify(itemWithExpiry));
     
     // Also set superadmin token cookie for middleware compatibility
-    document.cookie = `superadmin_token=${token}; path=/; max-age=900; samesite=lax`;
+    const cookieMaxAge = rememberMe ? 30 * 24 * 60 * 60 : 7 * 24 * 60 * 60; // 30 days or 7 days
+    document.cookie = `superadmin_token=${token}; path=/; max-age=${cookieMaxAge}; samesite=lax`;
   },
   
+  // Note: User data is now stored in Redux, not localStorage
   getAuthUser: () => {
-    if (typeof window === 'undefined') return null;
-    const userStr = localStorage.getItem('auth_user');
-    if (!userStr) return null;
-    
-    try {
-      const parsedItem = JSON.parse(userStr);
-      if (parsedItem.expiry && Date.now() > parsedItem.expiry) {
-        // User data has expired, remove it
-        localStorage.removeItem('auth_user');
-        return null;
-      }
-      return parsedItem.value ? JSON.parse(parsedItem.value) : parsedItem; // Fallback to original item
-    } catch (error) {
-      // If parsing fails, return the original item (backward compatibility)
-      return JSON.parse(userStr);
-    }
+    // This method is kept for backward compatibility but returns null
+    // User data should be accessed from Redux store instead
+    return null;
   },
   
   setAuthUser: (user: any): void => {
-    if (typeof window === 'undefined') return;
-    
-    // Store with expiration date (3 months from now)
-    const expirationDate = new Date();
-    expirationDate.setMonth(expirationDate.getMonth() + 3);
-    
-    const itemWithExpiry = {
-      value: JSON.stringify(user),
-      expiry: expirationDate.getTime(),
-    };
-    
-    localStorage.setItem('auth_user', JSON.stringify(itemWithExpiry));
+    // This method is kept for backward compatibility but does nothing
+    // User data should be stored in Redux store instead
+    console.warn('setAuthUser called - user data should be stored in Redux, not localStorage');
   },
   
   clearAuth: () => {
     if (typeof window === 'undefined') return;
     localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_user');
+    // Note: auth_user is no longer stored in localStorage (moved to Redux)
     
     // Also clear superadmin token cookie
     document.cookie = 'superadmin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
@@ -114,16 +101,15 @@ export const simpleStorage = {
     localStorage.setItem('theme', theme);
   },
 
-  // Sidebar state
+  // Note: Sidebar state is now managed in Redux/Context, not localStorage
   getSidebarState: () => {
-    if (typeof window === 'undefined') return { isExpanded: true };
-    const stateStr = localStorage.getItem('sidebar_state');
-    return stateStr ? JSON.parse(stateStr) : { isExpanded: true };
+    // This method is kept for backward compatibility but returns default state
+    return { isExpanded: true };
   },
   
   setSidebarState: (state: any): void => {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem('sidebar_state', JSON.stringify(state));
+    // This method is kept for backward compatibility but does nothing
+    console.warn('setSidebarState called - sidebar state should be managed in Context, not localStorage');
   },
 
   // Clear all

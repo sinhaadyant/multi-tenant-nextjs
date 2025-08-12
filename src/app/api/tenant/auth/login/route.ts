@@ -11,7 +11,7 @@ export const POST = asyncHandler(async (req: NextRequest) => {
     console.log('🔐 Tenant login attempt');
   }
 
-  const { email, password, tenantSlug } = await req.json();
+  const { email, password, tenantSlug, rememberMe } = await req.json();
 
   // Validate required fields
   if (!email || !password || !tenantSlug) {
@@ -134,7 +134,7 @@ export const POST = asyncHandler(async (req: NextRequest) => {
       data: { lastLogin: new Date() }
     });
 
-    // Generate JWT tokens
+    // Generate JWT tokens with "Remember Me" support
     const tokenPayload = {
       id: user.id,
       email: user.email,
@@ -143,7 +143,7 @@ export const POST = asyncHandler(async (req: NextRequest) => {
       tenantSlug: tenant.slug
     };
 
-    const tokenPair = generateTokenPair(tokenPayload);
+    const tokenPair = generateTokenPair(tokenPayload, rememberMe === true);
 
     // Create audit log
     await createAuditLogFromRequest(
@@ -153,12 +153,13 @@ export const POST = asyncHandler(async (req: NextRequest) => {
       { 
         email: user.email,
         tenantId: tenant.id,
-        tenantSlug: tenant.slug
+        tenantSlug: tenant.slug,
+        rememberMe: rememberMe === true
       }
     );
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('✅ Tenant user login successful:', user.email, 'in tenant:', tenant.slug);
+      console.log('✅ Tenant user login successful:', user.email, 'in tenant:', tenant.slug, 'rememberMe:', rememberMe);
     }
 
     // Prepare user data for response (exclude sensitive information)

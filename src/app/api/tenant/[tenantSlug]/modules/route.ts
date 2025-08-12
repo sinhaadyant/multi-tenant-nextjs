@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { verifyToken } from '@/lib/jwt';
 import { checkTenantPermission } from '@/lib/permissions';
 
 // Permission constants for module management
@@ -17,9 +16,16 @@ export async function GET(
   { params }: { params: { tenantSlug: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const token = authHeader.substring(7);
+    const decoded = await verifyToken(token);
+    
+    if (!decoded || !decoded.userId) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
     const { tenantSlug } = params;
@@ -39,7 +45,7 @@ export async function GET(
     // Check if user has access to this tenant
     const user = await prisma.user.findFirst({
       where: {
-        email: session.user.email,
+        id: decoded.userId,
         tenantId: tenant.id
       },
       include: {

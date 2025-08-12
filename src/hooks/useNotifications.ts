@@ -17,6 +17,7 @@ export interface Notification {
   updatedAt: string;
   createdBy: string;
   createdByType: 'superadmin' | 'tenant_admin' | 'user';
+  isRead?: boolean;
   attachments?: Array<{
     filename: string;
     originalName: string;
@@ -42,6 +43,7 @@ export interface Notification {
 
 export interface NotificationResponse {
   notifications: Notification[];
+  unreadCount?: number;
   stats: {
     total: number;
     draft: number;
@@ -112,7 +114,7 @@ export const useNotifications = (filters: NotificationFilters = {}) => {
     queryFn: async (): Promise<NotificationResponse> => {
       try {
         const response = await api.get(`/superadmin/notifications?${queryParams.toString()}`);
-        return response.data.data;
+        return response.data.data || response.data;
       } catch (error: any) {
         console.error('Error fetching notifications:', error);
         throw error;
@@ -131,7 +133,7 @@ export const useCreateNotification = () => {
   return useMutation({
     mutationFn: async (data: CreateNotificationData): Promise<{ notification: Notification }> => {
       const response = await api.post('/superadmin/notifications', data);
-      return response.data.data;
+      return response.data;
     },
     onSuccess: (data) => {
       toast.success('Notification created successfully');
@@ -152,7 +154,7 @@ export const useUpdateNotification = () => {
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<CreateNotificationData> }): Promise<{ notification: Notification }> => {
       const response = await api.put(`/superadmin/notifications/${id}`, data);
-      return response.data.data;
+      return response.data;
     },
     onSuccess: (data) => {
       toast.success('Notification updated successfully');
@@ -197,7 +199,7 @@ export const useSendNotification = () => {
         action: 'send',
         notificationId,
       });
-      return response.data.data;
+      return response.data;
     },
     onSuccess: (data) => {
       toast.success('Notification sent successfully');
@@ -217,9 +219,29 @@ export const useNotification = (id: string) => {
     queryKey: ['notification', id],
     queryFn: async (): Promise<{ notification: Notification }> => {
       const response = await api.get(`/superadmin/notifications/${id}`);
-      return response.data.data;
+      return response.data;
     },
     enabled: !!id,
     staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
+// Mark notification as read
+export const useMarkNotificationAsRead = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (notificationId: string): Promise<any> => {
+      const response = await api.patch(`/superadmin/notifications/${notificationId}/read`);
+      return response.data;
+    },
+    onSuccess: () => {
+      // Invalidate notifications cache to refresh the list
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.message || 'Failed to mark notification as read';
+      toast.error(errorMessage);
+    },
   });
 }; 

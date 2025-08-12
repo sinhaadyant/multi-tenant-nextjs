@@ -31,6 +31,7 @@ export const GET = asyncHandler(async (req: NextRequest) => {
   const search = searchParams.get('search') || '';
   const status = searchParams.get('status') || '';
   const plan = searchParams.get('plan') || '';
+  const region = searchParams.get('region') || '';
   const sortBy = searchParams.get('sortBy') || 'createdAt';
   const sortOrder = searchParams.get('sortOrder') || 'desc';
 
@@ -53,6 +54,10 @@ export const GET = asyncHandler(async (req: NextRequest) => {
 
   if (plan) {
     where.plan = plan;
+  }
+
+  if (region) {
+    where.region = region;
   }
 
   // Build order by clause

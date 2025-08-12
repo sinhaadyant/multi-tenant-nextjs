@@ -23,15 +23,15 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose }) => {
     limit: 10,
   });
 
-  const { data: trendingResults } = useTrendingResults(5);
+  const trendingResultsQuery = useTrendingResults(5);
 
-  const allResults = query.trim() ? results : trendingResults || [];
-  const showResults = isOpen && (query.trim() || trendingResults?.length);
+  const allResults: SearchResult[] = query.trim() ? results : (trendingResultsQuery.data as SearchResult[] || []);
+  const showResults = isOpen && (query.trim() || (trendingResultsQuery.data && (trendingResultsQuery.data as SearchResult[]).length > 0));
 
   // Reset selected index when results change
   useEffect(() => {
     setSelectedIndex(0);
-  }, [results, trendingResults]);
+  }, [results, trendingResultsQuery.data]);
 
   // Focus input when opened
   useEffect(() => {
@@ -186,7 +186,7 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose }) => {
                     >
                       <div className="flex items-start space-x-3">
                         <div className="flex-shrink-0 text-2xl">
-                          {result.icon}
+                          <span>{String(result.icon || '🔍')}</span>
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-2">

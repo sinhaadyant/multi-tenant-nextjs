@@ -38,38 +38,38 @@ export const GET = asyncHandler(async (req: NextRequest) => {
     ] = await Promise.all([
       // Total reports
       prisma.report.count({
-        where: { generatedBy: superAdmin.id }
+        where: { superAdminId: superAdmin.id }
       }),
       
       // Reports this month
       prisma.report.count({
         where: {
-          generatedBy: superAdmin.id,
+          superAdminId: superAdmin.id,
           createdAt: { gte: thirtyDaysAgo }
         }
       }),
       
-      // Reports by status
+      // Reports by status - Note: Report model doesn't have status field, using type instead
       prisma.report.groupBy({
-        by: ['status'],
-        where: { generatedBy: superAdmin.id },
-        _count: { status: true }
+        by: ['type'],
+        where: { superAdminId: superAdmin.id },
+        _count: { type: true }
       }),
       
       // Reports by type
       prisma.report.groupBy({
-        by: ['reportType'],
-        where: { generatedBy: superAdmin.id },
-        _count: { reportType: true }
+        by: ['type'],
+        where: { superAdminId: superAdmin.id },
+        _count: { type: true }
       }),
       
       // Recent reports (last 5)
       prisma.report.findMany({
-        where: { generatedBy: superAdmin.id },
+        where: { superAdminId: superAdmin.id },
         orderBy: { createdAt: 'desc' },
         take: 5,
         include: {
-          generatedBy: {
+          superAdmin: {
             select: { name: true, email: true }
           }
         }
@@ -98,29 +98,31 @@ export const GET = asyncHandler(async (req: NextRequest) => {
       prisma.auditLog.count()
     ]);
 
-    // Process status counts
-    const statusCounts = {
-      generating: 0,
-      ready: 0,
-      failed: 0
-    };
-    
-    reportsByStatus.forEach(item => {
-      statusCounts[item.status as keyof typeof statusCounts] = item._count.status;
-    });
-
-    // Process type counts
+    // Process type counts (since Report model doesn't have status field)
     const typeCounts = {
       user_activity: 0,
       tenant_summary: 0,
       login_history: 0,
       audit_logs: 0,
-      system_health: 0
+      system_health: 0,
+      other: 0
     };
     
     reportsByType.forEach(item => {
-      typeCounts[item.reportType as keyof typeof typeCounts] = item._count.reportType;
+      const reportType = item.type as keyof typeof typeCounts;
+      if (typeCounts.hasOwnProperty(reportType)) {
+        typeCounts[reportType] = item._count.type;
+      } else {
+        typeCounts.other = item._count.type;
+      }
     });
+
+    // Since Report model doesn't have status, we'll use a simplified status structure
+    const statusCounts = {
+      completed: totalReports,
+      generating: 0,
+      failed: 0
+    };
 
     if (process.env.NODE_ENV === 'development') {
       console.log('✅ Reports overview fetched successfully');

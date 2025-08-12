@@ -162,15 +162,16 @@ const TenantsPage: React.FC = () => {
   }, [confirm, deleteTenantMutation]);
 
   const handleToggleStatus = useCallback((tenant: Tenant) => {
-    const action = tenant.isActive ? 'suspend' : 'activate';
+    const isCurrentlyActive = tenant.status === 'active';
+    const action = isCurrentlyActive ? 'suspend' : 'activate';
     confirm({
       title: `${action.charAt(0).toUpperCase() + action.slice(1)} Tenant`,
-      message: `Are you sure you want to ${action} "${tenant.name}"? ${tenant.isActive ? 'All users will lose access to the system until reactivated.' : 'All users will regain access to the system.'}`,
+      message: `Are you sure you want to ${action} "${tenant.name}"? ${isCurrentlyActive ? 'All users will lose access to the system until reactivated.' : 'All users will regain access to the system.'}`,
       confirmText: action.charAt(0).toUpperCase() + action.slice(1),
-      variant: tenant.isActive ? 'warning' : 'success',
+      variant: isCurrentlyActive ? 'warning' : 'success',
       onConfirm: () => toggleStatusMutation.mutate({
         id: tenant.id,
-        isActive: !tenant.isActive
+        isActive: !isCurrentlyActive
       }),
     });
   }, [confirm, toggleStatusMutation]);

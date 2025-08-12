@@ -64,7 +64,8 @@ const ActionsCellRenderer = memo(({ data, onView, onEdit, onDelete }: ICellRende
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+        className="flex items-center justify-center w-8 h-8 rounded-md bg-gray-50 hover:bg-gray-100 text-gray-400 hover:text-gray-600 dark:bg-gray-900/20 dark:hover:bg-gray-900/30 dark:hover:text-gray-300 transition-colors"
+        title="Actions"
       >
         <MoreHorizontal className="w-4 h-4" />
       </button>
@@ -75,7 +76,7 @@ const ActionsCellRenderer = memo(({ data, onView, onEdit, onDelete }: ICellRende
             {onView && (
               <button
                 onClick={() => handleAction('view')}
-                className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
                 <Eye className="w-4 h-4 mr-3" />
                 View
@@ -84,7 +85,7 @@ const ActionsCellRenderer = memo(({ data, onView, onEdit, onDelete }: ICellRende
             {onEdit && (
               <button
                 onClick={() => handleAction('edit')}
-                className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
                 <Edit className="w-4 h-4 mr-3" />
                 Edit
@@ -93,7 +94,7 @@ const ActionsCellRenderer = memo(({ data, onView, onEdit, onDelete }: ICellRende
             {onDelete && (
               <button
                 onClick={() => handleAction('delete')}
-                className="flex items-center w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="flex items-center w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
                 <Trash2 className="w-4 h-4 mr-3" />
                 Delete
