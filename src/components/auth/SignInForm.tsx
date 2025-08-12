@@ -33,20 +33,21 @@ export default function SignInForm({ superAdmin }: { superAdmin?: boolean }) {
 
   // Login mutation
   const loginMutation = useMutation({
-    mutationFn: (data: LoginFormData): Promise<LoginResponse> => {
+    mutationFn: (data: LoginFormData & { rememberMe?: boolean }): Promise<LoginResponse> => {
       return login(data);
     },
     onSuccess: (response: LoginResponse) => {
       if (response.success && response.data) {
         try {
-          // Store auth data using storage utility
-          simpleStorage.setAuthToken(response.data.token);
+          // Store auth data using storage utility with "Remember Me" preference
+          simpleStorage.setAuthToken(response.data.token, isChecked);
           simpleStorage.setAuthUser(response.data.user);
           
           // For superadmin, also ensure the cookie is properly set
           if (response.data.user.role === 'superadmin') {
-            // Set cookie for superadmin token
-            document.cookie = `superadmin_token=${response.data.token}; path=/; max-age=900; samesite=lax`;
+            // Set cookie for superadmin token with appropriate expiration
+            const cookieMaxAge = isChecked ? 30 * 24 * 60 * 60 : 7 * 24 * 60 * 60; // 30 days or 7 days
+            document.cookie = `superadmin_token=${response.data.token}; path=/; max-age=${cookieMaxAge}; samesite=lax`;
           }
           
           // Update Redux state
@@ -80,7 +81,12 @@ export default function SignInForm({ superAdmin }: { superAdmin?: boolean }) {
   });
 
   const onSubmit = (data: LoginFormData) => {
-    loginMutation.mutate(data);
+    // Include rememberMe in the login data
+    const loginData = {
+      ...data,
+      rememberMe: isChecked
+    };
+    loginMutation.mutate(loginData);
   };
 
   return (

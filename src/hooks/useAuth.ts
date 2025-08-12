@@ -1,18 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { setLogin, setLogout, updateUser, selectAuth, User } from '@/store/slices/authSlice';
+import { clearPermissions } from '@/store/slices/permissionsSlice';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { simpleStorage } from '@/lib/simpleStorage';
 
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-  tenantId?: string;
-  tenantSlug?: string;
-  avatar?: string;
-}
 
 interface AuthState {
   user: User | null;
@@ -35,12 +29,30 @@ interface LoginResponse {
 
 export const useAuth = () => {
   const router = useRouter();
-  const [state, setState] = useState<AuthState>({
-    user: null,
-    isAuthenticated: false,
-    isLoading: true,
-    error: null
-  });
+  const dispatch = useAppDispatch();
+  const authState = useAppSelector(selectAuth);
+  
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Define clearAuth first to avoid hoisting issues
+  const clearAuth = useCallback(() => {
+    // Clear auth token from localStorage
+    simpleStorage.clearAuth();
+    
+    // Clear other storage locations
+    localStorage.removeItem('refresh_token');
+    sessionStorage.removeItem('access_token');
+    sessionStorage.removeItem('auth_token');
+    
+    // Clear cookies
+    document.cookie = 'superadmin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    document.cookie = 'refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+
+    // Clear Redux state
+    dispatch(setLogout());
+    dispatch(clearPermissions());
+  }, [dispatch]);
 
   // Check authentication status on mount
   useEffect(() => {
@@ -49,10 +61,11 @@ export const useAuth = () => {
 
   const checkAuthStatus = useCallback(async () => {
     try {
-      setState(prev => ({ ...prev, isLoading: true, error: null }));
+      setIsLoading(true);
+      setError(null);
 
-      // Check if we have a token in localStorage or sessionStorage
-      let token = simpleStorage.getAuthToken() || localStorage.getItem('auth_token') || sessionStorage.getItem('access_token');
+      // Check if we have a token in localStorage
+      let token = simpleStorage.getAuthToken();
       
       // If no token in storage, check for superadmin token in cookies
       if (!token) {
@@ -69,12 +82,7 @@ export const useAuth = () => {
       }
       
       if (!token) {
-        setState({
-          user: null,
-          isAuthenticated: false,
-          isLoading: false,
-          error: null
-        });
+        setIsLoading(false);
         return;
       }
 
@@ -82,7 +90,7 @@ export const useAuth = () => {
       const response = await api.get('/auth/verify');
       
       if (response.data.success) {
-        const userData = response.data.data;
+        const userData = response.data;
         
         // Ensure we have the correct user data structure
         const user = {
@@ -95,12 +103,8 @@ export const useAuth = () => {
           avatar: userData.avatar
         };
         
-        setState({
-          user,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null
-        });
+        // Update Redux state with user data
+        dispatch(updateUser(user));
       } else {
         // Token is invalid, clear it
         clearAuth();
@@ -112,18 +116,17 @@ export const useAuth = () => {
       if (error.response?.status === 401) {
         clearAuth();
       } else {
-        setState(prev => ({
-          ...prev,
-          isLoading: false,
-          error: 'Failed to verify authentication'
-        }));
+        setError('Failed to verify authentication');
       }
+    } finally {
+      setIsLoading(false);
     }
-  }, []);
+  }, [clearAuth]);
 
-  const login = useCallback(async (credentials: LoginCredentials): Promise<boolean> => {
+  const login = useCallback(async (credentials: LoginCredentials & { rememberMe?: boolean }): Promise<boolean> => {
     try {
-      setState(prev => ({ ...prev, isLoading: true, error: null }));
+      setIsLoading(true);
+      setError(null);
 
       const endpoint = credentials.tenantSlug 
         ? `/tenant/auth/login`
@@ -132,23 +135,23 @@ export const useAuth = () => {
       const response = await api.post(endpoint, credentials);
       
       if (response.data.success) {
-        const { user, token, refreshToken } = response.data.data;
+        const { user, token, refreshToken } = response.data;
         
-        // Store tokens using simpleStorage for consistency
-        simpleStorage.setAuthToken(token);
+        // Store tokens using simpleStorage with "Remember Me" preference
+        simpleStorage.setAuthToken(token, credentials.rememberMe || false);
         simpleStorage.setAuthUser(user);
         
         if (refreshToken) {
           localStorage.setItem('refresh_token', refreshToken);
         }
         
-        // Update state
-        setState({
+        // Update Redux state with user data
+        dispatch(setLogin({
           user,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null
-        });
+          token,
+          refreshToken: refreshToken || '',
+          email: user.email,
+        }));
 
         // Show success message
         toast.success('Login successful!');
@@ -172,16 +175,13 @@ export const useAuth = () => {
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || error.message || 'Login failed';
       
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: errorMessage
-      }));
-
+      setError(errorMessage);
       toast.error(errorMessage);
       return false;
+    } finally {
+      setIsLoading(false);
     }
-  }, [router]);
+  }, [router, dispatch]);
 
   const logout = useCallback(async (options: {
     redirect?: boolean;
@@ -190,53 +190,45 @@ export const useAuth = () => {
   } = {}) => {
     const { redirect = true, redirectTo, showToast = true } = options;
 
+    // Prevent multiple logout calls
+    if (isLoading) {
+      return;
+    }
+
     try {
+      setIsLoading(true);
+
       // Call logout endpoint if user is authenticated
-      if (state.isAuthenticated) {
-        await api.post('/auth/logout');
+      if (authState.isLoggedIn) {
+        const endpoint = authState.user?.role === 'superadmin' 
+          ? '/superadmin/auth/logout'
+          : '/auth/logout';
+        
+        try {
+          await api.post(endpoint);
+        } catch (error) {
+          // Ignore logout API errors, just clear local data
+          console.warn('Logout API call failed:', error);
+        }
       }
-    } catch (error) {
-      // Ignore logout API errors, just clear local data
-      console.warn('Logout API call failed:', error);
+    } catch (error: any) {
+      // Ignore any errors during logout
+      console.warn('Logout error:', error);
+    } finally {
+      // Always clear auth data
+      clearAuth();
+
+      if (showToast) {
+        toast.success('Logged out successfully');
+      }
+
+      // Redirect if requested
+      if (redirect) {
+        const loginPath = redirectTo || (authState.user?.role === 'superadmin' ? '/superadmin/login' : '/auth/sign-in');
+        router.push(loginPath);
+      }
     }
-
-    // Clear auth data
-    clearAuth();
-
-    if (showToast) {
-      toast.success('Logged out successfully');
-    }
-
-    // Redirect if requested
-    if (redirect) {
-      const loginPath = redirectTo || (state.user?.role === 'superadmin' ? '/superadmin/login' : '/login');
-      router.push(loginPath);
-    }
-  }, [state.isAuthenticated, state.user?.role, router]);
-
-  const clearAuth = useCallback(() => {
-    // Clear all auth data using simpleStorage
-    simpleStorage.clearAuth();
-    
-    // Also clear other storage locations
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('refresh_token');
-    sessionStorage.removeItem('access_token');
-    sessionStorage.removeItem('auth_token');
-    localStorage.removeItem('persist:superadmin-root');
-    
-    // Clear cookies
-    document.cookie = 'superadmin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-    document.cookie = 'refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-
-    // Reset state
-    setState({
-      user: null,
-      isAuthenticated: false,
-      isLoading: false,
-      error: null
-    });
-  }, []);
+  }, [isLoading, authState.isLoggedIn, authState.user?.role, router, clearAuth]);
 
   const refreshToken = useCallback(async (): Promise<boolean> => {
     try {
@@ -246,47 +238,53 @@ export const useAuth = () => {
         return false;
       }
 
-      const response = await api.post('/auth/refresh', { refreshToken });
+      // Determine the correct refresh endpoint based on user role
+      const userRole = authState.user?.role;
+      const endpoint = userRole === 'superadmin' 
+        ? '/superadmin/auth/refresh'
+        : '/tenant/auth/refresh';
+
+      const response = await api.post(endpoint, { refreshToken });
       
       if (response.data.success) {
-        const { token, refreshToken: newRefreshToken } = response.data.data;
+        const { accessToken, refreshToken: newRefreshToken } = response.data;
         
         // Update tokens
-        simpleStorage.setAuthToken(token);
+        simpleStorage.setAuthToken(accessToken, false); // Default to session storage for refresh
         if (newRefreshToken) {
           localStorage.setItem('refresh_token', newRefreshToken);
         }
         
         return true;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Token refresh failed:', error);
-      clearAuth();
+      // Only clear auth if it's a 401 error (invalid token)
+      if (error.response?.status === 401) {
+        clearAuth();
+      }
     }
     
     return false;
-  }, [clearAuth]);
+  }, [clearAuth, authState.user?.role]);
 
-  const updateUser = useCallback((userData: Partial<User>) => {
-    setState(prev => ({
-      ...prev,
-      user: prev.user ? { ...prev.user, ...userData } : null
-    }));
-  }, []);
+  const updateUserData = useCallback((userData: Partial<User>) => {
+    dispatch(updateUser(userData));
+  }, [dispatch]);
 
   return {
     // State
-    user: state.user,
-    isAuthenticated: state.isAuthenticated,
-    isLoading: state.isLoading,
-    error: state.error,
+    user: authState.user,
+    isAuthenticated: authState.isLoggedIn,
+    isLoading,
+    error,
     
     // Actions
     login,
     logout,
     checkAuthStatus,
     refreshToken,
-    updateUser,
+    updateUser: updateUserData,
     clearAuth
   };
 }; 

@@ -44,7 +44,7 @@ const useTenantRealTimeStats = (tenantSlug: string) => {
       setLoading(true);
       const response = await api.get(`/tenant/${tenantSlug}/dashboard/stats`);
       if (response.data.success) {
-        setStats(response.data.data);
+        setStats(response.data);
       } else {
         throw new Error(response.data.message || 'Failed to fetch stats');
       }

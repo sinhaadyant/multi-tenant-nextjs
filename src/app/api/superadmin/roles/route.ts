@@ -12,8 +12,41 @@ export const GET = asyncHandler(async (req: NextRequest) => {
     return authResult;
   }
 
+  const { searchParams } = new URL(req.url);
+  const tenantId = searchParams.get('tenantId');
+  const search = searchParams.get('search');
+  const status = searchParams.get('status');
+  const sortBy = searchParams.get('sortBy') || 'createdAt';
+  const sortOrder = searchParams.get('sortOrder') || 'desc';
+  const page = parseInt(searchParams.get('page') || '1');
+  const limit = parseInt(searchParams.get('limit') || '10');
+  const offset = (page - 1) * limit;
+
   try {
+    // Build where clause
+    const where: any = {};
+    
+    if (tenantId) {
+      where.tenantId = tenantId;
+    }
+    
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+    
+    if (status && status !== 'all') {
+      where.isActive = status === 'active';
+    }
+
+    // Build orderBy clause
+    const orderBy: any = {};
+    orderBy[sortBy] = sortOrder;
+
     const roles = await prisma.role.findMany({
+      where,
       include: {
         permissions: {
           include: {
@@ -24,8 +57,14 @@ export const GET = asyncHandler(async (req: NextRequest) => {
           select: { userRoles: true }
         }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy,
+      skip: offset,
+      take: limit
     });
+
+    // Get total count for pagination
+    const totalRoles = await prisma.role.count({ where });
+    const totalPages = Math.ceil(totalRoles / limit);
 
     // Transform the data to match the expected format
     const transformedRoles = roles.map(role => ({
@@ -47,10 +86,22 @@ export const GET = asyncHandler(async (req: NextRequest) => {
     }));
 
     await createAuditLogFromRequest(req, authResult, 'role.list', {
-      rolesCount: transformedRoles.length
+      rolesCount: transformedRoles.length,
+      tenantId,
+      filters: { search, status, sortBy, sortOrder, page, limit }
     });
 
-    return createSuccessResponse({ roles: transformedRoles }, 'Roles retrieved successfully');
+    return createSuccessResponse({ 
+      roles: transformedRoles,
+      pagination: {
+        page,
+        limit,
+        totalRoles,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1
+      }
+    }, 'Roles retrieved successfully');
   } catch (error) {
     console.error('Error fetching roles:', error);
     throw error;
@@ -64,7 +115,7 @@ export const POST = asyncHandler(async (req: NextRequest) => {
     return authResult;
   }
 
-  const { name, description, isTemplate = false, permissions = [] } = await req.json();
+  const { name, description, isTemplate = false, permissions = [], tenantId } = await req.json();
 
   // Validation
   if (!name || name.trim().length === 0) {
@@ -86,9 +137,12 @@ export const POST = asyncHandler(async (req: NextRequest) => {
   }
 
   try {
-    // Check for duplicate role name
+    // Check for duplicate role name within the same tenant
     const existingRole = await prisma.role.findFirst({
-      where: { name: name.trim() }
+      where: { 
+        name: name.trim(),
+        tenantId: tenantId || null
+      }
     });
 
     if (existingRole) {
@@ -104,7 +158,8 @@ export const POST = asyncHandler(async (req: NextRequest) => {
           name: name.trim(),
           description: description?.trim() || null,
           isTemplate,
-          isActive: true
+          isActive: true,
+          tenantId: tenantId || null
         }
       });
 

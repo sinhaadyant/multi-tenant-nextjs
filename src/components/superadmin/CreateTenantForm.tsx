@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -19,7 +19,7 @@ interface CreateTenantFormProps {
   onCancel: () => void;
 }
 
-// Countries list
+// Countries list - memoized to prevent re-creation
 const countries = [
   { code: 'US', name: 'United States' },
   { code: 'CA', name: 'Canada' },
@@ -41,9 +41,9 @@ const countries = [
   { code: 'CN', name: 'China' },
   { code: 'RU', name: 'Russia' },
   { code: 'ZA', name: 'South Africa' },
-];
+] as const;
 
-// Industry types
+// Industry types - memoized to prevent re-creation
 const industryTypes = [
   'Technology',
   'Healthcare',
@@ -59,9 +59,9 @@ const industryTypes = [
   'Non-Profit',
   'Government',
   'Other'
-];
+] as const;
 
-export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFormProps) {
+const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [subdomainChecking, setSubdomainChecking] = useState(false);
@@ -70,6 +70,24 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
   const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Memoize form default values to prevent re-creation
+  const defaultValues = useMemo(() => ({
+    tenantName: '',
+    companyName: '',
+    subdomain: '',
+    tenantType: 'SaaS' as const,
+    industryType: '',
+    country: '',
+    address: '',
+    description: '',
+    status: true,
+    adminFullName: '',
+    adminEmail: '',
+    adminMobile: '',
+    adminPassword: '',
+    confirmPassword: ''
+  }), []);
 
   const {
     control,
@@ -82,13 +100,7 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
     reset
   } = useForm<CreateTenantFormData>({
     resolver: zodResolver(createTenantSchema),
-    defaultValues: {
-      status: true,
-      tenantType: 'SaaS',
-      country: '',
-      industryType: '',
-      address: ''
-    }
+    defaultValues
   });
 
   const watchedSubdomain = watch('subdomain');
@@ -97,172 +109,254 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
   // Email validation hook
   const checkEmailMutation = useCheckEmail();
 
-  // Clear form error when user starts making changes
-  useEffect(() => {
+  // Clear form error when user starts making changes - memoized callback
+  const clearFormError = useCallback(() => {
     if (formError) {
       setFormError(null);
     }
-  }, [watchedSubdomain, watchedEmail, formError]);
+  }, [formError]);
 
-  // Check email availability
   useEffect(() => {
-    const checkEmail = async () => {
-      if (!watchedEmail || watchedEmail.length < 5 || !watchedEmail.includes('@')) {
-        setEmailAvailable(null);
-        setEmailError(null);
-        return;
-      }
+    clearFormError();
+  }, [watchedSubdomain, watchedEmail, clearFormError]);
 
-      setEmailChecking(true);
+  // Check email availability - memoized callback
+  const checkEmail = useCallback(async () => {
+    if (!watchedEmail || watchedEmail.length < 5 || !watchedEmail.includes('@')) {
+      setEmailAvailable(null);
       setEmailError(null);
+      return;
+    }
+
+    setEmailChecking(true);
+    setEmailError(null);
+    
+    try {
+      const result = await checkEmailMutation.mutateAsync({ email: watchedEmail });
       
-      try {
-        const result = await checkEmailMutation.mutateAsync({ email: watchedEmail });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📧 Email validation response:', {
+          email: watchedEmail,
+          result,
+          available: result.data.available,
+          existsIn: result.data.existsIn,
+          details: result.data.details,
+          tenantName: result.data.details?.tenantName
+        });
+      }
+      
+      if (result.data.available) {
+        setEmailAvailable(true);
+        setEmailError(null);
+        clearErrors('adminEmail');
+      } else {
+        setEmailAvailable(false);
+        let errorMessage = 'Email is not available';
+        
+        if (result.data.existsIn === 'tenant') {
+          errorMessage = `Email is already registered in tenant: ${result.data.details.tenantName || 'Unknown'}`;
+        } else if (result.data.existsIn === 'superadmin') {
+          errorMessage = 'Email is already registered as a SuperAdmin';
+        }
+        
+        setEmailError(errorMessage);
+        setError('adminEmail', { message: errorMessage });
         
         if (process.env.NODE_ENV === 'development') {
-          console.log('📧 Email validation response:', {
-            email: watchedEmail,
-            result,
-            available: result.data.available,
-            existsIn: result.data.existsIn,
-            details: result.data.details,
-            tenantName: result.data.details?.tenantName
-          });
+          console.log('📧 Email validation error set:', errorMessage);
         }
-        
-        if (result.data.available) {
-          setEmailAvailable(true);
-          setEmailError(null);
-          clearErrors('adminEmail');
-        } else {
-          setEmailAvailable(false);
-          let errorMessage = 'Email is not available';
-          
-          if (result.data.existsIn === 'tenant') {
-            errorMessage = `Email is already registered in tenant: ${result.data.details.tenantName || 'Unknown'}`;
-          } else if (result.data.existsIn === 'superadmin') {
-            errorMessage = 'Email is already registered as a SuperAdmin';
-          }
-          
-          setEmailError(errorMessage);
-          setError('adminEmail', { message: errorMessage });
-          
-          if (process.env.NODE_ENV === 'development') {
-            console.log('📧 Email validation error set:', errorMessage);
-          }
-        }
-      } catch (error) {
-        console.error('Error checking email:', error);
-        setEmailAvailable(false);
-        setEmailError('Error checking email availability');
-      } finally {
-        setEmailChecking(false);
       }
-    };
-
-    const debounceTimer = setTimeout(checkEmail, 500);
-    return () => clearTimeout(debounceTimer);
+    } catch (error) {
+      console.error('Error checking email:', error);
+      setEmailAvailable(false);
+      setEmailError('Error checking email availability');
+    } finally {
+      setEmailChecking(false);
+    }
   }, [watchedEmail, setError, clearErrors, checkEmailMutation]);
 
-  // Check subdomain availability
   useEffect(() => {
-    const checkSubdomain = async () => {
-      if (!watchedSubdomain || watchedSubdomain.length < 3) {
-        setSubdomainAvailable(null);
-        return;
-      }
-
-      setSubdomainChecking(true);
-      try {
-        const response = await api.get(`/superadmin/tenants/check-subdomain?subdomain=${watchedSubdomain}`);
-        const available = response.data.data.available;
-        
-        if (process.env.NODE_ENV === 'development') {
-          console.log('🔍 Subdomain validation response:', {
-            subdomain: watchedSubdomain,
-            available,
-            responseData: response.data
-          });
-        }
-        
-        setSubdomainAvailable(available);
-        if (available) {
-          clearErrors('subdomain');
-        } else {
-          setError('subdomain', { message: 'This subdomain is already taken' });
-        }
-      } catch (error) {
-        console.error('Error checking subdomain:', error);
-        setSubdomainAvailable(false);
-      } finally {
-        setSubdomainChecking(false);
-      }
-    };
-
-    const debounceTimer = setTimeout(checkSubdomain, 500);
+    const debounceTimer = setTimeout(checkEmail, 500);
     return () => clearTimeout(debounceTimer);
+  }, [checkEmail]);
+
+  // Check subdomain availability - memoized callback
+  const checkSubdomain = useCallback(async () => {
+    if (!watchedSubdomain || watchedSubdomain.length < 3) {
+      setSubdomainAvailable(null);
+      return;
+    }
+
+    setSubdomainChecking(true);
+    try {
+      const response = await api.get(`/superadmin/tenants/check-subdomain?subdomain=${watchedSubdomain}`);
+      const available = response.data.available;
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 Subdomain validation response:', {
+          subdomain: watchedSubdomain,
+          available,
+          responseData: response.data
+        });
+      }
+      
+      setSubdomainAvailable(available);
+      if (available) {
+        clearErrors('subdomain');
+      } else {
+        setError('subdomain', { message: 'This subdomain is already taken' });
+      }
+    } catch (error) {
+      console.error('Error checking subdomain:', error);
+      setSubdomainAvailable(false);
+    } finally {
+      setSubdomainChecking(false);
+    }
   }, [watchedSubdomain, setError, clearErrors]);
 
-  // Create tenant mutation
-  const createTenantMutation = useMutation({
-    mutationFn: async (data: CreateTenantFormData) => {
-      const response = await api.post('/superadmin/tenants', {
-        tenant: {
-          name: data.tenantName,
-          companyName: data.companyName,
-          slug: data.subdomain,
-          domain: `${data.subdomain}.example.com`,
-          description: `${data.companyName} - ${data.tenantType} tenant`,
-          plan: data.tenantType.toLowerCase(),
-          region: data.country,
-          features: ['analytics', 'api', 'sso'],
-          isActive: data.status,
-          metadata: {
-            industryType: data.industryType,
-            address: data.address,
-            country: data.country
-          }
-        },
-        admin: {
-          name: data.adminFullName,
-          email: data.adminEmail,
-          password: data.adminPassword,
-          contactNumber: data.adminMobile,
-          isActive: true
+  useEffect(() => {
+    const debounceTimer = setTimeout(checkSubdomain, 500);
+    return () => clearTimeout(debounceTimer);
+  }, [checkSubdomain]);
+
+  // Create tenant mutation - memoized callbacks
+  const mutationFn = useCallback(async (data: CreateTenantFormData) => {
+    const response = await api.post('/superadmin/tenants', {
+      tenant: {
+        name: data.tenantName,
+        companyName: data.companyName,
+        slug: data.subdomain,
+        domain: `${data.subdomain}.example.com`,
+        description: `${data.companyName} - ${data.tenantType} tenant`,
+        plan: data.tenantType.toLowerCase(),
+        region: data.country,
+        features: ['analytics', 'api', 'sso'],
+        isActive: data.status,
+        metadata: {
+          industryType: data.industryType,
+          address: data.address,
+          country: data.country
         }
-      });
-      return response.data;
-    },
-    onSuccess: (data) => {
-      setFormError(null); // Clear any previous form errors
-      toast.success('Tenant and Admin User created successfully!');
-      onSuccess(data);
-    },
-    onError: (error: any) => {
-      // Log detailed error in development
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Tenant creation error:', error);
-        console.error('Error response:', error.response?.data);
+      },
+      admin: {
+        name: data.adminFullName,
+        email: data.adminEmail,
+        password: data.adminPassword,
+        contactNumber: data.adminMobile,
+        isActive: true
       }
-      
-      // Show user-friendly error message in form
-      let errorMessage = 'Failed to create tenant. Please try again.';
-      
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.response?.status === 409) {
-        errorMessage = 'A tenant with this subdomain already exists.';
-      } else if (error.response?.status === 400) {
-        errorMessage = 'Please check your input and try again.';
-      } else if (error.response?.status >= 500) {
-        errorMessage = 'Server error. Please try again later.';
-      }
-      
-      setFormError(errorMessage);
+    });
+    return response.data;
+  }, []);
+
+  const handleMutationSuccess = useCallback((data: any) => {
+    setFormError(null); // Clear any previous form errors
+    toast.success('Tenant and Admin User created successfully!');
+    onSuccess(data);
+  }, [onSuccess]);
+
+  const onError = useCallback((error: any) => {
+    // Log detailed error in development
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Tenant creation error:', error);
+      console.error('Error response:', error.response?.data);
     }
+    
+    // Show user-friendly error message in form
+    let errorMessage = 'Failed to create tenant. Please try again.';
+    
+    if (error.response?.data?.message) {
+      errorMessage = error.response.data.message;
+    } else if (error.response?.status === 409) {
+      errorMessage = 'A tenant with this subdomain already exists.';
+    } else if (error.response?.status === 400) {
+      errorMessage = 'Please check your input and try again.';
+    } else if (error.response?.status >= 500) {
+      errorMessage = 'Server error. Please try again later.';
+    }
+    
+    setFormError(errorMessage);
+  }, []);
+
+  const createTenantMutation = useMutation({
+    mutationFn,
+    onSuccess: handleMutationSuccess,
+    onError
   });
 
-  const onSubmit = (data: any) => {
+    const getPasswordStrength = useCallback((password: string) => {
+    if (!password) return { score: 0, label: 'Very Weak', color: 'text-red-500', bgColor: 'bg-red-500', requirements: [] };
+    
+    const requirements = [];
+    let score = 0;
+    
+    // Length check
+    if (password.length >= 8) {
+      score++;
+      requirements.push({ met: true, text: 'At least 8 characters' });
+    } else {
+      requirements.push({ met: false, text: 'At least 8 characters' });
+    }
+    
+    // Uppercase check
+    if (/[A-Z]/.test(password)) {
+      score++;
+      requirements.push({ met: true, text: 'One uppercase letter' });
+    } else {
+      requirements.push({ met: false, text: 'One uppercase letter' });
+    }
+    
+    // Lowercase check
+    if (/[a-z]/.test(password)) {
+      score++;
+      requirements.push({ met: true, text: 'One lowercase letter' });
+    } else {
+      requirements.push({ met: false, text: 'One lowercase letter' });
+    }
+    
+    // Number check
+    if (/[0-9]/.test(password)) {
+      score++;
+      requirements.push({ met: true, text: 'One number' });
+    } else {
+      requirements.push({ met: false, text: 'One number' });
+    }
+    
+    // Special character check
+    if (/[^A-Za-z0-9]/.test(password)) {
+      score++;
+      requirements.push({ met: true, text: 'One special character' });
+    } else {
+      requirements.push({ met: false, text: 'One special character' });
+    }
+    
+    const strengthConfig = [
+      { label: 'Very Weak', color: 'text-red-500', bgColor: 'bg-red-500' },
+      { label: 'Weak', color: 'text-orange-500', bgColor: 'bg-orange-500' },
+      { label: 'Fair', color: 'text-yellow-500', bgColor: 'bg-yellow-500' },
+      { label: 'Good', color: 'text-blue-500', bgColor: 'bg-blue-500' },
+      { label: 'Strong', color: 'text-green-500', bgColor: 'bg-green-500' }
+    ];
+    
+    const config = strengthConfig[score - 1] || strengthConfig[0];
+    
+    return {
+      score,
+      label: config.label,
+      color: config.color,
+      bgColor: config.bgColor,
+      requirements
+    };
+  }, []);
+
+  const watchedPassword = watch('adminPassword');
+  const passwordStrength = useMemo(() => getPasswordStrength(watchedPassword), [getPasswordStrength, watchedPassword]);
+
+
+
+  const onSubmit = useCallback((data: any) => {
+    console.log('Form submission started with data:', data);
+    
     // Custom validation for subdomain and email availability
     let hasErrors = false;
     
@@ -284,34 +378,22 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
       hasErrors = true;
     }
     
+    // Additional password strength validation
+    if (passwordStrength.score < 3) {
+      setError('adminPassword', { 
+        message: 'Password is too weak. Please choose a stronger password.' 
+      });
+      hasErrors = true;
+    }
+    
     if (hasErrors) {
+      console.log('Form validation failed');
       return;
     }
     
+    console.log('Form validation passed, submitting...');
     createTenantMutation.mutate(data);
-  };
-
-  const getPasswordStrength = (password: string) => {
-    if (!password) return { score: 0, label: '', color: '' };
-    
-    let score = 0;
-    if (password.length >= 8) score++;
-    if (/[A-Z]/.test(password)) score++;
-    if (/[a-z]/.test(password)) score++;
-    if (/[0-9]/.test(password)) score++;
-    if (/[^A-Za-z0-9]/.test(password)) score++;
-
-    const labels = ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong'];
-    const colors = ['text-red-500', 'text-orange-500', 'text-yellow-500', 'text-blue-500', 'text-green-500'];
-    
-    return {
-      score,
-      label: labels[score - 1] || '',
-      color: colors[score - 1] || ''
-    };
-  };
-
-  const passwordStrength = getPasswordStrength(watch('adminPassword'));
+  }, [subdomainAvailable, emailAvailable, emailError, passwordStrength.score, setError, createTenantMutation]);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
@@ -322,6 +404,21 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
             <div className="flex items-center">
               <X className="w-5 h-5 text-red-500 mr-2" />
               <p className="text-sm text-red-700 dark:text-red-300" data-testid="validation-error">{formError}</p>
+            </div>
+          </div>
+        )}
+        
+        {/* Debug Information (Development Only) */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 text-xs">
+            <h3 className="font-semibold mb-2">Debug Info:</h3>
+            <div className="grid grid-cols-2 gap-2">
+              <div>Subdomain Available: {subdomainAvailable?.toString() || 'null'}</div>
+              <div>Email Available: {emailAvailable?.toString() || 'null'}</div>
+              <div>Password Score: {passwordStrength.score}</div>
+              <div>Form Errors: {Object.keys(errors).length}</div>
+              <div>Is Submitting: {isSubmitting.toString()}</div>
+              <div>Mutation Pending: {createTenantMutation.isPending.toString()}</div>
             </div>
           </div>
         )}
@@ -740,7 +837,7 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
                           key={level}
                           className={`h-1 w-8 rounded ${
                             level <= passwordStrength.score
-                              ? passwordStrength.color.replace('text-', 'bg-')
+                              ? passwordStrength.bgColor.replace('bg-', 'bg-')
                               : 'bg-gray-200 dark:bg-gray-600'
                           }`}
                         />
@@ -750,6 +847,18 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
                       {passwordStrength.label}
                     </span>
                   </div>
+                  <ul className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                    {passwordStrength.requirements.map((req, index) => (
+                      <li key={index} className={`flex items-center ${req.met ? 'text-green-500' : 'text-red-500'}`}>
+                        {req.met ? (
+                          <Check className="w-3 h-3 mr-1" />
+                        ) : (
+                          <X className="w-3 h-3 mr-1" />
+                        )}
+                        {req.text}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </div>
@@ -805,7 +914,25 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
           <button
             type="submit"
             data-testid="create-tenant-submit"
-            disabled={isSubmitting || createTenantMutation.isPending || subdomainAvailable !== true || emailAvailable !== true}
+            disabled={
+              isSubmitting || 
+              createTenantMutation.isPending || 
+              subdomainAvailable !== true || 
+              emailAvailable !== true ||
+              passwordStrength.score < 3 ||
+              Object.keys(errors).length > 0
+            }
+            onClick={() => {
+              console.log('Submit button clicked');
+              console.log('Form state:', {
+                isSubmitting,
+                mutationPending: createTenantMutation.isPending,
+                subdomainAvailable,
+                emailAvailable,
+                passwordScore: passwordStrength.score,
+                errors: Object.keys(errors)
+              });
+            }}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
           >
             {(isSubmitting || createTenantMutation.isPending) && (
@@ -813,8 +940,28 @@ export default function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFo
             )}
             {isSubmitting || createTenantMutation.isPending ? 'Creating...' : 'Create Tenant'}
           </button>
+          
+          {/* Validation Status */}
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            <div className="flex items-center space-x-4">
+              <span className={`flex items-center ${subdomainAvailable === true ? 'text-green-500' : 'text-red-500'}`}>
+                {subdomainAvailable === true ? <Check className="w-3 h-3 mr-1" /> : <X className="w-3 h-3 mr-1" />}
+                Subdomain
+              </span>
+              <span className={`flex items-center ${emailAvailable === true ? 'text-green-500' : 'text-red-500'}`}>
+                {emailAvailable === true ? <Check className="w-3 h-3 mr-1" /> : <X className="w-3 h-3 mr-1" />}
+                Email
+              </span>
+              <span className={`flex items-center ${passwordStrength.score >= 3 ? 'text-green-500' : 'text-red-500'}`}>
+                {passwordStrength.score >= 3 ? <Check className="w-3 h-3 mr-1" /> : <X className="w-3 h-3 mr-1" />}
+                Password
+              </span>
+            </div>
+          </div>
         </div>
       </form>
     </div>
   );
-} 
+});
+
+export default CreateTenantForm; 

@@ -30,6 +30,10 @@ export interface BackupHistoryItem {
   fileSize: number;
   duration: number;
   description?: string;
+  createdBy?: {
+    name: string;
+    email: string;
+  };
 }
 
 export interface BackupHistoryResponse {
@@ -92,7 +96,7 @@ export const useBackupHistory = () => {
         }
         
         // Return the data property from the success response
-        return response.data.data;
+        return response.data;
       } catch (error: any) {
         // Handle axios errors
         if (error.response) {

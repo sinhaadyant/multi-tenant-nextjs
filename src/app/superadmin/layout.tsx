@@ -1,7 +1,7 @@
 "use client";
 
 import { useSidebar } from "@/context/SidebarContext";
-import AppHeader from "@/layout/AppHeader";
+import SuperAdminHeader from "@/components/header/SuperAdminHeader";
 import SuperAdminSidebar from "@/layout/SuperAdminSidebar";
 import Backdrop from "@/layout/Backdrop";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
@@ -92,7 +92,7 @@ export default function SuperAdminLayout({
           className={`flex-1 transition-all duration-300 ease-in-out ${mainContentMargin}`}
         >
           {/* Header */}
-          <AppHeader />
+          <SuperAdminHeader />
           {/* Page Content */}
           <div className="p-4 mx-auto max-w-7xl md:p-6">{children}</div>
         </div>

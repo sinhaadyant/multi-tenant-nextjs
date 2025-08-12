@@ -101,7 +101,7 @@ export const useAuditLogs = () => {
         throw new Error(response.data.message || 'Failed to fetch audit logs');
       }
 
-      const data: AuditLogsResponse = response.data.data;
+      const data: AuditLogsResponse = response.data;
 
       if (process.env.NODE_ENV === 'development') {
         console.log('✅ Audit logs fetched successfully:', data.auditLogs.length, 'logs');

@@ -48,7 +48,7 @@ export const useRolesAPI = () => {
       const response = await api.get('/superadmin/roles');
       
       if (response.data.success) {
-        setRoles(response.data.data.roles);
+        setRoles(response.data.roles);
       } else {
         setError(response.data.message || 'Failed to fetch roles');
       }
@@ -68,8 +68,8 @@ export const useRolesAPI = () => {
       
       if (response.data.success) {
         // Add the new role to the list
-        setRoles(prev => [...prev, response.data.data.role]);
-        return response.data.data.role;
+        setRoles(prev => [...prev, response.data.role]);
+        return response.data.role;
       } else {
         throw new Error(response.data.message || 'Failed to create role');
       }
@@ -89,9 +89,9 @@ export const useRolesAPI = () => {
       if (response.data.success) {
         // Update the role in the list
         setRoles(prev => prev.map(role => 
-          role.id === roleId ? { ...role, ...response.data.data.role } : role
+          role.id === roleId ? { ...role, ...response.data.role } : role
         ));
-        return response.data.data.role;
+        return response.data.role;
       } else {
         throw new Error(response.data.message || 'Failed to update role');
       }
@@ -128,7 +128,7 @@ export const useRolesAPI = () => {
       const response = await api.get(`/superadmin/roles/${roleId}`);
       
       if (response.data.success) {
-        return response.data.data.role;
+        return response.data.role;
       } else {
         throw new Error(response.data.message || 'Failed to fetch role');
       }

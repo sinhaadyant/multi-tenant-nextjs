@@ -11,7 +11,9 @@ import {
   Users,
   Calendar,
   Building2,
-  ExternalLink
+  ExternalLink,
+  Power,
+  PowerOff
 } from 'lucide-react';
 import { Tenant } from '@/hooks/useTenantsAPI';
 
@@ -228,14 +230,14 @@ const TenantCard: React.FC<TenantCardProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={() => onView?.(tenant)}
-              className="flex items-center gap-1 px-3 py-1 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+              className="flex items-center gap-1 px-3 py-2 text-sm font-medium bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-700 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 dark:text-blue-400 dark:hover:text-blue-300 rounded-md transition-colors"
             >
               <Eye className="w-4 h-4" />
               View
             </button>
             <button
               onClick={() => onImpersonate?.(tenant)}
-              className="flex items-center gap-1 px-3 py-1 text-sm text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
+              className="flex items-center gap-1 px-3 py-2 text-sm font-medium bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 dark:bg-green-900/20 dark:hover:bg-green-900/30 dark:text-green-400 dark:hover:text-green-300 rounded-md transition-colors"
             >
               <ExternalLink className="w-4 h-4" />
               Impersonate
@@ -244,26 +246,26 @@ const TenantCard: React.FC<TenantCardProps> = ({
           <div className="flex items-center gap-1">
             <button
               onClick={() => onEdit?.(tenant)}
-              className="p-1 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
-              title="Edit"
+              className="flex items-center justify-center w-8 h-8 rounded-md bg-gray-50 hover:bg-gray-100 text-gray-600 hover:text-gray-700 dark:bg-gray-900/20 dark:hover:bg-gray-900/30 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
+              title="Edit Tenant"
             >
               <Edit className="w-4 h-4" />
             </button>
             {tenant.status === 'active' ? (
               <button
                 onClick={() => onSuspend?.(tenant)}
-                className="p-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                title="Suspend"
+                className="flex items-center justify-center w-8 h-8 rounded-md bg-orange-50 hover:bg-orange-100 text-orange-600 hover:text-orange-700 dark:bg-orange-900/20 dark:hover:bg-orange-900/30 dark:text-orange-400 dark:hover:text-orange-300 transition-colors"
+                title="Suspend Tenant"
               >
-                <XCircle className="w-4 h-4" />
+                <PowerOff className="w-4 h-4" />
               </button>
             ) : (
               <button
                 onClick={() => onReactivate?.(tenant)}
-                className="p-1 text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
-                title="Reactivate"
+                className="flex items-center justify-center w-8 h-8 rounded-md bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 dark:bg-green-900/20 dark:hover:bg-green-900/30 dark:text-green-400 dark:hover:text-green-300 transition-colors"
+                title="Activate Tenant"
               >
-                <CheckCircle className="w-4 h-4" />
+                <Power className="w-4 h-4" />
               </button>
             )}
           </div>

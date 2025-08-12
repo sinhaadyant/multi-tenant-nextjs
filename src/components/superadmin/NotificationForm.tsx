@@ -58,7 +58,7 @@ export const NotificationForm: React.FC<NotificationFormProps> = ({
       try {
         const response = await api.get('/superadmin/tenants');
         if (response.data.success) {
-          setTenants(response.data.data.tenants);
+          setTenants(response.data.tenants);
         }
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {

@@ -122,11 +122,11 @@ const getFallbackMenuItems = (tenantSlug: string): MenuItem[] => [
     hasChildren: false
   },
   {
-    id: "support",
-    label: "Support",
+    id: "supportTickets",
+    label: "Support Tickets",
     icon: "LifeBuoy",
-    path: `/${tenantSlug}/support`,
-    description: "Support tickets and help",
+    path: `/${tenantSlug}/support-tickets`,
+    description: "Manage support tickets and requests",
     permissions: ["support:view"],
     hasChildren: false
   }

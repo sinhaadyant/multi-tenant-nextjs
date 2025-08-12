@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   BarChart3, 
   Download, 
@@ -39,9 +39,21 @@ export default function ReportsPage() {
   const [selectedReport, setSelectedReport] = useState<any>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
+  // Memoize filters to prevent infinite re-renders
+  const memoizedFilters = useMemo(() => filters, [
+    filters.page,
+    filters.limit,
+    filters.sortBy,
+    filters.sortOrder,
+    filters.search,
+    filters.type,
+    filters.dateFrom,
+    filters.dateTo
+  ]);
+
   // Fetch data
   const { data: overviewData, isLoading: overviewLoading, error: overviewError } = useReportsOverview();
-  const { data: reportsData, isLoading: reportsLoading, error: reportsError } = useReports(filters);
+  const { data: reportsData, isLoading: reportsLoading, error: reportsError } = useReports(memoizedFilters);
 
   const overview = overviewData?.overview;
   const platformStats = overviewData?.platformStats;
@@ -289,27 +301,24 @@ export default function ReportsPage() {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div>
                               <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                {getReportTypeLabel(report.reportType)}
+                                {report.name}
                               </div>
                               <div className="text-sm text-gray-500 dark:text-gray-400">
-                                {format(new Date(report.dateFrom), 'MMM dd, yyyy')} - {format(new Date(report.dateTo), 'MMM dd, yyyy')}
+                                {getReportTypeLabel(report.type)}
                               </div>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {getStatusBadge(report.status)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm text-gray-900 dark:text-white uppercase">
-                              {report.format}
+                            <span className="text-sm text-gray-900 dark:text-white">
+                              {report.type}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900 dark:text-white">
-                              {report.generatedBy.name}
+                              {report.superAdmin?.name || 'Unknown'}
                             </div>
                             <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {report.generatedBy.email}
+                              {report.superAdmin?.email || 'N/A'}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -324,14 +333,12 @@ export default function ReportsPage() {
                               >
                                 <FileText className="w-4 h-4" />
                               </button>
-                              {report.status === 'ready' && (
-                                <button
-                                  className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
-                                  title="Download Report"
-                                >
-                                  <Download className="w-4 h-4" />
-                                </button>
-                              )}
+                              <button
+                                className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
+                                title="Download Report"
+                              >
+                                <Download className="w-4 h-4" />
+                              </button>
                             </div>
                           </td>
                         </tr>

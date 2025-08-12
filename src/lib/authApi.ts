@@ -98,7 +98,7 @@ const refreshAccessToken = async (): Promise<string | null> => {
       refreshToken,
     });
 
-    const { accessToken, refreshToken: newRefreshToken, expiresAt } = response.data.data;
+    const { accessToken, refreshToken: newRefreshToken, expiresAt } = response.data;
     
     // Update tokens
     setTokens(accessToken, newRefreshToken);

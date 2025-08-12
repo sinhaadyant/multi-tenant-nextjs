@@ -37,17 +37,11 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({
   const [activeItem, setActiveItem] = useState<string | null>(null);
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
 
-  // Move useEffect to the top, before any conditional logic
+  // Initialize sidebar state
   useEffect(() => {
-    // Load saved sidebar state from localStorage after hydration
-    if (typeof window !== 'undefined') {
-      const savedSidebarStateStr = localStorage.getItem('sidebar_state');
-      const savedSidebarState = savedSidebarStateStr ? JSON.parse(savedSidebarStateStr) : null;
-      if (savedSidebarState?.isExpanded !== undefined) {
-        setIsExpanded(savedSidebarState.isExpanded);
-      }
-      setIsInitialized(true);
-    }
+    // Set default state without localStorage dependency
+    setIsExpanded(true);
+    setIsInitialized(true);
   }, []);
 
   useEffect(() => {
@@ -68,11 +62,7 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const toggleSidebar = () => {
-    setIsExpanded((prev) => {
-      const newValue = !prev;
-      localStorage.setItem('sidebar_state', JSON.stringify({ isExpanded: newValue }));
-      return newValue;
-    });
+    setIsExpanded((prev) => !prev);
   };
 
   const toggleMobileSidebar = () => {

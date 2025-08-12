@@ -1,70 +1,61 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { requireSuperAdmin } from '@/middleware/auth';
-import { asyncHandler } from '@/lib/errorHandler';
+import { NextRequest } from 'next/server';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
+import { prisma } from '@/lib/prisma';
+import { withSuperAdminAuth } from '@/lib/authMiddleware';
+import { createAuditLogFromRequest } from '@/lib/audit';
 
-// PATCH /api/superadmin/notifications/[id]/read - Mark notification as read
-export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
-  if (process.env.NODE_ENV === 'development') {
-    console.log('📢 Marking notification as read:', params.id);
-  }
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  return withSuperAdminAuth(async (req: NextRequest, user: any) => {
+    try {
+      const notificationId = params.id;
 
-  // Authenticate SuperAdmin
-  const authResult = await requireSuperAdmin(req);
-  if (authResult instanceof NextResponse) {
-    return authResult;
-  }
+      // Check if notification exists
+      const notification = await prisma.notification.findUnique({
+        where: { id: notificationId },
+      });
 
-  const superAdmin = authResult as any;
-  const notificationId = params.id;
+      if (!notification) {
+        return createErrorResponse('Notification not found', 404);
+      }
 
-  try {
-    // Verify notification exists and belongs to this superadmin
-    const notification = await prisma.notification.findFirst({
-      where: {
-        id: notificationId,
-        OR: [
-          {
-            targetType: 'superadmin',
-            targetTenantId: superAdmin.id
+      // Mark notification as read for the current user
+      const userNotification = await prisma.userNotification.upsert({
+        where: {
+          notificationId_userId: {
+            notificationId: notificationId,
+            userId: user.id,
           },
-          {
-            createdBy: superAdmin.id
-          }
-        ],
-        isActive: true
-      }
-    });
+        },
+        update: {
+          isRead: true,
+          readAt: new Date(),
+        },
+        create: {
+          notificationId: notificationId,
+          userId: user.id,
+          isRead: true,
+          readAt: new Date(),
+        },
+      });
 
-    if (!notification) {
-      return createErrorResponse('Notification not found or access denied', 404);
+      // Get the updated notification
+      const updatedNotification = await prisma.notification.findUnique({
+        where: { id: notificationId },
+      });
+
+      // Create audit log
+      await createAuditLogFromRequest(req as any, user as any, 'notification.read', {
+        notificationId: notificationId,
+        notificationTitle: notification.title,
+      });
+
+      return createSuccessResponse(
+        { notification: updatedNotification },
+        'Notification marked as read successfully'
+      );
+    } catch (error: any) {
+      console.error('Error marking notification as read:', error);
+      return createErrorResponse('Failed to mark notification as read', 500);
     }
-
-    // Mark as read
-    const updatedNotification = await prisma.notification.update({
-      where: { id: notificationId },
-      data: { isRead: true },
-      select: {
-        id: true,
-        title: true,
-        isRead: true,
-        updatedAt: true
-      }
-    });
-
-    if (process.env.NODE_ENV === 'development') {
-      console.log('✅ Notification marked as read:', notificationId);
-    }
-
-    return createSuccessResponse({
-      notification: updatedNotification
-    }, 'Notification marked as read successfully');
-
-  } catch (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('❌ Error marking notification as read:', error);
-    }
-    throw error;
-  }
-}); 
+  })(req, { params });
+}

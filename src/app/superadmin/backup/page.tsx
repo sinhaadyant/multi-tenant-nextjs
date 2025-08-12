@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Download, Database, Users, Building2, FileText, Clock, CheckCircle, AlertCircle } from 'lucide-react';
-import { useBackupData } from '@/hooks/useBackupData';
+import { Download, Database, Users, Building2, FileText, Clock, CheckCircle, AlertCircle, History, Trash2, Calendar, RefreshCw } from 'lucide-react';
+import { useBackupData, useBackupHistory, useDeleteBackup } from '@/hooks/useBackupData';
+import Button from '@/components/ui/button/Button';
 
 export default function BackupPage() {
   const [backupOptions, setBackupOptions] = useState({
@@ -15,7 +16,11 @@ export default function BackupPage() {
     excludeSensitiveData: true
   });
 
-  const { mutate: createBackup, isLoading, error } = useBackupData();
+  const { mutate: createBackup, isLoading: isCreatingBackup, error } = useBackupData();
+  const { data: backupHistory, isLoading: isLoadingHistory, error: historyError, refetch } = useBackupHistory();
+  const { mutate: deleteBackup, isLoading: isDeleting } = useDeleteBackup();
+
+  const backups = backupHistory?.backups || [];
 
   const handleBackup = () => {
     createBackup(backupOptions);
@@ -28,17 +33,132 @@ export default function BackupPage() {
     }));
   };
 
+  const handleDeleteBackup = (backupId: string) => {
+    if (confirm('Are you sure you want to delete this backup? This action cannot be undone.')) {
+      deleteBackup(backupId);
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
+      case 'failed':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
+      case 'processing':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400';
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Backup Data
+            Backup & Restore
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Create comprehensive backups of your system data
+            Create comprehensive backups and manage your backup history
           </p>
+        </div>
+        <div className="flex items-center space-x-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isLoadingHistory}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingHistory ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => window.location.href = '/superadmin/backup/history'}
+          >
+            <History className="w-4 h-4 mr-2" />
+            View All Backups
+          </Button>
+        </div>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <Database className="h-8 w-8 text-blue-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Backups</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+                {isLoadingHistory ? '...' : backupHistory?.totalCount || 0}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <Clock className="h-8 w-8 text-green-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Last Backup</p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                {isLoadingHistory ? '...' : backupHistory?.lastBackupDate ? formatDate(backupHistory.lastBackupDate) : 'Never'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <FileText className="h-8 w-8 text-purple-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Size</p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                {isLoadingHistory ? '...' : backupHistory?.totalSize ? formatFileSize(backupHistory.totalSize) : '0 MB'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <CheckCircle className="h-8 w-8 text-emerald-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Successful</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+                {isLoadingHistory ? '...' : backups.filter(b => b.status === 'completed').length}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -192,12 +312,13 @@ export default function BackupPage() {
               </div>
             </div>
 
-            <button
+            <Button
               onClick={handleBackup}
-              disabled={isLoading}
-              className="w-full flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isCreatingBackup}
+              className="w-full"
+              size="md"
             >
-              {isLoading ? (
+              {isCreatingBackup ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                   Creating Backup...
@@ -208,7 +329,7 @@ export default function BackupPage() {
                   Create Backup
                 </>
               )}
-            </button>
+            </Button>
 
             {error && (
               <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
@@ -231,27 +352,128 @@ export default function BackupPage() {
         </div>
       </div>
 
-      {/* Backup History Preview */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Recent Backups
-          </h2>
-          <a
-            href="/superadmin/backup/history"
-            className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
-          >
-            View All
-          </a>
+      {/* Recent Backups */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Recent Backups
+            </h2>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.location.href = '/superadmin/backup/history'}
+            >
+              View All Backups
+            </Button>
+          </div>
         </div>
 
-        <div className="text-center py-8">
-          <Database className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No recent backups</h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Create your first backup to see it here.
-          </p>
-        </div>
+        {isLoadingHistory ? (
+          <div className="p-6">
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
+                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : historyError ? (
+          <div className="p-6">
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <Database className="h-5 w-5 text-red-400" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
+                    Error loading backup history
+                  </h3>
+                  <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+                    {historyError instanceof Error ? historyError.message : 'An unexpected error occurred'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : backups.length === 0 ? (
+          <div className="p-6 text-center">
+            <Database className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No recent backups</h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Create your first backup to see it here.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            {backups.slice(0, 5).map((backup) => (
+              <div
+                key={backup.id}
+                className="p-6 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
+                        <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2">
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                          {backup.filename}
+                        </h3>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(backup.status)}`}>
+                          {backup.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-4 mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center">
+                          <Calendar className="h-4 w-4 mr-1" />
+                          {formatDate(backup.createdAt)}
+                        </div>
+                        <div className="flex items-center">
+                          <Database className="h-4 w-4 mr-1" />
+                          {formatFileSize(backup.fileSize)}
+                        </div>
+                        <div className="flex items-center">
+                          <Clock className="h-4 w-4 mr-1" />
+                          {backup.duration}ms
+                        </div>
+                      </div>
+                      {backup.description && (
+                        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                          {backup.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(`/api/superadmin/backup/${backup.id}/download`, '_blank')}
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      Download
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteBackup(backup.id)}
+                      disabled={isDeleting}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

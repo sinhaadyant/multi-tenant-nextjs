@@ -29,11 +29,15 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
             slug: true
           }
         },
-        role: {
-          select: {
-            id: true,
-            name: true,
-            description: true
+        userRoles: {
+          include: {
+            role: {
+              select: {
+                id: true,
+                name: true,
+                description: true
+              }
+            }
           }
         }
       }
@@ -43,7 +47,13 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
       return createErrorResponse('User not found', 404);
     }
 
-    return createSuccessResponse({ user }, 'User details retrieved successfully');
+    // Transform user to match expected format
+    const transformedUser = {
+      ...user,
+      role: user.userRoles[0]?.role || null
+    };
+
+    return createSuccessResponse({ user: transformedUser }, 'User details retrieved successfully');
 
   } catch (error: any) {
     console.error('❌ Error fetching user:', error);
@@ -90,15 +100,25 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: {
             slug: true
           }
         },
-        role: {
-          select: {
-            id: true,
-            name: true,
-            description: true
+        userRoles: {
+          include: {
+            role: {
+              select: {
+                id: true,
+                name: true,
+                description: true
+              }
+            }
           }
         }
       }
     });
+
+    // Transform user to match expected format
+    const transformedUser = {
+      ...user,
+      role: user.userRoles[0]?.role || null
+    };
 
     // Create audit log
     await createAuditLogFromRequest(
@@ -113,7 +133,7 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: {
       }
     );
 
-    return createSuccessResponse({ user }, 'User updated successfully');
+    return createSuccessResponse({ user: transformedUser }, 'User updated successfully');
 
   } catch (error: any) {
     if (error.name === 'ZodError') {

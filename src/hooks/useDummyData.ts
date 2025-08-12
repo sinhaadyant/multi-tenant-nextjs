@@ -38,7 +38,7 @@ export const useDummyDataStatus = () => {
     queryKey: ['dummy-data-status'],
     queryFn: async (): Promise<DummyDataStatus> => {
       const response = await api.get('/tenant/dummy-data');
-      return response.data.data;
+      return response.data;
     },
     staleTime: 30 * 1000, // 30 seconds
   });
@@ -51,7 +51,7 @@ export const useGenerateDummyData = () => {
   return useMutation({
     mutationFn: async (params: GenerateDummyDataParams): Promise<{ message: string; generated: GeneratedData }> => {
       const response = await api.post('/tenant/dummy-data', params);
-      return response.data.data;
+      return response.data;
     },
     onSuccess: (data) => {
       toast.success(data.message);
@@ -74,7 +74,7 @@ export const useClearAllData = () => {
       const response = await api.delete('/tenant/dummy-data', {
         data: { confirm: true }
       });
-      return response.data.data;
+      return response.data;
     },
     onSuccess: (data) => {
       toast.success(data.message);

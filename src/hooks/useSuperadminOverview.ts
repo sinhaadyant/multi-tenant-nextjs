@@ -71,7 +71,7 @@ export const useSuperadminOverview = () => {
       const response = await api.get('/superadmin/dashboard/overview');
       
       if (response.data.success) {
-        setData(response.data.data);
+        setData(response.data);
       } else {
         throw new Error(response.data.message || 'Failed to fetch overview data');
       }

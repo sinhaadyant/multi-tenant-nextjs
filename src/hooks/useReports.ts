@@ -4,17 +4,14 @@ import { toast } from 'react-hot-toast';
 
 export interface Report {
   id: string;
-  reportType: 'user_activity' | 'tenant_summary' | 'login_history' | 'audit_logs' | 'system_health';
-  dateFrom: string;
-  dateTo: string;
+  type: string;
+  name: string;
+  data: string;
   tenantId?: string;
-  format: 'csv' | 'excel' | 'pdf';
-  filters: Record<string, any>;
-  status: 'generating' | 'ready' | 'failed';
-  fileName: string;
+  superAdminId?: string;
   createdAt: string;
   updatedAt: string;
-  generatedBy: {
+  superAdmin?: {
     name: string;
     email: string;
   };
@@ -24,8 +21,8 @@ export interface ReportsOverview {
   totalReports: number;
   reportsThisMonth: number;
   statusCounts: {
+    completed: number;
     generating: number;
-    ready: number;
     failed: number;
   };
   typeCounts: {
@@ -34,6 +31,7 @@ export interface ReportsOverview {
     login_history: number;
     audit_logs: number;
     system_health: number;
+    other: number;
   };
   recentReports: Report[];
 }
@@ -59,23 +57,20 @@ export interface ReportsResponse {
 }
 
 export interface GenerateReportData {
-  reportType: 'user_activity' | 'tenant_summary' | 'login_history' | 'audit_logs' | 'system_health';
-  dateFrom: string;
-  dateTo: string;
+  type: string;
+  name: string;
+  data: string;
   tenantId?: string;
-  format: 'csv' | 'excel' | 'pdf';
-  filters?: Record<string, any>;
 }
 
 export interface ReportsFilters {
   page?: number;
   limit?: number;
   search?: string;
-  reportType?: string;
-  status?: 'generating' | 'ready' | 'failed';
+  type?: string;
   dateFrom?: string;
   dateTo?: string;
-  sortBy?: 'createdAt' | 'reportType' | 'status' | 'generatedBy';
+  sortBy?: 'createdAt' | 'type' | 'name';
   sortOrder?: 'asc' | 'desc';
 }
 
@@ -85,7 +80,7 @@ export const useReportsOverview = () => {
     queryKey: ['reports-overview'],
     queryFn: async (): Promise<{ overview: ReportsOverview; platformStats: PlatformStats }> => {
       const response = await api.get('/superadmin/reports/overview');
-      return response.data.data;
+      return response.data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -105,7 +100,7 @@ export const useReports = (filters: ReportsFilters = {}) => {
       });
 
       const response = await api.get(`/superadmin/reports?${params.toString()}`);
-      return response.data.data;
+      return response.data;
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
@@ -118,7 +113,7 @@ export const useGenerateReport = () => {
   return useMutation({
     mutationFn: async (data: GenerateReportData): Promise<{ report: Report; message: string }> => {
       const response = await api.post('/superadmin/reports', data);
-      return response.data.data;
+      return response.data;
     },
     onSuccess: (data) => {
       toast.success(data.message || 'Report generation initiated successfully');

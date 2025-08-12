@@ -3,8 +3,9 @@ import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 
 const JWT_SECRET = (process.env.JWT_SECRET || 'your-secret-key') as string;
-const JWT_ACCESS_EXPIRES_IN = (process.env.JWT_ACCESS_EXPIRES_IN || '1h') as string; // Medium-lived access token
-const JWT_REFRESH_EXPIRES_IN = (process.env.JWT_REFRESH_EXPIRES_IN || '90d') as string; // 3-month refresh token
+const JWT_ACCESS_EXPIRES_IN = (process.env.JWT_ACCESS_EXPIRES_IN || '15m') as string; // 15 minutes access token
+const JWT_REFRESH_EXPIRES_IN = (process.env.JWT_REFRESH_EXPIRES_IN || '7d') as string; // 7 days default refresh token
+const JWT_REFRESH_EXPIRES_IN_REMEMBER = (process.env.JWT_REFRESH_EXPIRES_IN_REMEMBER || '30d') as string; // 30 days for "Remember Me"
 const REFRESH_TOKEN_SECRET = (process.env.REFRESH_TOKEN_SECRET || 'your-refresh-secret-key') as string;
 
 export interface JWTPayload {
@@ -48,17 +49,18 @@ export const generateAccessToken = (payload: JWTPayload): string => {
   return jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: JWT_ACCESS_EXPIRES_IN });
 };
 
-// Generate refresh token (long-lived)
-export const generateRefreshToken = (payload: RefreshTokenPayload): string => {
+// Generate refresh token (long-lived) with configurable duration
+export const generateRefreshToken = (payload: RefreshTokenPayload, rememberMe: boolean = false): string => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('🔐 Generating refresh token for:', payload.email);
+    console.log('🔐 Generating refresh token for:', payload.email, 'rememberMe:', rememberMe);
   }
   
-  return jwt.sign(payload, REFRESH_TOKEN_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN });
+  const expiresIn = rememberMe ? JWT_REFRESH_EXPIRES_IN_REMEMBER : JWT_REFRESH_EXPIRES_IN;
+  return jwt.sign(payload, REFRESH_TOKEN_SECRET, { expiresIn });
 };
 
-// Generate both tokens
-export const generateTokenPair = (userPayload: Omit<JWTPayload, 'jti'>): TokenPair => {
+// Generate both tokens with "Remember Me" support
+export const generateTokenPair = (userPayload: Omit<JWTPayload, 'jti'>, rememberMe: boolean = false): TokenPair => {
   const tokenId = generateTokenId();
   
   const accessTokenPayload: JWTPayload = {
@@ -74,7 +76,7 @@ export const generateTokenPair = (userPayload: Omit<JWTPayload, 'jti'>): TokenPa
   };
   
   const accessToken = generateAccessToken(accessTokenPayload);
-  const refreshToken = generateRefreshToken(refreshTokenPayload);
+  const refreshToken = generateRefreshToken(refreshTokenPayload, rememberMe);
   
   // Calculate expiration times
   const accessTokenDecoded = jwt.decode(accessToken) as any;

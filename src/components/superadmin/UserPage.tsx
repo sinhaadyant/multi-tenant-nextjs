@@ -90,9 +90,8 @@ const UserPage: React.FC = () => {
   }, []);
 
   const handleViewUser = useCallback((user: any) => {
-    // TODO: Navigate to user details page or open modal
-    console.log('View user:', user);
-  }, []);
+    router.push(`/superadmin/users/${user.id}`);
+  }, [router]);
 
   const handleEditUser = useCallback((user: any) => {
     // TODO: Open edit user modal

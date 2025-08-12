@@ -66,15 +66,6 @@ const authSlice = createSlice({
     setLogin: (state, action: PayloadAction<LoginPayload>) => {
       const { user, token, refreshToken, email } = action.payload;
       
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔄 Redux: setLogin called with payload:', {
-          email: email,
-          hasToken: !!token,
-          hasRefreshToken: !!refreshToken,
-          hasUser: !!user,
-        });
-      }
-      
       state.user = user;
       state.token = token;
       state.refreshToken = refreshToken;
@@ -83,22 +74,8 @@ const authSlice = createSlice({
       state.lastValidatedAt = Date.now();
       state.isInitialized = true;
       state.isHydrated = true; // Mark as hydrated after successful login
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔄 Redux: setLogin completed, new state:', {
-          isLoggedIn: state.isLoggedIn,
-          hasUser: !!state.user,
-          hasToken: !!state.token,
-          hasRefreshToken: !!state.refreshToken,
-          email: state.email,
-        });
-      }
     },
     setLogout: (state) => {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔄 Redux: setLogout called');
-      }
-      
       state.user = null;
       state.token = null;
       state.refreshToken = null;

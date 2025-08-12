@@ -40,7 +40,7 @@ export const GET = asyncHandler(async (req: NextRequest) => {
       { name: { contains: search, mode: 'insensitive' } },
       { email: { contains: search, mode: 'insensitive' } },
       { tenant: { name: { contains: search, mode: 'insensitive' } } },
-      { role: { name: { contains: search, mode: 'insensitive' } } }
+      { userRoles: { role: { name: { contains: search, mode: 'insensitive' } } } }
     ];
   }
 
@@ -56,7 +56,11 @@ export const GET = asyncHandler(async (req: NextRequest) => {
 
   // Role filter
   if (roleId) {
-    where.roleId = roleId;
+    where.userRoles = {
+      some: {
+        roleId: roleId
+      }
+    };
   }
 
   // Build order by clause
@@ -64,7 +68,9 @@ export const GET = asyncHandler(async (req: NextRequest) => {
   if (sortBy === 'tenant') {
     orderBy.tenant = { name: sortOrder };
   } else if (sortBy === 'role') {
-    orderBy.role = { name: sortOrder };
+    // Note: Role sorting is not directly supported due to many-to-many relationship
+    // We'll sort by createdAt as fallback
+    orderBy.createdAt = sortOrder;
   } else if (sortBy === 'lastLogin') {
     orderBy.lastLogin = sortOrder;
   } else {
@@ -87,11 +93,15 @@ export const GET = asyncHandler(async (req: NextRequest) => {
               slug: true
             }
           },
-          role: {
-            select: {
-              id: true,
-              name: true,
-              description: true
+          userRoles: {
+            include: {
+              role: {
+                select: {
+                  id: true,
+                  name: true,
+                  description: true
+                }
+              }
             }
           }
         }
@@ -106,6 +116,19 @@ export const GET = asyncHandler(async (req: NextRequest) => {
       prisma.user.count({ where: { isActive: false } })
     ]);
 
+    // Transform users to match expected format
+    const transformedUsers = users.map(user => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      isActive: user.isActive,
+      lastLogin: user.lastLogin,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      tenant: user.tenant,
+      role: user.userRoles[0]?.role || null
+    }));
+
     const totalPages = Math.ceil(totalCount / limit);
 
     if (process.env.NODE_ENV === 'development') {
@@ -113,7 +136,7 @@ export const GET = asyncHandler(async (req: NextRequest) => {
     }
 
     return createSuccessResponse({
-      users,
+      users: transformedUsers,
       stats: {
         total: totalUsers,
         active: activeUsers,
@@ -170,7 +193,6 @@ export const POST = asyncHandler(async (req: NextRequest) => {
         name: validatedData.name,
         password: hashedPassword,
         tenantId: validatedData.tenantId,
-        roleId: validatedData.roleId,
         isActive: true
       },
       include: {
@@ -181,15 +203,29 @@ export const POST = asyncHandler(async (req: NextRequest) => {
             slug: true
           }
         },
-        role: {
-          select: {
-            id: true,
-            name: true,
-            description: true
+        userRoles: {
+          include: {
+            role: {
+              select: {
+                id: true,
+                name: true,
+                description: true
+              }
+            }
           }
         }
       }
     });
+
+    // If roleId is provided, create user role assignment
+    if (validatedData.roleId) {
+      await prisma.userRole.create({
+        data: {
+          userId: user.id,
+          roleId: validatedData.roleId
+        }
+      });
+    }
 
     // Create audit log
     await createAuditLogFromRequest(
@@ -203,11 +239,17 @@ export const POST = asyncHandler(async (req: NextRequest) => {
       }
     );
 
+    // Transform user to match expected format
+    const transformedUser = {
+      ...user,
+      role: user.userRoles[0]?.role || null
+    };
+
     if (process.env.NODE_ENV === 'development') {
       console.log('✅ User created successfully:', user.email);
     }
 
-    return createSuccessResponse({ user }, 'User created successfully');
+    return createSuccessResponse({ user: transformedUser }, 'User created successfully');
 
   } catch (error: any) {
     if (error.name === 'ZodError') {

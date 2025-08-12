@@ -48,7 +48,7 @@ const UserFilterBar: React.FC<UserFilterBarProps> = ({
     queryKey: ['roles'],
     queryFn: async () => {
       const response = await api.get('/superadmin/roles');
-      return response.data.data.roles;
+      return response.data.roles;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });

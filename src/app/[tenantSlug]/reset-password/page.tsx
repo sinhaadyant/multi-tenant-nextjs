@@ -48,8 +48,8 @@ export default function TenantResetPasswordPage() {
         console.log('✅ Token is valid');
         setTokenValidation({
           isValid: true,
-          email: response.data.data.email,
-          data: response.data.data
+          email: response.data.email,
+          data: response.data
         });
       } else {
         console.log('❌ Token is invalid:', response.data.message);

@@ -114,12 +114,12 @@ export const TenantAuthProvider: React.FC<TenantAuthProviderProps> = ({ children
       console.log('🔍 API Response:', {
         success: response.data.success,
         status: response.status,
-        hasData: !!response.data.data,
-        dataKeys: response.data.data ? Object.keys(response.data.data) : []
+        hasData: !!response.data,
+        dataKeys: response.data ? Object.keys(response.data) : []
       });
 
       if (response.data.success) {
-        const userData = response.data.data;
+        const userData = response.data;
         
 
         

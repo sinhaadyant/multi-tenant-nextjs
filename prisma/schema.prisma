@@ -18,6 +18,7 @@ model SuperAdmin {
   contactNumber       String?
   avatar              String?
   auditLogs           AuditLog[]
+  backups             Backup[]
   inviteTokens        InviteToken[]
   notifications       Notification[]
   passwordResetTokens PasswordResetToken[]
@@ -444,4 +445,24 @@ model RefreshToken {
   @@index([tokenId])
   @@index([expiresAt])
   @@map("refresh_tokens")
+}
+
+model Backup {
+  id          String      @id @default(cuid())
+  filename    String
+  status      String      @default("processing") // processing, completed, failed
+  fileSize    Int         @default(0)
+  duration    Int         @default(0) // in milliseconds
+  description String?
+  createdAt   DateTime    @default(now())
+  completedAt DateTime?
+  createdById String
+  options     Json?       // Backup options as JSON
+  filePath    String?     // Path to the backup file
+  createdBy   SuperAdmin  @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([createdById], map: "backups_createdById_fkey")
+  @@index([status])
+  @@index([createdAt])
+  @@map("backups")
 }

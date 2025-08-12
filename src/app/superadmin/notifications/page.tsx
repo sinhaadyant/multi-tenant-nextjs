@@ -7,10 +7,10 @@ import { Plus, Search, Filter, Edit, Trash2, Send, Eye, Calendar, Users, AlertCi
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 import ConfirmModal from '@/components/common/ConfirmModal';
-import { Badge } from '@/components/ui/badge/Badge';
-import { Button } from '@/components/ui/button/Button';
-import { Input } from '@/components/form/input/Input';
-import { Select } from '@/components/form/form-elements/Select';
+import Badge from '@/components/ui/badge/Badge';
+import Button from '@/components/ui/button/Button';
+import Input from '@/components/form/input/Input';
+import Select from '@/components/form/form-elements/Select';
 
 const NotificationTypeIcon = ({ type }: { type: string }) => {
   const iconMap = {
@@ -25,12 +25,12 @@ const NotificationTypeIcon = ({ type }: { type: string }) => {
 
 const PriorityBadge = ({ priority }: { priority: string }) => {
   const colorMap = {
-    low: 'bg-gray-100 text-gray-800',
-    medium: 'bg-yellow-100 text-yellow-800',
-    high: 'bg-red-100 text-red-800',
+    low: 'light' as const,
+    medium: 'warning' as const,
+    high: 'error' as const,
   };
   return (
-    <Badge className={colorMap[priority as keyof typeof colorMap]}>
+    <Badge color={colorMap[priority as keyof typeof colorMap] || 'light'}>
       {priority.charAt(0).toUpperCase() + priority.slice(1)}
     </Badge>
   );
@@ -38,13 +38,13 @@ const PriorityBadge = ({ priority }: { priority: string }) => {
 
 const StatusBadge = ({ status }: { status: string }) => {
   const colorMap = {
-    draft: 'bg-gray-100 text-gray-800',
-    sent: 'bg-green-100 text-green-800',
-    scheduled: 'bg-blue-100 text-blue-800',
-    cancelled: 'bg-red-100 text-red-800',
+    draft: 'light' as const,
+    sent: 'success' as const,
+    scheduled: 'info' as const,
+    cancelled: 'error' as const,
   };
   return (
-    <Badge className={colorMap[status as keyof typeof colorMap]}>
+    <Badge color={colorMap[status as keyof typeof colorMap] || 'light'}>
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </Badge>
   );
@@ -59,7 +59,7 @@ const TargetTypeBadge = ({ targetType }: { targetType: string }) => {
     multiple_tenants: 'Multiple Tenants',
   };
   return (
-    <Badge className="bg-purple-100 text-purple-800">
+    <Badge color="primary">
       {displayMap[targetType as keyof typeof displayMap] || targetType}
     </Badge>
   );
@@ -218,13 +218,13 @@ export default function NotificationsPage() {
           <div className="flex-1">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
+              <input
                 type="text"
                 placeholder="Search notifications..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                className="pl-10"
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleSearch()}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
               />
             </div>
           </div>
@@ -241,51 +241,59 @@ export default function NotificationsPage() {
 
         {showFilters && (
           <div className="mt-4 pt-4 border-t grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Select
-              label="Type"
-              value={filters.type?.[0] || ''}
-              onChange={(value) => handleFilterChange('type', value ? [value] : undefined)}
-            >
-              <option value="">All Types</option>
-              <option value="info">Info</option>
-              <option value="warning">Warning</option>
-              <option value="alert">Alert</option>
-              <option value="promotional">Promotional</option>
-              <option value="system_update">System Update</option>
-            </Select>
-            <Select
-              label="Status"
-              value={filters.status?.[0] || ''}
-              onChange={(value) => handleFilterChange('status', value ? [value] : undefined)}
-            >
-              <option value="">All Status</option>
-              <option value="draft">Draft</option>
-              <option value="sent">Sent</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="cancelled">Cancelled</option>
-            </Select>
-            <Select
-              label="Priority"
-              value={filters.priority?.[0] || ''}
-              onChange={(value) => handleFilterChange('priority', value ? [value] : undefined)}
-            >
-              <option value="">All Priorities</option>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </Select>
-            <Select
-              label="Target Type"
-              value={filters.targetType?.[0] || ''}
-              onChange={(value) => handleFilterChange('targetType', value ? [value] : undefined)}
-            >
-              <option value="">All Targets</option>
-              <option value="superadmin">Super Admin</option>
-              <option value="specific_users">Specific Users</option>
-              <option value="multiple_users">Multiple Users</option>
-              <option value="entire_tenant">Entire Tenant</option>
-              <option value="multiple_tenants">Multiple Tenants</option>
-            </Select>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Type</label>
+              <Select
+                value={filters.type?.[0] || ''}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleFilterChange('type', e.target.value ? [e.target.value] : undefined)}
+              >
+                <option value="">All Types</option>
+                <option value="info">Info</option>
+                <option value="warning">Warning</option>
+                <option value="alert">Alert</option>
+                <option value="promotional">Promotional</option>
+                <option value="system_update">System Update</option>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
+              <Select
+                value={filters.status?.[0] || ''}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleFilterChange('status', e.target.value ? [e.target.value] : undefined)}
+              >
+                <option value="">All Status</option>
+                <option value="draft">Draft</option>
+                <option value="sent">Sent</option>
+                <option value="scheduled">Scheduled</option>
+                <option value="cancelled">Cancelled</option>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Priority</label>
+              <Select
+                value={filters.priority?.[0] || ''}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleFilterChange('priority', e.target.value ? [e.target.value] : undefined)}
+              >
+                <option value="">All Priorities</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Target Type</label>
+              <Select
+                value={filters.targetType?.[0] || ''}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleFilterChange('targetType', e.target.value ? [e.target.value] : undefined)}
+              >
+                <option value="">All Targets</option>
+                <option value="superadmin">Super Admin</option>
+                <option value="specific_users">Specific Users</option>
+                <option value="multiple_users">Multiple Users</option>
+                <option value="entire_tenant">Entire Tenant</option>
+                <option value="multiple_tenants">Multiple Tenants</option>
+              </Select>
+            </div>
           </div>
         )}
       </div>
@@ -364,19 +372,19 @@ export default function NotificationsPage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center space-x-2">
                         <Link href={`/superadmin/notifications/${notification.id}`}>
-                          <Button variant="ghost" size="sm">
+                          <Button variant="outline" size="sm">
                             <Eye className="w-4 h-4" />
                           </Button>
                         </Link>
                         {notification.status === 'draft' && (
                           <>
                             <Link href={`/superadmin/notifications/${notification.id}/edit`}>
-                              <Button variant="ghost" size="sm">
+                              <Button variant="outline" size="sm">
                                 <Edit className="w-4 h-4" />
                               </Button>
                             </Link>
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
                               onClick={() => handleSend(notification.id)}
                               disabled={sendMutation.isPending}
@@ -386,7 +394,7 @@ export default function NotificationsPage() {
                           </>
                         )}
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={() => setDeleteModal({ show: true, notification })}
                         >
@@ -441,7 +449,6 @@ export default function NotificationsPage() {
         message={`Are you sure you want to delete "${deleteModal.notification?.title}"? This action cannot be undone.`}
         confirmText="Delete"
         cancelText="Cancel"
-        confirmVariant="danger"
         isLoading={deleteMutation.isPending}
       />
     </div>

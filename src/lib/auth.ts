@@ -18,34 +18,34 @@ export const requireSuperAdmin = async (req: NextRequest): Promise<AuthResult> =
     const token = authHeader.substring(7);
     const decoded = await verifyToken(token);
     
-    if (!decoded || !decoded.userId) {
+    if (!decoded || !decoded.id) {
       return { success: false, error: 'Invalid token' };
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      include: {
-        role: {
-          include: {
-            permissions: {
-              include: {
-                permission: true
-              }
-            }
-          }
-        }
+    // Check if it's a superadmin token by looking in the SuperAdmin table
+    const superAdmin = await prisma.superAdmin.findUnique({
+      where: { id: decoded.id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        contactNumber: true,
+        avatar: true
       }
     });
 
-    if (!user) {
-      return { success: false, error: 'User not found' };
+    if (!superAdmin) {
+      return { success: false, error: 'SuperAdmin not found' };
     }
 
-    if (!user.isSuperAdmin) {
-      return { success: false, error: 'SuperAdmin access required' };
+    if (!superAdmin.isActive) {
+      return { success: false, error: 'SuperAdmin account is inactive' };
     }
 
-    return { success: true, user };
+    return { success: true, user: superAdmin };
   } catch (error) {
     console.error('Auth error:', error);
     return { success: false, error: 'Authentication failed' };
