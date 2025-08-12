@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Save, X } from 'lucide-react';
 import { useCreateSupportTicket, useUpdateSupportTicket, CreateTicketData, UpdateTicketData, SupportTicket } from '@/hooks/useSupportTickets';
 import { useToast } from '@/hooks/useToast';
@@ -21,6 +22,7 @@ export const TicketForm: React.FC<TicketFormProps> = ({
 }) => {
   const router = useRouter();
   const { success, error } = useToast();
+  const queryClient = useQueryClient();
   
   const createTicketMutation = useCreateSupportTicket();
   const updateTicketMutation = useUpdateSupportTicket();
@@ -96,18 +98,24 @@ export const TicketForm: React.FC<TicketFormProps> = ({
         await createTicketMutation.mutateAsync(createData);
         success('Support ticket created successfully!');
         
-        // Determine redirect path based on current URL
-        const currentPath = window.location.pathname;
-        if (currentPath.includes('/superadmin/')) {
-          router.push('/superadmin/support-tickets');
-        } else if (currentPath.includes('/[tenantSlug]/') || currentPath.includes('/tenant/')) {
-          // Extract tenant slug from current path
-          const pathParts = currentPath.split('/');
-          const tenantSlug = pathParts[1];
-          router.push(`/${tenantSlug}/support-tickets`);
-        } else {
-          router.push('/support-tickets');
-        }
+        // Force refresh the tickets list
+        queryClient.invalidateQueries({ queryKey: ['superadmin-support-tickets'] });
+        
+        // Add a small delay to ensure cache is updated
+        setTimeout(() => {
+          // Determine redirect path based on current URL
+          const currentPath = window.location.pathname;
+          if (currentPath.includes('/superadmin/')) {
+            router.push('/superadmin/support-tickets');
+          } else if (currentPath.includes('/[tenantSlug]/') || currentPath.includes('/tenant/')) {
+            // Extract tenant slug from current path
+            const pathParts = currentPath.split('/');
+            const tenantSlug = pathParts[1];
+            router.push(`/${tenantSlug}/support-tickets`);
+          } else {
+            router.push('/support-tickets');
+          }
+        }, 500);
       } else {
         const updateData: UpdateTicketData = {
           title: formData.title.trim(),
@@ -144,25 +152,27 @@ export const TicketForm: React.FC<TicketFormProps> = ({
   return (
     <div className={`max-w-4xl mx-auto ${className}`}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-4">
-          <Link
-            href="/support-tickets"
-            className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Tickets
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {mode === 'create' ? 'Create New Support Ticket' : 'Edit Support Ticket'}
-            </h1>
-            <p className="text-gray-600">
-              {mode === 'create' 
-                ? 'Submit a new support request with details and attachments'
-                : 'Update your support ticket information'
-              }
-            </p>
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Link
+              href="/superadmin/support-tickets"
+              className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Tickets
+            </Link>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {mode === 'create' ? 'Create New Support Ticket' : 'Edit Support Ticket'}
+              </h1>
+              <p className="text-gray-600">
+                {mode === 'create' 
+                  ? 'Submit a new support request with details and attachments'
+                  : 'Update your support ticket information'
+                }
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -270,7 +280,7 @@ export const TicketForm: React.FC<TicketFormProps> = ({
         {/* Submit Buttons */}
         <div className="flex items-center justify-end space-x-4">
           <Link
-            href="/support-tickets"
+            href="/superadmin/support-tickets"
             className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
           >
             <X className="w-4 h-4 mr-2" />

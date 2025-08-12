@@ -106,15 +106,24 @@ const UserActionsDropdown: React.FC<{
 // Skeleton loader for the table
 const UserTableSkeleton: React.FC = () => {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700" style={{ tableLayout: 'fixed' }}>
           <thead className="bg-gray-50 dark:bg-gray-700">
             <tr>
               {['Name', 'Tenant', 'Role', 'Status', 'Last Login', 'Created', 'Actions'].map((header) => (
                 <th
                   key={header}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                  className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                  style={{ 
+                    width: header === 'Name' ? '200px' : 
+                           header === 'Tenant' ? '150px' : 
+                           header === 'Role' ? '150px' : 
+                           header === 'Status' ? '100px' : 
+                           header === 'Last Login' ? '120px' : 
+                           header === 'Created' ? '120px' : 
+                           header === 'Actions' ? '100px' : 'auto'
+                  }}
                 >
                   {header}
                 </th>
@@ -125,7 +134,19 @@ const UserTableSkeleton: React.FC = () => {
             {Array.from({ length: 10 }, (_, i) => (
               <tr key={i}>
                 {Array.from({ length: 7 }, (_, j) => (
-                  <td key={j} className="px-6 py-4 whitespace-nowrap">
+                  <td 
+                    key={j} 
+                    className="px-3 sm:px-6 py-4 whitespace-nowrap"
+                    style={{ 
+                      width: j === 0 ? '200px' : 
+                             j === 1 ? '150px' : 
+                             j === 2 ? '150px' : 
+                             j === 3 ? '100px' : 
+                             j === 4 ? '120px' : 
+                             j === 5 ? '120px' : 
+                             j === 6 ? '100px' : 'auto'
+                    }}
+                  >
                     <div className="animate-pulse">
                       <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-3/4"></div>
                     </div>
@@ -159,6 +180,7 @@ const UserTable: React.FC<UserTableProps> = ({
   const columns = [
     columnHelper.accessor('name', {
       header: 'Name',
+      size: 200,
       cell: ({ row }) => (
         <div className="flex items-center space-x-3">
           <div className="flex-shrink-0">
@@ -181,6 +203,7 @@ const UserTable: React.FC<UserTableProps> = ({
     }),
     columnHelper.accessor('tenant', {
       header: 'Tenant',
+      size: 150,
       cell: ({ getValue }) => {
         const tenant = getValue();
         return tenant ? (
@@ -199,6 +222,7 @@ const UserTable: React.FC<UserTableProps> = ({
     }),
     columnHelper.accessor('role', {
       header: 'Role',
+      size: 150,
       cell: ({ getValue }) => {
         const role = getValue();
         return role ? (
@@ -219,6 +243,7 @@ const UserTable: React.FC<UserTableProps> = ({
     }),
     columnHelper.accessor('isActive', {
       header: 'Status',
+      size: 100,
       cell: ({ getValue }) => {
         const isActive = getValue();
         return (
@@ -234,6 +259,7 @@ const UserTable: React.FC<UserTableProps> = ({
     }),
     columnHelper.accessor('lastLogin', {
       header: 'Last Login',
+      size: 120,
       cell: ({ getValue }) => {
         const lastLogin = getValue();
         return lastLogin ? (
@@ -247,6 +273,7 @@ const UserTable: React.FC<UserTableProps> = ({
     }),
     columnHelper.accessor('createdAt', {
       header: 'Created',
+      size: 120,
       cell: ({ getValue }) => (
         <div className="text-sm text-gray-900 dark:text-white">
           {new Date(getValue()).toLocaleDateString()}
@@ -256,6 +283,7 @@ const UserTable: React.FC<UserTableProps> = ({
     columnHelper.display({
       id: 'actions',
       header: 'Actions',
+      size: 100,
       cell: ({ row }) => {
         const [isOpen, setIsOpen] = useState(false);
         
@@ -348,17 +376,18 @@ const UserTable: React.FC<UserTableProps> = ({
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
       {/* Desktop Table */}
       <div className="hidden lg:block overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700" style={{ tableLayout: 'fixed' }}>
           <thead className="bg-gray-50 dark:bg-gray-700">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
                   <th
                     key={header.id}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                    style={{ width: header.getSize() }}
                     onClick={header.column.getToggleSortingHandler()}
                   >
                     <div className="flex items-center space-x-1">
@@ -392,7 +421,8 @@ const UserTable: React.FC<UserTableProps> = ({
                 {row.getVisibleCells().map((cell) => (
                   <td
                     key={cell.id}
-                    className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white"
+                    className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white"
+                    style={{ width: cell.column.getSize() }}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
@@ -483,104 +513,42 @@ const UserTable: React.FC<UserTableProps> = ({
       </div>
 
       {/* Pagination */}
-      <div className="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6">
-        <div className="flex-1 flex justify-between sm:hidden">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handlePageChange(pagination.page - 1)}
-            disabled={pagination.page <= 1}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handlePageChange(pagination.page + 1)}
-            disabled={pagination.page >= pagination.totalPages}
-          >
-            Next
-          </Button>
-        </div>
-        <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm text-gray-700 dark:text-gray-300">
-              {pagination.totalRecords === 0 ? (
-                'No results'
-              ) : (
-                <>
-                  Showing{' '}
-                  <span className="font-medium">
-                    {((pagination.page - 1) * pagination.limit) + 1}
-                  </span>{' '}
-                  to{' '}
-                  <span className="font-medium">
-                    {Math.min(pagination.page * pagination.limit, pagination.totalRecords)}
-                  </span>{' '}
-                  of{' '}
-                  <span className="font-medium">{pagination.totalRecords}</span>{' '}
-                  results
-                </>
-              )}
-            </p>
+      <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-700 dark:text-gray-300">Show:</span>
+            <select
+              value={pagination.limit}
+              onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+              className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span className="text-sm text-gray-700 dark:text-gray-300">entries</span>
           </div>
-          <div>
-            <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(pagination.page - 1)}
-                disabled={pagination.page <= 1}
-                className="rounded-l-md"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              
-              {/* Page numbers */}
-              {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                const pageNum = i + 1;
-                return (
-                  <Button
-                    key={pageNum}
-                    variant={pagination.page === pageNum ? "primary" : "outline"}
-                    size="sm"
-                    onClick={() => handlePageChange(pageNum)}
-                    className="rounded-none"
-                  >
-                    {pageNum}
-                  </Button>
-                );
-              })}
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(pagination.page + 1)}
-                disabled={pagination.page >= pagination.totalPages}
-                className="rounded-r-md"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </nav>
+          
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => handlePageChange(pagination.page - 1)}
+              disabled={pagination.page <= 1}
+              className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              Page {pagination.page} of {pagination.totalPages}
+            </span>
+            <button
+              onClick={() => handlePageChange(pagination.page + 1)}
+              disabled={pagination.page >= pagination.totalPages}
+              className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
           </div>
-        </div>
-      </div>
-
-      {/* Page size selector */}
-      <div className="bg-white dark:bg-gray-800 px-4 py-2 border-t border-gray-200 dark:border-gray-700">
-        <div className="flex items-center space-x-2">
-          <span className="text-sm text-gray-700 dark:text-gray-300">Show:</span>
-          <select
-            value={pagination.limit}
-            onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-            className="border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 text-sm dark:bg-gray-700 dark:text-white"
-          >
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </select>
-          <span className="text-sm text-gray-700 dark:text-gray-300">per page</span>
         </div>
       </div>
     </div>

@@ -174,8 +174,8 @@ export const POST = asyncHandler(async (req: NextRequest) => {
     // Validate input
     const validatedData = createUserSchema.parse(body);
 
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
+    // Check if user already exists (globally across all tenants)
+    const existingUser = await prisma.user.findFirst({
       where: { email: validatedData.email }
     });
 

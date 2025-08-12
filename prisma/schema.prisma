@@ -402,6 +402,7 @@ model Report {
   createdAt    DateTime    @default(now())
   data         String      @db.LongText
   name         String
+  status       String      @default("generating") // generating, ready, failed
   superAdminId String?
   type         String
   superAdmin   SuperAdmin? @relation(fields: [superAdminId], references: [id])
@@ -409,6 +410,7 @@ model Report {
 
   @@index([tenantId], map: "reports_tenantId_fkey")
   @@index([superAdminId], map: "reports_superAdminId_fkey")
+  @@index([status])
   @@map("reports")
 }
 

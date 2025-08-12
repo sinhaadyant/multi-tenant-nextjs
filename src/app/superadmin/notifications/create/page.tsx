@@ -31,7 +31,13 @@ export default function CreateNotificationPage() {
     e.preventDefault();
     
     try {
-      await createMutation.mutateAsync(formData);
+      // Set status to draft by default
+      const notificationData = {
+        ...formData,
+        status: 'draft' as const
+      };
+      
+      await createMutation.mutateAsync(notificationData);
       router.push('/superadmin/notifications');
     } catch (error) {
       // Error is handled by the mutation
@@ -55,13 +61,17 @@ export default function CreateNotificationPage() {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="bg-white dark:bg-gray-800 rounded-lg border p-6">
-            <div className="space-y-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Notification Details</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Basic information about the notification</p>
+            </div>
+            <div className="p-6 space-y-6">
               <div>
-                <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Title *
+                <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Title <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="title"
@@ -70,13 +80,13 @@ export default function CreateNotificationPage() {
                   onChange={(e) => handleInputChange('title', e.target.value)}
                   placeholder="Enter notification title"
                   required
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                 />
               </div>
 
               <div>
-                <label htmlFor="message" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Message *
+                <label htmlFor="message" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Message <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   id="message"
@@ -85,20 +95,20 @@ export default function CreateNotificationPage() {
                   placeholder="Enter notification message"
                   rows={4}
                   required
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
-                  <label htmlFor="type" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Type *
+                  <label htmlFor="type" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Type <span className="text-red-500">*</span>
                   </label>
                   <select
                     id="type"
                     value={formData.type}
                     onChange={(e) => handleInputChange('type', e.target.value)}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                   >
                     <option value="info">Info</option>
                     <option value="warning">Warning</option>
@@ -109,47 +119,49 @@ export default function CreateNotificationPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="priority" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Priority *
+                  <label htmlFor="priority" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Priority <span className="text-red-500">*</span>
                   </label>
                   <select
                     id="priority"
                     value={formData.priority}
                     onChange={(e) => handleInputChange('priority', e.target.value)}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                   >
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
                     <option value="high">High</option>
                   </select>
                 </div>
+
+                <div>
+                  <label htmlFor="targetType" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Target Type <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id="targetType"
+                    value={formData.targetType}
+                    onChange={(e) => handleInputChange('targetType', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="superadmin">Super Admin</option>
+                    <option value="specific_users">Specific Users</option>
+                    <option value="multiple_users">Multiple Users</option>
+                    <option value="entire_tenant">Entire Tenant</option>
+                    <option value="multiple_tenants">Multiple Tenants</option>
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <label htmlFor="targetType" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Target Type *
-                </label>
-                <select
-                  id="targetType"
-                  value={formData.targetType}
-                  onChange={(e) => handleInputChange('targetType', e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="superadmin">Super Admin</option>
-                  <option value="specific_users">Specific Users</option>
-                  <option value="multiple_users">Multiple Users</option>
-                  <option value="entire_tenant">Entire Tenant</option>
-                  <option value="multiple_tenants">Multiple Tenants</option>
-                </select>
-              </div>
+
             </div>
           </div>
 
-          <div className="flex justify-end space-x-4">
+          <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200 dark:border-gray-700">
             <Link href="/superadmin/notifications">
               <button
                 type="button"
-                className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600"
               >
                 Cancel
               </button>
@@ -157,10 +169,10 @@ export default function CreateNotificationPage() {
             <button
               type="submit"
               disabled={createMutation.isPending}
-              className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             >
               <Save className="w-4 h-4 mr-2" />
-              <span>Create Notification</span>
+              <span>{createMutation.isPending ? 'Creating...' : 'Create Notification'}</span>
             </button>
           </div>
         </form>

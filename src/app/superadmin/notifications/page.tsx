@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useNotifications, useDeleteNotification, useSendNotification } from '@/hooks/useNotifications';
+import { useNotifications, useDeleteNotification, useSendNotification, useMarkNotificationAsRead } from '@/hooks/useNotifications';
 import { Notification, NotificationFilters } from '@/hooks/useNotifications';
-import { Plus, Search, Filter, Edit, Trash2, Send, Eye, Calendar, Users, AlertCircle, Info, Bell } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, Send, Eye, Calendar, Users, AlertCircle, Info, Bell, X } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 import ConfirmModal from '@/components/common/ConfirmModal';
@@ -82,11 +82,21 @@ export default function NotificationsPage() {
   const { data, isLoading, error, refetch } = useNotifications(filters);
   const deleteMutation = useDeleteNotification();
   const sendMutation = useSendNotification();
+  const markAsReadMutation = useMarkNotificationAsRead();
 
   const handleSearch = () => {
     setFilters(prev => ({
       ...prev,
-      search: searchTerm,
+      search: searchTerm.trim(),
+      page: 1,
+    }));
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setFilters(prev => ({
+      ...prev,
+      search: undefined,
       page: 1,
     }));
   };
@@ -117,6 +127,16 @@ export default function NotificationsPage() {
   const handleSend = async (notificationId: string) => {
     try {
       await sendMutation.mutateAsync(notificationId);
+    } catch (error) {
+      // Error is handled by the mutation
+    }
+  };
+
+  const handleMarkAsRead = async (notificationId: string) => {
+    try {
+      await markAsReadMutation.mutateAsync(notificationId);
+      // Refetch to update the UI
+      refetch();
     } catch (error) {
       // Error is handled by the mutation
     }
@@ -224,8 +244,16 @@ export default function NotificationsPage() {
                 value={searchTerm}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                 onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleSearch()}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
               />
+              {searchTerm && (
+                <button
+                  onClick={handleClearSearch}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
           <Button
@@ -240,66 +268,72 @@ export default function NotificationsPage() {
         </div>
 
         {showFilters && (
-          <div className="mt-4 pt-4 border-t grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Type</label>
-              <Select
-                value={filters.type?.[0] || ''}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleFilterChange('type', e.target.value ? [e.target.value] : undefined)}
-              >
-                <option value="">All Types</option>
-                <option value="info">Info</option>
-                <option value="warning">Warning</option>
-                <option value="alert">Alert</option>
-                <option value="promotional">Promotional</option>
-                <option value="system_update">System Update</option>
-              </Select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
-              <Select
-                value={filters.status?.[0] || ''}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleFilterChange('status', e.target.value ? [e.target.value] : undefined)}
-              >
-                <option value="">All Status</option>
-                <option value="draft">Draft</option>
-                <option value="sent">Sent</option>
-                <option value="scheduled">Scheduled</option>
-                <option value="cancelled">Cancelled</option>
-              </Select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Priority</label>
-              <Select
-                value={filters.priority?.[0] || ''}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleFilterChange('priority', e.target.value ? [e.target.value] : undefined)}
-              >
-                <option value="">All Priorities</option>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </Select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Target Type</label>
-              <Select
-                value={filters.targetType?.[0] || ''}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleFilterChange('targetType', e.target.value ? [e.target.value] : undefined)}
-              >
-                <option value="">All Targets</option>
-                <option value="superadmin">Super Admin</option>
-                <option value="specific_users">Specific Users</option>
-                <option value="multiple_users">Multiple Users</option>
-                <option value="entire_tenant">Entire Tenant</option>
-                <option value="multiple_tenants">Multiple Tenants</option>
-              </Select>
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Type</label>
+                <select
+                  value={filters.type?.[0] || ''}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleFilterChange('type', e.target.value ? [e.target.value] : undefined)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="">All Types</option>
+                  <option value="info">Info</option>
+                  <option value="warning">Warning</option>
+                  <option value="alert">Alert</option>
+                  <option value="promotional">Promotional</option>
+                  <option value="system_update">System Update</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
+                <select
+                  value={filters.status?.[0] || ''}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleFilterChange('status', e.target.value ? [e.target.value] : undefined)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="">All Status</option>
+                  <option value="draft">Draft</option>
+                  <option value="sent">Sent</option>
+                  <option value="scheduled">Scheduled</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Priority</label>
+                <select
+                  value={filters.priority?.[0] || ''}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleFilterChange('priority', e.target.value ? [e.target.value] : undefined)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="">All Priorities</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Target Type</label>
+                <select
+                  value={filters.targetType?.[0] || ''}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleFilterChange('targetType', e.target.value ? [e.target.value] : undefined)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="">All Targets</option>
+                  <option value="superadmin">Super Admin</option>
+                  <option value="specific_users">Specific Users</option>
+                  <option value="multiple_users">Multiple Users</option>
+                  <option value="entire_tenant">Entire Tenant</option>
+                  <option value="multiple_tenants">Multiple Tenants</option>
+                </select>
+              </div>
             </div>
           </div>
         )}
       </div>
 
       {/* Notifications List */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
         {isLoading ? (
           <div className="p-6 text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
@@ -307,72 +341,87 @@ export default function NotificationsPage() {
           </div>
         ) : data?.notifications && data.notifications.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-full">
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[250px]">
                     Notification
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[100px]">
                     Type
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[100px]">
                     Priority
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[100px]">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Target
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
+                    Target Type
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
                     Created
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {data.notifications.map((notification) => (
-                  <tr key={notification.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <tr 
+                    key={notification.id} 
+                    className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                      !notification.isRead ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                    }`}
+                  >
                     <td className="px-6 py-4">
                       <div className="flex items-start space-x-3">
                         <NotificationTypeIcon type={notification.type} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                            {notification.title}
-                          </p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                            {notification.message}
+                        <div className="flex-1 min-w-0 max-w-xs">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[200px]">
+                              {notification.title.length > 20 ? notification.title.slice(0, 20) + '...' : notification.title || 'No title'}
+                            </p>
+                            {!notification.isRead && (
+                              <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
+                            {notification.message.length > 20 ? notification.message.slice(0, 20) + '...' : notification.message || 'No message'}
                           </p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <TargetTypeBadge targetType={notification.targetType} />
-                    </td>
-                    <td className="px-6 py-4">
-                      <PriorityBadge priority={notification.priority} />
-                    </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge status={notification.status} />
-                    </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 sm:px-6 py-4">
                       <div className="flex items-center space-x-2">
-                        <Users className="w-4 h-4 text-gray-400" />
+                        <NotificationTypeIcon type={notification.type} />
                         <span className="text-sm text-gray-900 dark:text-white">
-                          {notification._count?.userNotifications || 0}
+                          {notification.type.charAt(0).toUpperCase() + notification.type.slice(1)}
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                    <td className="px-3 sm:px-6 py-4">
+                      <PriorityBadge priority={notification.priority} />
+                    </td>
+                    <td className="px-3 sm:px-6 py-4">
+                      <StatusBadge status={notification.status} />
+                    </td>
+                    <td className="px-3 sm:px-6 py-4">
+                      <TargetTypeBadge targetType={notification.targetType} />
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                       {formatDate(notification.createdAt)}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 sm:px-6 py-4">
                       <div className="flex items-center space-x-2">
                         <Link href={`/superadmin/notifications/${notification.id}`}>
-                          <Button variant="outline" size="sm">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleMarkAsRead(notification.id)}
+                            disabled={markAsReadMutation.isPending}
+                          >
                             <Eye className="w-4 h-4" />
                           </Button>
                         </Link>

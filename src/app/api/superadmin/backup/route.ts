@@ -1,110 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { requireSuperAdmin } from '@/middleware/auth';
+import { asyncHandler } from '@/lib/errorHandler';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-
-// Mock backup data for demonstration
-const mockBackups = [
-  {
-    id: '1',
-    filename: 'backup_2024-01-15_123456.sql',
-    status: 'completed',
-    createdAt: '2024-01-15T10:30:00Z',
-    fileSize: 1024 * 1024 * 2.5, // 2.5MB
-    duration: 5000,
-    description: 'Full system backup including all tenants and users',
-    createdBy: {
-      name: 'Admin User',
-      email: 'admin@example.com'
-    }
-  },
-  {
-    id: '2',
-    filename: 'backup_2024-01-14_234567.sql',
-    status: 'completed',
-    createdAt: '2024-01-14T15:45:00Z',
-    fileSize: 1024 * 1024 * 1.8, // 1.8MB
-    duration: 4200,
-    description: 'Daily backup with sensitive data excluded',
-    createdBy: {
-      name: 'Admin User',
-      email: 'admin@example.com'
-    }
-  },
-  {
-    id: '3',
-    filename: 'backup_2024-01-13_345678.sql',
-    status: 'failed',
-    createdAt: '2024-01-13T09:15:00Z',
-    fileSize: 0,
-    duration: 0,
-    description: 'Backup failed due to database connection issues',
-    createdBy: {
-      name: 'Admin User',
-      email: 'admin@example.com'
-    }
-  }
-];
-
-// GET /api/superadmin/backup - Get backup history
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const status = searchParams.get('status');
-    const search = searchParams.get('search');
-
-    let filteredBackups = [...mockBackups];
-
-    // Apply filters
-    if (status) {
-      filteredBackups = filteredBackups.filter(backup => backup.status === status);
-    }
-
-    if (search) {
-      filteredBackups = filteredBackups.filter(backup => 
-        backup.filename.toLowerCase().includes(search.toLowerCase()) ||
-        backup.description?.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-
-    // Apply pagination
-    const totalCount = filteredBackups.length;
-    const skip = (page - 1) * limit;
-    const paginatedBackups = filteredBackups.slice(skip, skip + limit);
-
-    // Calculate statistics
-    const completedBackups = mockBackups.filter(b => b.status === 'completed');
-    const lastBackup = completedBackups.length > 0 ? completedBackups[0] : null;
-    const totalSize = completedBackups.reduce((sum, backup) => sum + backup.fileSize, 0);
-
-    const response = {
-      backups: paginatedBackups,
-      totalCount,
-      lastBackupDate: lastBackup?.createdAt,
-      totalSize,
-      pagination: {
-        page,
-        limit,
-        totalPages: Math.ceil(totalCount / limit),
-        hasNext: page * limit < totalCount,
-        hasPrev: page > 1
-      }
-    };
-
-    return NextResponse.json({
-      success: true,
-      message: 'Backup history retrieved successfully',
-      data: response
-    });
-  } catch (error: any) {
-    console.error('Backup history error:', error);
-    return createErrorResponse('Failed to retrieve backup history', 500);
-  }
-}
+import { createAuditLog } from '@/lib/audit';
 
 // POST /api/superadmin/backup - Create backup
-export async function POST(request: NextRequest) {
+export const POST = asyncHandler(async (request: NextRequest) => {
   try {
+    // Authenticate SuperAdmin
+    const authResult = await requireSuperAdmin(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+
+    const superAdmin = authResult as any;
     const body = await request.json();
     const {
       includeTenants = true,
@@ -116,12 +26,85 @@ export async function POST(request: NextRequest) {
       excludeSensitiveData = true
     } = body;
 
-    // Simulate backup creation
-    const backupId = Date.now().toString();
+    // Create backup record in database
+    const backupId = `backup_${Date.now()}`;
     const filename = `backup_${new Date().toISOString().split('T')[0]}_${Date.now()}.sql`;
     
-    // Create a mock backup file content
+    const backup = await (prisma as any).backup.create({
+      data: {
+        id: backupId,
+        filename,
+        status: 'processing',
+        fileSize: 0,
+        duration: 0,
+        description: `Backup with options: ${Object.entries({
+          includeTenants,
+          includeUsers,
+          includeNotifications,
+          includeAuditLogs,
+          includeSupportTickets,
+          includeSystemSettings,
+          excludeSensitiveData
+        }).filter(([_, value]) => value).map(([key]) => key).join(', ')}`,
+        createdById: superAdmin.id,
+        options: {
+          includeTenants,
+          includeUsers,
+          includeNotifications,
+          includeAuditLogs,
+          includeSupportTickets,
+          includeSystemSettings,
+          excludeSensitiveData
+        }
+      }
+    });
+
+    // Create audit log
+    await createAuditLog({
+      action: 'create_backup',
+      resourceType: 'BACKUP',
+      resourceId: backup.id,
+      superAdminId: superAdmin.id,
+      details: `Superadmin backup generated: ${filename} with options: ${JSON.stringify({
+        includeTenants,
+        includeUsers,
+        includeNotifications,
+        includeAuditLogs,
+        includeSupportTickets,
+        includeSystemSettings,
+        excludeSensitiveData
+      })}`
+    });
+
+    // Simulate backup creation process
+    const startTime = Date.now();
+    
+    // In a real implementation, you would:
+    // 1. Export data from database based on options
+    // 2. Create the actual backup file
+    // 3. Save it to storage (local filesystem, S3, etc.)
+    
+    // For now, we'll simulate the process
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate processing time
+    
+    const duration = Date.now() - startTime;
+    const fileSize = Math.floor(Math.random() * 1000000) + 100000; // Mock file size
+
+    // Update backup record with completion details
+    await (prisma as any).backup.update({
+      where: { id: backup.id },
+      data: {
+        status: 'completed',
+        fileSize,
+        duration,
+        completedAt: new Date(),
+        filePath: `/backups/${filename}` // Mock file path
+      }
+    });
+
+    // Create the backup file content
     const backupContent = `-- Backup created on ${new Date().toISOString()}
+-- Backup ID: ${backup.id}
 -- Options: ${JSON.stringify({
       includeTenants,
       includeUsers,
@@ -130,12 +113,15 @@ export async function POST(request: NextRequest) {
       includeSupportTickets,
       includeSystemSettings,
       excludeSensitiveData
-    })}
+    }, null, 2)}
 
 -- This is a mock backup file
 -- In a real implementation, this would contain actual database data
 
 SELECT 'Backup completed successfully' as status;
+SELECT 'Backup ID: ${backup.id}' as backup_id;
+SELECT 'File Size: ${fileSize} bytes' as file_size;
+SELECT 'Duration: ${duration}ms' as duration;
 `;
 
     // Create response with file download
@@ -151,4 +137,4 @@ SELECT 'Backup completed successfully' as status;
     console.error('Create backup error:', error);
     return createErrorResponse('Failed to create backup', 500);
   }
-} 
+}); 

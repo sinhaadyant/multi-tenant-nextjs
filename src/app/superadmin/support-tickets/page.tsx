@@ -7,6 +7,7 @@ import { TicketDetails } from '@/components/support-tickets/TicketDetails';
 import { TicketForm } from '@/components/support-tickets/TicketForm';
 import { useSupportTicket, useDeleteSupportTicket, SupportTicket } from '@/hooks/useSupportTickets';
 import { useToast } from '@/hooks/useToast';
+import Head from 'next/head';
 
 type ViewMode = 'list' | 'details' | 'create' | 'edit';
 
@@ -56,11 +57,16 @@ export default function SuperAdminSupportTicketsPage() {
   switch (viewMode) {
     case 'create':
       return (
-        <div className="min-h-screen bg-gray-50 py-8">
-          <TicketForm
-            mode="create"
-          />
-        </div>
+        <>
+          <Head>
+            <title>Create Support Ticket | SuperAdmin</title>
+          </Head>
+          <div className="min-h-screen bg-gray-50 py-8">
+            <TicketForm
+              mode="create"
+            />
+          </div>
+        </>
       );
 
     case 'edit':
@@ -98,13 +104,18 @@ export default function SuperAdminSupportTicketsPage() {
 
     default:
       return (
-        <div className="min-h-screen bg-gray-50 py-8">
-          <TicketList
-            onViewTicket={handleViewTicket}
-            onEditTicket={handleEditTicket}
-            onDeleteTicket={handleDeleteTicket}
-          />
-        </div>
+        <>
+          <Head>
+            <title>Support Tickets | SuperAdmin</title>
+          </Head>
+          <div className="min-h-screen bg-gray-50 py-8">
+            <TicketList
+              onViewTicket={handleViewTicket}
+              onEditTicket={handleEditTicket}
+              onDeleteTicket={handleDeleteTicket}
+            />
+          </div>
+        </>
       );
   }
 }

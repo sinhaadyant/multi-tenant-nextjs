@@ -75,9 +75,23 @@ interface DashboardOverviewCardsProps {
       revenueGrowth: number;
     };
   };
+  selectedRange?: string;
 }
 
-export const DashboardOverviewCards: React.FC<DashboardOverviewCardsProps> = ({ summary }) => {
+export const DashboardOverviewCards: React.FC<DashboardOverviewCardsProps> = ({ summary, selectedRange = '7d' }) => {
+  // Helper function to get growth label based on selected range
+  const getGrowthLabel = (range: string): string => {
+    switch (range) {
+      case '1d': return 'from yesterday';
+      case '7d': return 'from last week';
+      case '30d': return 'from last month';
+      case '60d': return 'from last 60 days';
+      case '90d': return 'from last 90 days';
+      case 'all': return 'from all time';
+      default: return 'from last period';
+    }
+  };
+
   // Add null checks to prevent errors
   if (!summary) {
     return (
@@ -103,7 +117,7 @@ export const DashboardOverviewCards: React.FC<DashboardOverviewCardsProps> = ({ 
       value: summary.totalTenants || 0,
       icon: <Building2 className="w-6 h-6" />,
       growth: summary.growthMetrics?.tenantGrowth,
-      growthLabel: 'from last month',
+      growthLabel: getGrowthLabel(selectedRange),
       bgColor: 'bg-blue-100 dark:bg-blue-900',
       iconColor: 'text-blue-600 dark:text-blue-400'
     },
@@ -112,7 +126,7 @@ export const DashboardOverviewCards: React.FC<DashboardOverviewCardsProps> = ({ 
       value: summary.totalUsers || 0,
       icon: <Users className="w-6 h-6" />,
       growth: summary.growthMetrics?.userGrowth,
-      growthLabel: 'from last month',
+      growthLabel: getGrowthLabel(selectedRange),
       bgColor: 'bg-green-100 dark:bg-green-900',
       iconColor: 'text-green-600 dark:text-green-400'
     },

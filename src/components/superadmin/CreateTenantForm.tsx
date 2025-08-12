@@ -65,9 +65,9 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [subdomainChecking, setSubdomainChecking] = useState(false);
+  const [subdomainBlurChecking, setSubdomainBlurChecking] = useState(false);
   const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null);
   const [emailChecking, setEmailChecking] = useState(false);
-  const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -120,65 +120,11 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
     clearFormError();
   }, [watchedSubdomain, watchedEmail, clearFormError]);
 
-  // Check email availability - memoized callback
-  const checkEmail = useCallback(async () => {
-    if (!watchedEmail || watchedEmail.length < 5 || !watchedEmail.includes('@')) {
-      setEmailAvailable(null);
-      setEmailError(null);
-      return;
-    }
-
-    setEmailChecking(true);
-    setEmailError(null);
-    
-    try {
-      const result = await checkEmailMutation.mutateAsync({ email: watchedEmail });
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log('📧 Email validation response:', {
-          email: watchedEmail,
-          result,
-          available: result.data.available,
-          existsIn: result.data.existsIn,
-          details: result.data.details,
-          tenantName: result.data.details?.tenantName
-        });
-      }
-      
-      if (result.data.available) {
-        setEmailAvailable(true);
-        setEmailError(null);
-        clearErrors('adminEmail');
-      } else {
-        setEmailAvailable(false);
-        let errorMessage = 'Email is not available';
-        
-        if (result.data.existsIn === 'tenant') {
-          errorMessage = `Email is already registered in tenant: ${result.data.details.tenantName || 'Unknown'}`;
-        } else if (result.data.existsIn === 'superadmin') {
-          errorMessage = 'Email is already registered as a SuperAdmin';
-        }
-        
-        setEmailError(errorMessage);
-        setError('adminEmail', { message: errorMessage });
-        
-        if (process.env.NODE_ENV === 'development') {
-          console.log('📧 Email validation error set:', errorMessage);
-        }
-      }
-    } catch (error) {
-      console.error('Error checking email:', error);
-      setEmailAvailable(false);
-      setEmailError('Error checking email availability');
-    } finally {
-      setEmailChecking(false);
-    }
-  }, [watchedEmail, setError, clearErrors, checkEmailMutation]);
-
+  // Clear email validation state when email changes
   useEffect(() => {
-    const debounceTimer = setTimeout(checkEmail, 500);
-    return () => clearTimeout(debounceTimer);
-  }, [checkEmail]);
+    setEmailError(null);
+    clearErrors('adminEmail');
+  }, [watchedEmail, clearErrors]);
 
   // Check subdomain availability - memoized callback
   const checkSubdomain = useCallback(async () => {
@@ -187,27 +133,51 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
       return;
     }
 
+    // Validate subdomain format
+    const subdomainRegex = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+    if (!subdomainRegex.test(watchedSubdomain)) {
+      setSubdomainAvailable(false);
+      setError('subdomain', { message: 'Subdomain must contain only lowercase letters, numbers, and hyphens. Cannot start or end with hyphen.' });
+      return;
+    }
+
     setSubdomainChecking(true);
     try {
       const response = await api.get(`/superadmin/tenants/check-subdomain?subdomain=${watchedSubdomain}`);
-      const available = response.data.available;
       
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔍 Subdomain validation response:', {
-          subdomain: watchedSubdomain,
-          available,
-          responseData: response.data
-        });
-      }
+      // Debug logging
+      console.log('Subdomain check response:', response.data);
       
-      setSubdomainAvailable(available);
-      if (available) {
-        clearErrors('subdomain');
+      if (response.data && response.data.success && response.data.data && typeof response.data.data.available === 'boolean') {
+        const available = response.data.data.available;
+        console.log('Subdomain available:', available);
+        setSubdomainAvailable(available);
+        if (available) {
+          clearErrors('subdomain');
+        } else {
+          setError('subdomain', { message: 'This subdomain is already taken' });
+        }
       } else {
-        setError('subdomain', { message: 'This subdomain is already taken' });
+        console.error('Invalid response format from subdomain check API:', response.data);
+        setSubdomainAvailable(false);
+        setError('subdomain', { message: 'Error checking subdomain availability' });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error checking subdomain:', error);
+      console.error('Error response:', error.response?.data);
+      
+      // Handle specific error cases
+      if (error.response?.status === 401) {
+        setError('subdomain', { message: 'Authentication required. Please log in again.' });
+      } else if (error.response?.status === 400) {
+        const errorMessage = error.response.data?.message || error.response.data?.data?.message || 'Invalid subdomain format';
+        setError('subdomain', { message: errorMessage });
+      } else if (error.response?.status >= 500) {
+        setError('subdomain', { message: 'Server error. Please try again later.' });
+      } else {
+        setError('subdomain', { message: 'Error checking subdomain availability' });
+      }
+      
       setSubdomainAvailable(false);
     } finally {
       setSubdomainChecking(false);
@@ -221,6 +191,20 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
 
   // Create tenant mutation - memoized callbacks
   const mutationFn = useCallback(async (data: CreateTenantFormData) => {
+    // Map tenantType to plan values
+    const getPlanFromTenantType = (tenantType: string) => {
+      switch (tenantType) {
+        case 'SaaS':
+          return 'starter';
+        case 'Enterprise':
+          return 'enterprise';
+        case 'Custom':
+          return 'professional';
+        default:
+          return 'starter';
+      }
+    };
+
     const response = await api.post('/superadmin/tenants', {
       tenant: {
         name: data.tenantName,
@@ -228,7 +212,7 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
         slug: data.subdomain,
         domain: `${data.subdomain}.example.com`,
         description: `${data.companyName} - ${data.tenantType} tenant`,
-        plan: data.tenantType.toLowerCase(),
+        plan: getPlanFromTenantType(data.tenantType),
         region: data.country,
         features: ['analytics', 'api', 'sso'],
         isActive: data.status,
@@ -354,10 +338,10 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
 
 
 
-  const onSubmit = useCallback((data: any) => {
+  const onSubmit = useCallback(async (data: any) => {
     console.log('Form submission started with data:', data);
     
-    // Custom validation for subdomain and email availability
+    // Custom validation for subdomain availability
     let hasErrors = false;
     
     if (subdomainAvailable !== true) {
@@ -365,15 +349,6 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
         message: subdomainAvailable === false 
           ? 'This subdomain is already taken' 
           : 'Please check subdomain availability' 
-      });
-      hasErrors = true;
-    }
-    
-    if (emailAvailable !== true) {
-      setError('adminEmail', { 
-        message: emailAvailable === false 
-          ? emailError || 'Email is not available'
-          : 'Please check email availability' 
       });
       hasErrors = true;
     }
@@ -393,7 +368,7 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
     
     console.log('Form validation passed, submitting...');
     createTenantMutation.mutate(data);
-  }, [subdomainAvailable, emailAvailable, emailError, passwordStrength.score, setError, createTenantMutation]);
+  }, [subdomainAvailable, passwordStrength.score, setError, createTenantMutation]);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
@@ -408,20 +383,7 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
           </div>
         )}
         
-        {/* Debug Information (Development Only) */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 text-xs">
-            <h3 className="font-semibold mb-2">Debug Info:</h3>
-            <div className="grid grid-cols-2 gap-2">
-              <div>Subdomain Available: {subdomainAvailable?.toString() || 'null'}</div>
-              <div>Email Available: {emailAvailable?.toString() || 'null'}</div>
-              <div>Password Score: {passwordStrength.score}</div>
-              <div>Form Errors: {Object.keys(errors).length}</div>
-              <div>Is Submitting: {isSubmitting.toString()}</div>
-              <div>Mutation Pending: {createTenantMutation.isPending.toString()}</div>
-            </div>
-          </div>
-        )}
+
         
         {/* Tenant Information Section */}
         <div className="space-y-6">
@@ -504,6 +466,16 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
                           errors.subdomain ? 'border-red-500' : 'border-gray-300'
                         }`}
                         placeholder="your-company"
+                        onBlur={() => {
+                          // Trigger subdomain check on blur with a small delay to avoid conflicts with debounced check
+                          if (watchedSubdomain && watchedSubdomain.length >= 3) {
+                            setSubdomainBlurChecking(true);
+                            setTimeout(() => {
+                              checkSubdomain();
+                              setSubdomainBlurChecking(false);
+                            }, 100);
+                          }
+                        }}
                       />
                       <span className="px-3 py-2 bg-gray-100 dark:bg-gray-600 border border-l-0 border-gray-300 dark:border-gray-600 rounded-r-lg text-gray-500 dark:text-gray-400 text-sm">
                         .example.com
@@ -512,13 +484,13 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
                   )}
                 />
                 <div className="absolute right-16 top-2">
-                  {subdomainChecking && (
+                  {(subdomainChecking || subdomainBlurChecking) && (
                     <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
                   )}
-                  {subdomainAvailable === true && (
+                  {!subdomainChecking && !subdomainBlurChecking && subdomainAvailable === true && (
                     <Check className="w-4 h-4 text-green-500" />
                   )}
-                  {subdomainAvailable === false && (
+                  {!subdomainChecking && !subdomainBlurChecking && subdomainAvailable === false && (
                     <X className="w-4 h-4 text-red-500" />
                   )}
                 </div>
@@ -545,15 +517,15 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
                 render={({ field }) => (
                   <select
                     {...field}
-                    name="plan"
+                    name="tenantType"
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
                       errors.tenantType ? 'border-red-500' : 'border-gray-300'
                     }`}
                   >
-                    <option value="">Select plan</option>
-                    <option value="basic">Basic</option>
-                    <option value="premium">Premium</option>
-                    <option value="enterprise">Enterprise</option>
+                    <option value="">Select tenant type</option>
+                    <option value="SaaS">SaaS</option>
+                    <option value="Enterprise">Enterprise</option>
+                    <option value="Custom">Custom</option>
                   </select>
                 )}
               />
@@ -748,12 +720,6 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
                   {emailChecking && (
                     <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
                   )}
-                  {emailAvailable === true && !emailChecking && (
-                    <Check className="w-4 h-4 text-green-500" />
-                  )}
-                  {emailAvailable === false && !emailChecking && (
-                    <X className="w-4 h-4 text-red-500" />
-                  )}
                 </div>
               </div>
               {errors.adminEmail && (
@@ -762,9 +728,7 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
               {emailError && !errors.adminEmail && (
                 <p className="mt-1 text-sm text-red-500">{emailError}</p>
               )}
-              {emailAvailable === true && !emailChecking && !errors.adminEmail && !emailError && (
-                <p className="mt-1 text-sm text-green-500">Email is available</p>
-              )}
+
             </div>
 
             {/* Mobile Number */}
@@ -918,21 +882,10 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
               isSubmitting || 
               createTenantMutation.isPending || 
               subdomainAvailable !== true || 
-              emailAvailable !== true ||
               passwordStrength.score < 3 ||
               Object.keys(errors).length > 0
             }
-            onClick={() => {
-              console.log('Submit button clicked');
-              console.log('Form state:', {
-                isSubmitting,
-                mutationPending: createTenantMutation.isPending,
-                subdomainAvailable,
-                emailAvailable,
-                passwordScore: passwordStrength.score,
-                errors: Object.keys(errors)
-              });
-            }}
+
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
           >
             {(isSubmitting || createTenantMutation.isPending) && (
@@ -948,13 +901,12 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
                 {subdomainAvailable === true ? <Check className="w-3 h-3 mr-1" /> : <X className="w-3 h-3 mr-1" />}
                 Subdomain
               </span>
-              <span className={`flex items-center ${emailAvailable === true ? 'text-green-500' : 'text-red-500'}`}>
-                {emailAvailable === true ? <Check className="w-3 h-3 mr-1" /> : <X className="w-3 h-3 mr-1" />}
-                Email
-              </span>
               <span className={`flex items-center ${passwordStrength.score >= 3 ? 'text-green-500' : 'text-red-500'}`}>
                 {passwordStrength.score >= 3 ? <Check className="w-3 h-3 mr-1" /> : <X className="w-3 h-3 mr-1" />}
                 Password
+              </span>
+              <span className="text-gray-400">
+                Email (validated on submit)
               </span>
             </div>
           </div>

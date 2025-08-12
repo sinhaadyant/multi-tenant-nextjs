@@ -22,17 +22,19 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     if (!token) {
+      console.log('❌ No token provided in URL');
       setTokenValidation({ isValid: false, error: 'No token provided' });
       setIsLoading(false);
       return;
     }
 
+    console.log('🔍 Token found in URL:', token.substring(0, 10) + '...');
     validateToken(token);
   }, [token]);
 
   const validateToken = async (token: string) => {
     try {
-      console.log('🔍 Validating token with axios:', token);
+      console.log('🔍 Validating token with axios:', token.substring(0, 10) + '...');
       
       const response = await axios.get(`/api/superadmin/auth/verify-reset-token`, {
         params: { token },
@@ -43,10 +45,19 @@ export default function ResetPasswordPage() {
 
       if (response.data.success) {
         console.log('✅ Token is valid');
-        setTokenValidation({
-          isValid: true,
-          email: response.data.email
-        });
+        const email = response.data.data?.email;
+        if (!email) {
+          console.log('❌ No email found in response data');
+          setTokenValidation({
+            isValid: false,
+            error: 'Invalid response from server - no email found'
+          });
+        } else {
+          setTokenValidation({
+            isValid: true,
+            email: email
+          });
+        }
       } else {
         console.log('❌ Token is invalid:', response.data.message);
         setTokenValidation({
@@ -60,12 +71,15 @@ export default function ResetPasswordPage() {
       let errorMessage = 'Failed to verify reset token';
       if (error.response) {
         // Server responded with error status
+        console.log('❌ Server error response:', error.response.status, error.response.data);
         errorMessage = error.response.data?.message || errorMessage;
       } else if (error.request) {
         // Request was made but no response received
+        console.log('❌ No response received from server');
         errorMessage = 'Network error - no response from server';
       } else {
         // Something else happened
+        console.log('❌ Request setup error:', error.message);
         errorMessage = error.message || errorMessage;
       }
       
@@ -82,7 +96,7 @@ export default function ResetPasswordPage() {
   console.log('🔍 Current state:', {
     isLoading,
     tokenValidation,
-    token,
+    token: token ? token.substring(0, 10) + '...' : null,
     shouldRenderClient: tokenValidation?.isValid && tokenValidation.email && token
   });
 

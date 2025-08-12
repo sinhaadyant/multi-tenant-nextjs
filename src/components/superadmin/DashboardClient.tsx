@@ -233,7 +233,7 @@ export const DashboardClient: React.FC = () => {
 
       {/* Overview Cards */}
       {data.summary && (
-        <DashboardOverviewCards summary={data.summary} />
+        <DashboardOverviewCards summary={data.summary} selectedRange={selectedRange} />
       )}
 
       {/* Quick Actions */}

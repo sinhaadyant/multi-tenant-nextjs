@@ -42,7 +42,8 @@ export const NotificationForm: React.FC<NotificationFormProps> = ({
     defaultValues: {
       title: '',
       message: '',
-      targetType: 'all_tenants',
+      type: 'info',
+      targetType: 'superadmin',
       targetTenantId: '',
       priority: 'medium'
     },
@@ -137,6 +138,32 @@ export const NotificationForm: React.FC<NotificationFormProps> = ({
         )}
       </div>
 
+      {/* Type Field */}
+      <div>
+        <Label>
+          Type <span className="text-error-500">*</span>
+        </Label>
+        <Controller
+          name="type"
+          control={control}
+          render={({ field }) => (
+            <select
+              {...field}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+            >
+              <option value="info">Info</option>
+              <option value="warning">Warning</option>
+              <option value="alert">Alert</option>
+              <option value="promotional">Promotional</option>
+              <option value="system_update">System Update</option>
+            </select>
+          )}
+        />
+        {errors.type && (
+          <p className="mt-1 text-sm text-error-500">{errors.type.message}</p>
+        )}
+      </div>
+
       {/* Target Type Field */}
       <div>
         <Label>
@@ -150,9 +177,11 @@ export const NotificationForm: React.FC<NotificationFormProps> = ({
               {...field}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
             >
-              <option value="all_tenants">All Tenants</option>
-              <option value="superadmin">SuperAdmin Only</option>
-              <option value="specific_tenant">Specific Tenant</option>
+              <option value="superadmin">Super Admin</option>
+              <option value="specific_users">Specific Users</option>
+              <option value="multiple_users">Multiple Users</option>
+              <option value="entire_tenant">Entire Tenant</option>
+              <option value="multiple_tenants">Multiple Tenants</option>
             </select>
           )}
         />
@@ -162,7 +191,7 @@ export const NotificationForm: React.FC<NotificationFormProps> = ({
       </div>
 
       {/* Specific Tenant Selection */}
-      {targetType === 'specific_tenant' && (
+      {(targetType === 'entire_tenant' || targetType === 'multiple_tenants') && (
         <div>
           <Label>
             Select Tenant <span className="text-error-500">*</span>

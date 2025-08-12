@@ -224,8 +224,8 @@ export const POST = asyncHandler(async (req: NextRequest) => {
       );
     }
 
-    // Check if admin email already exists
-    const existingUser = await prisma.user.findUnique({
+    // Check if admin email already exists (globally across all tenants)
+    const existingUser = await prisma.user.findFirst({
       where: { email: admin.email }
     });
 
@@ -239,7 +239,7 @@ export const POST = asyncHandler(async (req: NextRequest) => {
       );
     }
 
-    // Create tenant and admin user in a transaction
+    // Create tenant, roles, modules, and admin user in a transaction
     const result = await prisma.$transaction(async (tx) => {
       // Create tenant
       const newTenant = await tx.tenant.create({
@@ -255,6 +255,142 @@ export const POST = asyncHandler(async (req: NextRequest) => {
         }
       });
 
+      // Get all available modules
+      const availableModules = await tx.module.findMany({
+        where: { isActive: true },
+        orderBy: { orderIndex: 'asc' }
+      });
+
+      // Get all available permissions
+      const availablePermissions = await tx.permission.findMany({
+        where: { isActive: true }
+      });
+
+      // Create default roles for the tenant
+      const defaultRoles = [
+        {
+          name: 'Admin',
+          description: 'Full administrative access with all permissions',
+          isDefault: true,
+          priority: 1,
+          color: '#dc2626' // Red
+        },
+        {
+          name: 'Manager',
+          description: 'Management level access with most permissions',
+          isDefault: true,
+          priority: 2,
+          color: '#ea580c' // Orange
+        },
+        {
+          name: 'User',
+          description: 'Standard user access with basic permissions',
+          isDefault: true,
+          priority: 3,
+          color: '#2563eb' // Blue
+        },
+        {
+          name: 'Viewer',
+          description: 'Read-only access with limited permissions',
+          isDefault: true,
+          priority: 4,
+          color: '#059669' // Green
+        }
+      ];
+
+      const createdRoles = [];
+      for (const roleData of defaultRoles) {
+        const role = await tx.role.create({
+          data: {
+            ...roleData,
+            tenantId: newTenant.id
+          }
+        });
+        createdRoles.push(role);
+      }
+
+      // Assign permissions to roles
+      const adminRole = createdRoles.find(r => r.name === 'Admin');
+      const managerRole = createdRoles.find(r => r.name === 'Manager');
+      const userRole = createdRoles.find(r => r.name === 'User');
+      const viewerRole = createdRoles.find(r => r.name === 'Viewer');
+
+      // Admin gets all permissions
+      if (adminRole) {
+        const adminPermissions = availablePermissions.map(permission => ({
+          roleId: adminRole.id,
+          permissionId: permission.id
+        }));
+        await tx.rolePermission.createMany({
+          data: adminPermissions
+        });
+      }
+
+      // Manager gets most permissions (exclude sensitive ones)
+      if (managerRole) {
+        const managerPermissions = availablePermissions
+          .filter(permission => 
+            !permission.name.includes('delete') && 
+            !permission.name.includes('audit:export') &&
+            !permission.name.includes('modules.manage_versions')
+          )
+          .map(permission => ({
+            roleId: managerRole.id,
+            permissionId: permission.id
+          }));
+        await tx.rolePermission.createMany({
+          data: managerPermissions
+        });
+      }
+
+      // User gets basic permissions
+      if (userRole) {
+        const userPermissions = availablePermissions
+          .filter(permission => 
+            permission.name.includes('view') ||
+            permission.name.includes('dashboard') ||
+            permission.name.includes('notifications:view') ||
+            permission.name.includes('content')
+          )
+          .map(permission => ({
+            roleId: userRole.id,
+            permissionId: permission.id
+          }));
+        await tx.rolePermission.createMany({
+          data: userPermissions
+        });
+      }
+
+      // Viewer gets read-only permissions
+      if (viewerRole) {
+        const viewerPermissions = availablePermissions
+          .filter(permission => 
+            permission.name.includes('view') ||
+            permission.name.includes('dashboard')
+          )
+          .map(permission => ({
+            roleId: viewerRole.id,
+            permissionId: permission.id
+          }));
+        await tx.rolePermission.createMany({
+          data: viewerPermissions
+        });
+      }
+
+      // Enable all modules for the tenant
+      const tenantModules = availableModules.map(module => ({
+        tenantId: newTenant.id,
+        moduleKey: module.moduleKey,
+        isEnabled: true,
+        isVisible: true,
+        enabledAt: new Date(),
+        enabledBy: authResult.id
+      }));
+
+      await tx.tenantModule.createMany({
+        data: tenantModules
+      });
+
       // Hash password
       const hashedPassword = await hashPassword(admin.password);
 
@@ -264,13 +400,27 @@ export const POST = asyncHandler(async (req: NextRequest) => {
           name: admin.name,
           email: admin.email,
           password: hashedPassword,
+          contactNumber: admin.contactNumber || null,
           tenantId: newTenant.id,
-          role: 'admin',
           isActive: true
         }
       });
 
-      return { tenant: newTenant, admin: adminUser };
+      // Assign Admin role to the admin user
+      await tx.userRole.create({
+        data: {
+          userId: adminUser.id,
+          roleId: adminRole!.id,
+          assignedBy: authResult.id
+        }
+      });
+
+      return { 
+        tenant: newTenant, 
+        admin: adminUser,
+        roles: createdRoles,
+        modules: availableModules.length
+      };
     });
 
     // Create audit log
@@ -304,8 +454,21 @@ export const POST = asyncHandler(async (req: NextRequest) => {
         createdAt: result.tenant.createdAt,
         updatedAt: result.tenant.updatedAt,
         userCount: 1
-      }
-    }, 'Tenant created successfully');
+      },
+      admin: {
+        id: result.admin.id,
+        name: result.admin.name,
+        email: result.admin.email,
+        role: 'Admin'
+      },
+      roles: result.roles.map(role => ({
+        id: role.id,
+        name: role.name,
+        description: role.description,
+        color: role.color
+      })),
+      modulesEnabled: result.modules
+    }, 'Tenant created successfully with Admin user, roles, and modules');
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
       console.error('❌ Error creating tenant:', error);

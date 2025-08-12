@@ -42,10 +42,14 @@ export default function ForgotPassword() {
         setSuccess(true);
         // In a real implementation, we would just show success message
         // For demo purposes, we'll redirect to reset password page
+        console.log('✅ Forgot password successful, redirecting with token:', response.token?.substring(0, 10) + '...');
         setTimeout(() => {
-          router.push(`/superadmin/reset-password?token=${response.token}`);
+          const redirectUrl = `/superadmin/reset-password?token=${encodeURIComponent(response.token)}`;
+          console.log('🔗 Redirecting to:', redirectUrl);
+          router.push(redirectUrl);
         }, 2000);
       } else {
+        console.log('❌ Forgot password failed:', response.message);
         setError(response.message);
       }
     } catch (err) {

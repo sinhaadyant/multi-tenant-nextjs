@@ -237,7 +237,7 @@ const UserFilterBar: React.FC<UserFilterBarProps> = ({
           </div>
 
           {/* Enhanced Tenant Filter */}
-          <div className="flex flex-col space-y-1">
+          <div className="flex flex-col space-y-1 w-full sm:w-auto">
             <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Tenant</label>
             <div className="space-y-2">
               {/* Tenant Search */}
@@ -268,7 +268,7 @@ const UserFilterBar: React.FC<UserFilterBarProps> = ({
                 <select
                   value={localFilters.tenantId}
                   onChange={(e) => handleFilterChange('tenantId', e.target.value)}
-                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white min-w-[250px] font-medium appearance-none"
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white w-full sm:min-w-[200px] lg:min-w-[250px] font-medium appearance-none"
                   disabled={loading}
                 >
                   <option value="">All Tenants ({tenantsData?.data?.tenants?.length || 0} total)</option>
@@ -313,12 +313,12 @@ const UserFilterBar: React.FC<UserFilterBarProps> = ({
           </div>
 
           {/* Role Filter */}
-          <div className="flex flex-col space-y-1">
+          <div className="flex flex-col space-y-1 w-full sm:w-auto">
             <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Role</label>
             <select
               value={localFilters.roleId}
               onChange={(e) => handleFilterChange('roleId', e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white min-w-[150px]"
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white w-full sm:min-w-[120px] lg:min-w-[150px]"
               disabled={loading}
             >
               <option value="">All Roles</option>
@@ -331,12 +331,12 @@ const UserFilterBar: React.FC<UserFilterBarProps> = ({
           </div>
 
           {/* Status Filter */}
-          <div className="flex flex-col space-y-1">
+          <div className="flex flex-col space-y-1 w-full sm:w-auto">
             <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Status</label>
             <select
               value={localFilters.status}
               onChange={(e) => handleFilterChange('status', e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white min-w-[120px]"
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white w-full sm:min-w-[100px] lg:min-w-[120px]"
               disabled={loading}
             >
               <option value="">All Status</option>
@@ -346,7 +346,7 @@ const UserFilterBar: React.FC<UserFilterBarProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-end gap-2 ml-auto">
+          <div className="flex items-end gap-2 w-full sm:w-auto sm:ml-auto">
             {hasActiveFilters && (
               <Button
                 variant="outline"

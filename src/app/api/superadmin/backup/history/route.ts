@@ -31,84 +31,76 @@ export const GET = asyncHandler(async (req: NextRequest) => {
     const limit = parseInt(searchParams.get('limit') || '10');
     const offset = (page - 1) * limit;
 
-    // Get backup audit logs
-    const backupLogs = await prisma.auditLog.findMany({
+    // Get backups from the Backup model
+    const backups = await prisma.backup.findMany({
       where: {
-        action: 'create_backup',
-        superAdminId: superAdmin.id
+        createdById: superAdmin.id
       },
       orderBy: { createdAt: 'desc' },
       skip: offset,
       take: limit,
-      select: {
-        id: true,
-        details: true,
-        createdAt: true,
-        ipAddress: true
+      include: {
+        createdBy: {
+          select: {
+            name: true,
+            email: true
+          }
+        }
       }
     });
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('📊 Found backup logs:', backupLogs.length);
+      console.log('📊 Found backups:', backups.length);
     }
 
     // Get total count
-    const totalCount = await prisma.auditLog.count({
+    const totalCount = await prisma.backup.count({
       where: {
-        action: 'create_backup',
-        superAdminId: superAdmin.id
+        createdById: superAdmin.id
       }
     });
 
     // Get last backup date
-    const lastBackup = await prisma.auditLog.findFirst({
+    const lastBackup = await prisma.backup.findFirst({
       where: {
-        action: 'create_backup',
-        superAdminId: superAdmin.id
+        createdById: superAdmin.id,
+        status: 'completed'
       },
       orderBy: { createdAt: 'desc' },
       select: { createdAt: true }
     });
 
-    // Transform audit logs to backup history format
-    const backups = backupLogs.map(log => {
-      // Extract filename from details
-      const details = typeof log.details === 'string' ? log.details : '';
-      const filenameMatch = details.match(/backup generated: (.+?) with options/);
-      const filename = filenameMatch ? filenameMatch[1] : `backup_${log.id}.sql`;
-      
-      // Extract options from details
-      const optionsMatch = details.match(/options: (.+)$/);
-      let options = {};
-      if (optionsMatch) {
-        try {
-          options = JSON.parse(optionsMatch[1]);
-        } catch (e) {
-          // Ignore parsing errors
-        }
-      }
-
-      return {
-        id: log.id,
-        filename,
-        status: 'completed' as const,
-        createdAt: log.createdAt.toISOString(),
-        fileSize: Math.floor(Math.random() * 1000000) + 100000, // Mock file size
-        duration: Math.floor(Math.random() * 5000) + 1000, // Mock duration
-        description: `Backup created with options: ${Object.keys(options).filter(k => options[k as keyof typeof options]).join(', ')}`
-      };
+    // Calculate total size
+    const totalSizeResult = await prisma.backup.aggregate({
+      where: {
+        createdById: superAdmin.id,
+        status: 'completed'
+      },
+      _sum: { fileSize: true }
     });
 
-    // Calculate total size (mock for now)
-    const totalSize = backups.reduce((sum, backup) => sum + backup.fileSize, 0);
+    const totalSize = totalSizeResult._sum.fileSize || 0;
+
+    // Transform backups to match expected format
+    const transformedBackups = backups.map(backup => ({
+      id: backup.id,
+      filename: backup.filename,
+      status: backup.status as 'completed' | 'failed' | 'processing',
+      createdAt: backup.createdAt.toISOString(),
+      completedAt: backup.completedAt?.toISOString(),
+      fileSize: backup.fileSize,
+      duration: backup.duration,
+      description: backup.description,
+      createdBy: backup.createdBy
+    }));
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('✅ Backup history fetched successfully:', backups.length);
+      console.log('✅ Backup history fetched successfully:', transformedBackups.length);
     }
 
     // Return response with proper structure
     const responseData = {
-      backups,
+      backups: transformedBackups,
       totalCount,
       lastBackupDate: lastBackup?.createdAt.toISOString() || null,
       totalSize,

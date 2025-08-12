@@ -217,7 +217,6 @@ export default function TenantEditPage() {
         data: updateData
       });
 
-      toast.success('Tenant updated successfully!');
       router.push(`/superadmin/tenants/${tenantId}`);
     } catch (error: any) {
       console.error('Error updating tenant:', error);
