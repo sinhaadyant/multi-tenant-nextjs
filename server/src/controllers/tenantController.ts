@@ -9,7 +9,6 @@ import {
 import {
   createTenantSchema,
   updateTenantSchema,
-  tenantListParamsSchema,
 } from '@/validation/tenantValidation';
 
 const tenantService = new TenantService();
@@ -17,88 +16,9 @@ const tenantService = new TenantService();
 /**
  * @swagger
  * /api/tenants:
- *   post:
- *     summary: Create a new tenant
- *     description: Create a new tenant organization with the provided information
- *     tags: [Tenants]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/CreateTenantRequest'
- *     responses:
- *       201:
- *         description: Tenant created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: Tenant created successfully
- *                 data:
- *                   $ref: '#/components/schemas/Tenant'
- *       400:
- *         description: Validation error or tenant already exists
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       401:
- *         description: Unauthorized
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
-export const createTenant = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    // Validate request body
-    const validationResult = createTenantSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      badRequestResponse(
-        res,
-        'Validation failed',
-        validationResult.error.issues
-      );
-      return;
-    }
-
-    const tenantData = validationResult.data;
-    const auditUserId = req.user?.userId;
-
-    const tenant = await tenantService.createTenant(tenantData, auditUserId);
-
-    successResponse(res, tenant, 'Tenant created successfully', 201);
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Failed to create tenant';
-    errorResponse(res, message, 500);
-  }
-};
-
-/**
- * @swagger
- * /api/tenants:
  *   get:
- *     summary: Get list of tenants
- *     description: Retrieve a paginated list of tenants with optional filtering
+ *     summary: Get all tenants
+ *     description: Retrieve all tenants (superadmin only)
  *     tags: [Tenants]
  *     security:
  *       - bearerAuth: []
@@ -108,7 +28,7 @@ export const createTenant = async (
  *         schema:
  *           type: integer
  *           default: 1
- *         description: Page number for pagination
+ *         description: Page number
  *       - in: query
  *         name: limit
  *         schema:
@@ -119,74 +39,56 @@ export const createTenant = async (
  *         name: search
  *         schema:
  *           type: string
- *         description: Search term for name or domain
- *       - in: query
- *         name: isActive
- *         schema:
- *           type: boolean
- *         description: Filter by active status
- *       - in: query
- *         name: orderBy
- *         schema:
- *           type: string
- *           enum: [name, domain, createdAt]
- *           default: createdAt
- *         description: Field to order by
- *       - in: query
- *         name: orderDirection
- *         schema:
- *           type: string
- *           enum: [asc, desc]
- *           default: desc
- *         description: Order direction
+ *         description: Search term for tenant name or slug
  *     responses:
  *       200:
  *         description: Tenants retrieved successfully
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/PaginatedResponse'
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Tenants retrieved successfully
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Tenant'
  *       401:
  *         description: Unauthorized
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
  */
-export const getTenants = async (
+export const getAllTenants = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
-    // Validate query parameters
-    const validationResult = tenantListParamsSchema.safeParse(req.query);
-    if (!validationResult.success) {
-      badRequestResponse(
-        res,
-        'Invalid query parameters',
-        validationResult.error.issues
-      );
-      return;
-    }
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      sortBy = 'name',
+      sortOrder = 'asc',
+    } = req.query;
 
-    const params = validationResult.data;
-    const result = await tenantService.listTenants(params);
-
-    successResponse(
-      res,
-      {
-        tenants: result.tenants,
-        total: result.total,
-        meta: result.meta,
+    const tenants = await tenantService.listTenants({
+      page: Number(page),
+      limit: Number(limit),
+      filters: {
+        search: search as string,
       },
-      'Tenants retrieved successfully'
-    );
+      orderBy: sortBy as 'name' | 'domain' | 'createdAt',
+      orderDirection: sortOrder as 'asc' | 'desc',
+    });
+
+    successResponse(res, tenants, 'Tenants retrieved successfully');
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Failed to retrieve tenants';
@@ -199,7 +101,7 @@ export const getTenants = async (
  * /api/tenants/{id}:
  *   get:
  *     summary: Get tenant by ID
- *     description: Retrieve a specific tenant by their ID
+ *     description: Retrieve a specific tenant by its ID
  *     tags: [Tenants]
  *     security:
  *       - bearerAuth: []
@@ -232,12 +134,6 @@ export const getTenants = async (
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
- *       401:
- *         description: Unauthorized
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const getTenantById = async (
   req: Request,
@@ -245,14 +141,12 @@ export const getTenantById = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-
     if (!id) {
       badRequestResponse(res, 'Tenant ID is required');
       return;
     }
 
     const tenant = await tenantService.getTenantById(id);
-
     successResponse(res, tenant, 'Tenant retrieved successfully');
   } catch (error) {
     const message =
@@ -267,10 +161,94 @@ export const getTenantById = async (
 
 /**
  * @swagger
+ * /api/tenants:
+ *   post:
+ *     summary: Create a new tenant
+ *     description: Create a new tenant (superadmin only)
+ *     tags: [Tenants]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Acme Corporation"
+ *               slug:
+ *                 type: string
+ *                 example: "acme"
+ *               domain:
+ *                 type: string
+ *                 example: "acme.com"
+ *               settings:
+ *                 type: object
+ *                 example: { "theme": "dark", "timezone": "UTC" }
+ *               isActive:
+ *                 type: boolean
+ *                 example: true
+ *             required:
+ *               - name
+ *               - slug
+ *     responses:
+ *       201:
+ *         description: Tenant created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Tenant created successfully
+ *                 data:
+ *                   $ref: '#/components/schemas/Tenant'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+export const createTenant = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const validationResult = createTenantSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      badRequestResponse(
+        res,
+        'Validation failed',
+        validationResult.error.issues
+      );
+      return;
+    }
+
+    const tenant = await tenantService.createTenant(
+      validationResult.data,
+      req.user?.userId
+    );
+    successResponse(res, tenant, 'Tenant created successfully', 201);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Failed to create tenant';
+    errorResponse(res, message, 500);
+  }
+};
+
+/**
+ * @swagger
  * /api/tenants/{id}:
  *   put:
  *     summary: Update tenant
- *     description: Update an existing tenant's information
+ *     description: Update an existing tenant (superadmin only)
  *     tags: [Tenants]
  *     security:
  *       - bearerAuth: []
@@ -286,7 +264,23 @@ export const getTenantById = async (
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/CreateTenantRequest'
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Updated Acme Corporation"
+ *               slug:
+ *                 type: string
+ *                 example: "acme"
+ *               domain:
+ *                 type: string
+ *                 example: "acme.com"
+ *               settings:
+ *                 type: object
+ *                 example: { "theme": "light", "timezone": "UTC" }
+ *               isActive:
+ *                 type: boolean
+ *                 example: true
  *     responses:
  *       200:
  *         description: Tenant updated successfully
@@ -303,20 +297,8 @@ export const getTenantById = async (
  *                   example: Tenant updated successfully
  *                 data:
  *                   $ref: '#/components/schemas/Tenant'
- *       400:
- *         description: Validation error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: Tenant not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       401:
- *         description: Unauthorized
  *         content:
  *           application/json:
  *             schema:
@@ -328,13 +310,11 @@ export const updateTenant = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-
     if (!id) {
       badRequestResponse(res, 'Tenant ID is required');
       return;
     }
 
-    // Validate request body
     const validationResult = updateTenantSchema.safeParse(req.body);
     if (!validationResult.success) {
       badRequestResponse(
@@ -345,16 +325,12 @@ export const updateTenant = async (
       return;
     }
 
-    const tenantData = validationResult.data;
-    const auditUserId = req.user?.userId;
-
     const tenant = await tenantService.updateTenant(
       id,
-      tenantData,
-      auditUserId
+      validationResult.data,
+      req.user?.userId
     );
-
-    successResponse(res, 'Tenant updated successfully', tenant);
+    successResponse(res, tenant, 'Tenant updated successfully');
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Failed to update tenant';
@@ -371,7 +347,7 @@ export const updateTenant = async (
  * /api/tenants/{id}:
  *   delete:
  *     summary: Delete tenant
- *     description: Soft delete a tenant (mark as inactive)
+ *     description: Delete a tenant (soft delete, superadmin only)
  *     tags: [Tenants]
  *     security:
  *       - bearerAuth: []
@@ -396,16 +372,8 @@ export const updateTenant = async (
  *                 message:
  *                   type: string
  *                   example: Tenant deleted successfully
- *                 data:
- *                   $ref: '#/components/schemas/Tenant'
  *       404:
  *         description: Tenant not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       401:
- *         description: Unauthorized
  *         content:
  *           application/json:
  *             schema:
@@ -417,16 +385,13 @@ export const deleteTenant = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const auditUserId = req.user?.userId;
-
     if (!id) {
       badRequestResponse(res, 'Tenant ID is required');
       return;
     }
 
-    const tenant = await tenantService.deleteTenant(id, auditUserId);
-
-    successResponse(res, 'Tenant deleted successfully', tenant);
+    await tenantService.deleteTenant(id, req.user?.userId);
+    successResponse(res, null, 'Tenant deleted successfully');
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Failed to delete tenant';
@@ -442,8 +407,8 @@ export const deleteTenant = async (
  * @swagger
  * /api/tenants/{id}/users:
  *   get:
- *     summary: Get users by tenant
- *     description: Retrieve all users belonging to a specific tenant
+ *     summary: Get tenant users
+ *     description: Retrieve all users for a specific tenant
  *     tags: [Tenants]
  *     security:
  *       - bearerAuth: []
@@ -459,7 +424,7 @@ export const deleteTenant = async (
  *         schema:
  *           type: integer
  *           default: 1
- *         description: Page number for pagination
+ *         description: Page number
  *       - in: query
  *         name: limit
  *         schema:
@@ -472,15 +437,20 @@ export const deleteTenant = async (
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/PaginatedResponse'
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Tenant users retrieved successfully
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/User'
  *       404:
  *         description: Tenant not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       401:
- *         description: Unauthorized
  *         content:
  *           application/json:
  *             schema:
@@ -492,32 +462,18 @@ export const getTenantUsers = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { page = 1, limit = 10 } = req.query;
-
     if (!id) {
       badRequestResponse(res, 'Tenant ID is required');
       return;
     }
 
     const result = await tenantService.getTenantWithUsers(id);
+    const users = result.users.map((user: any) => {
+      const { passwordHash, ...userData } = user;
+      return userData;
+    });
 
-    successResponse(
-      res,
-      {
-        users: result.users.map((user: any) => {
-          const { passwordHash, ...userData } = user;
-          return userData;
-        }),
-        total: result.users.length,
-        meta: {
-          page: Number(page),
-          limit: Number(limit),
-          total: result.users.length,
-          totalPages: Math.ceil(result.users.length / Number(limit)),
-        },
-      },
-      'Tenant users retrieved successfully'
-    );
+    successResponse(res, users, 'Tenant users retrieved successfully');
   } catch (error) {
     const message =
       error instanceof Error
@@ -536,7 +492,7 @@ export const getTenantUsers = async (
  * /api/tenants/stats:
  *   get:
  *     summary: Get tenant statistics
- *     description: Retrieve tenant statistics and metrics
+ *     description: Retrieve statistics for all tenants
  *     tags: [Tenants]
  *     security:
  *       - bearerAuth: []
@@ -572,12 +528,6 @@ export const getTenantUsers = async (
  *                     averageUsersPerTenant:
  *                       type: number
  *                       example: 15
- *       401:
- *         description: Unauthorized
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const getTenantStats = async (
   _req: Request,
@@ -585,7 +535,6 @@ export const getTenantStats = async (
 ): Promise<void> => {
   try {
     const stats = await tenantService.getAllTenantStats();
-
     successResponse(res, stats, 'Tenant statistics retrieved successfully');
   } catch (error) {
     const message =

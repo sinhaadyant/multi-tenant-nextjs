@@ -2,6 +2,12 @@ import { Router } from 'express';
 import authRoutes from './authRoutes';
 import userRoutes from './userRoutes';
 import deviceRoutes from './deviceRoutes';
+import tenantRoutes from './tenantRoutes';
+import roleRoutes from './roleRoutes';
+import moduleRoutes from './moduleRoutes';
+import supportRoutes from './supportRoutes';
+import auditRoutes from './auditRoutes';
+import tokenRoutes from './tokenRoutes';
 import exampleRoutes from './exampleRoutes';
 import { healthCheck, getSystemInfo } from '@/controllers/systemController';
 
@@ -82,6 +88,12 @@ router.get('/system/info', getSystemInfo);
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/devices', deviceRoutes);
+router.use('/tenants', tenantRoutes);
+router.use('/roles', roleRoutes);
+router.use('/modules', moduleRoutes);
+router.use('/support', supportRoutes);
+router.use('/audit', auditRoutes);
+router.use('/tokens', tokenRoutes);
 router.use('/example', exampleRoutes);
 
 export default router;

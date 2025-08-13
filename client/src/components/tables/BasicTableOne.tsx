@@ -120,34 +120,19 @@ export default function BasicTableOne() {
             {/* Table Header */}
             <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
               <TableRow>
-                <TableCell
-                  isHeader
-                  className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-                >
+                <TableCell className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
                   User
                 </TableCell>
-                <TableCell
-                  isHeader
-                  className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-                >
+                <TableCell className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
                   Project Name
                 </TableCell>
-                <TableCell
-                  isHeader
-                  className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-                >
+                <TableCell className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
                   Team
                 </TableCell>
-                <TableCell
-                  isHeader
-                  className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-                >
+                <TableCell className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
                   Status
                 </TableCell>
-                <TableCell
-                  isHeader
-                  className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-                >
+                <TableCell className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
                   Budget
                 </TableCell>
               </TableRow>
@@ -155,7 +140,7 @@ export default function BasicTableOne() {
 
             {/* Table Body */}
             <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-              {tableData.map((order) => (
+              {tableData.map(order => (
                 <TableRow key={order.id}>
                   <TableCell className="px-5 py-4 sm:px-6 text-start">
                     <div className="flex items-center gap-3">
@@ -205,8 +190,8 @@ export default function BasicTableOne() {
                         order.status === "Active"
                           ? "success"
                           : order.status === "Pending"
-                          ? "warning"
-                          : "error"
+                            ? "warning"
+                            : "error"
                       }
                     >
                       {order.status}

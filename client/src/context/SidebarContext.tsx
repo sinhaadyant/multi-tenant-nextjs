@@ -52,15 +52,15 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const toggleSidebar = () => {
-    setIsExpanded((prev) => !prev);
+    setIsExpanded(prev => !prev);
   };
 
   const toggleMobileSidebar = () => {
-    setIsMobileOpen((prev) => !prev);
+    setIsMobileOpen(prev => !prev);
   };
 
   const toggleSubmenu = (item: string) => {
-    setOpenSubmenu((prev) => (prev === item ? null : item));
+    setOpenSubmenu(prev => (prev === item ? null : item));
   };
 
   return (

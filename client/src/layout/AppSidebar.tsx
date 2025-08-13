@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState,useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -166,7 +166,7 @@ const AppSidebar: React.FC = () => {
           )}
           {nav.subItems && (isExpanded || isHovered || isMobileOpen) && (
             <div
-              ref={(el) => {
+              ref={el => {
                 subMenuRefs.current[`${menuType}-${index}`] = el;
               }}
               className="overflow-hidden transition-all duration-300"
@@ -178,7 +178,7 @@ const AppSidebar: React.FC = () => {
               }}
             >
               <ul className="mt-2 space-y-1 ml-9">
-                {nav.subItems.map((subItem) => (
+                {nav.subItems.map(subItem => (
                   <li key={subItem.name}>
                     <Link
                       href={subItem.path}
@@ -234,16 +234,16 @@ const AppSidebar: React.FC = () => {
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // const isActive = (path: string) => path === pathname;
-   const isActive = useCallback((path: string) => path === pathname, [pathname]);
+  const isActive = useCallback((path: string) => path === pathname, [pathname]);
 
   useEffect(() => {
     // Check if the current path matches any submenu item
     let submenuMatched = false;
-    ["main", "others"].forEach((menuType) => {
+    ["main", "others"].forEach(menuType => {
       const items = menuType === "main" ? navItems : othersItems;
       items.forEach((nav, index) => {
         if (nav.subItems) {
-          nav.subItems.forEach((subItem) => {
+          nav.subItems.forEach(subItem => {
             if (isActive(subItem.path)) {
               setOpenSubmenu({
                 type: menuType as "main" | "others",
@@ -260,14 +260,14 @@ const AppSidebar: React.FC = () => {
     if (!submenuMatched) {
       setOpenSubmenu(null);
     }
-  }, [pathname,isActive]);
+  }, [pathname, isActive]);
 
   useEffect(() => {
     // Set the height of the submenu items when the submenu is opened
     if (openSubmenu !== null) {
       const key = `${openSubmenu.type}-${openSubmenu.index}`;
       if (subMenuRefs.current[key]) {
-        setSubMenuHeight((prevHeights) => ({
+        setSubMenuHeight(prevHeights => ({
           ...prevHeights,
           [key]: subMenuRefs.current[key]?.scrollHeight || 0,
         }));
@@ -276,7 +276,7 @@ const AppSidebar: React.FC = () => {
   }, [openSubmenu]);
 
   const handleSubmenuToggle = (index: number, menuType: "main" | "others") => {
-    setOpenSubmenu((prevOpenSubmenu) => {
+    setOpenSubmenu(prevOpenSubmenu => {
       if (
         prevOpenSubmenu &&
         prevOpenSubmenu.type === menuType &&
@@ -295,8 +295,8 @@ const AppSidebar: React.FC = () => {
           isExpanded || isMobileOpen
             ? "w-[290px]"
             : isHovered
-            ? "w-[290px]"
-            : "w-[90px]"
+              ? "w-[290px]"
+              : "w-[90px]"
         }
         ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
         lg:translate-x-0`}

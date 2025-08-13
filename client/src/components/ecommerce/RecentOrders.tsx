@@ -128,28 +128,16 @@ export default function RecentOrders() {
           {/* Table Header */}
           <TableHeader className="border-gray-100 dark:border-gray-800 border-y">
             <TableRow>
-              <TableCell
-                isHeader
-                className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-              >
+              <TableCell className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
                 Products
               </TableCell>
-              <TableCell
-                isHeader
-                className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-              >
+              <TableCell className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
                 Category
               </TableCell>
-              <TableCell
-                isHeader
-                className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-              >
+              <TableCell className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
                 Price
               </TableCell>
-              <TableCell
-                isHeader
-                className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-              >
+              <TableCell className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
                 Status
               </TableCell>
             </TableRow>
@@ -158,7 +146,7 @@ export default function RecentOrders() {
           {/* Table Body */}
 
           <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {tableData.map((product) => (
+            {tableData.map(product => (
               <TableRow key={product.id} className="">
                 <TableCell className="py-3">
                   <div className="flex items-center gap-3">
@@ -194,8 +182,8 @@ export default function RecentOrders() {
                       product.status === "Delivered"
                         ? "success"
                         : product.status === "Pending"
-                        ? "warning"
-                        : "error"
+                          ? "warning"
+                          : "error"
                     }
                   >
                     {product.status}
