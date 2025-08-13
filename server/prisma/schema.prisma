@@ -1,0 +1,232 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @default(cuid())
+  tenantId        String?   @map("tenant_id")
+  name            String
+  email           String    @unique
+  passwordHash    String    @map("password_hash")
+  isActive        Boolean   @default(true) @map("is_active")
+  isSuperadmin    Boolean   @default(false) @map("is_superadmin")
+  lastLoginAt     DateTime? @map("last_login_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  tenant          Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  userRoles       UserRole[]
+  supportTickets  SupportTicket[]
+  supportReplies  SupportReply[]
+  auditLogs       AuditLog[]
+  refreshTokens   RefreshToken[]
+  loginDevices    LoginDevice[]
+
+  @@map("users")
+}
+
+model Tenant {
+  id                  String         @id @default(cuid())
+  name                String
+  domain              String?        @unique
+  isActive            Boolean        @default(true) @map("is_active")
+  loginRestrictions   Json?          @map("login_restrictions")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  users               User[]
+  roles               Role[]
+  supportTickets      SupportTicket[]
+  auditLogs           AuditLog[]
+
+  @@map("tenants")
+}
+
+model Role {
+  id          String    @id @default(cuid())
+  tenantId    String?   @map("tenant_id")
+  name        String
+  description String?
+  isGlobal    Boolean   @default(false) @map("is_global")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  tenant            Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userRoles         UserRole[]
+  rolePermissions   RolePermission[]
+
+  @@map("roles")
+}
+
+model Module {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  isActive    Boolean   @default(true) @map("is_active")
+  orderIndex  Int       @default(0) @map("order_index")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  submodules        Submodule[]
+  rolePermissions   RolePermission[]
+
+  @@map("modules")
+}
+
+model Submodule {
+  id          String    @id @default(cuid())
+  moduleId    String    @map("module_id")
+  name        String
+  description String?
+  orderIndex  Int       @default(0) @map("order_index")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  module            Module            @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  rolePermissions   RolePermission[]
+
+  @@map("submodules")
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  roleId    String   @map("role_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  id            String    @id @default(cuid())
+  roleId        String    @map("role_id")
+  moduleId      String    @map("module_id")
+  submoduleId   String?   @map("submodule_id")
+  canCreate     Boolean   @default(false) @map("can_create")
+  canRead       Boolean   @default(false) @map("can_read")
+  canUpdate     Boolean   @default(false) @map("can_update")
+  canDelete     Boolean   @default(false) @map("can_delete")
+  canViewAll    Boolean   @default(false) @map("can_view_all")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  role      Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  module    Module    @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  submodule Submodule? @relation(fields: [submoduleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, moduleId, submoduleId])
+  @@map("role_permissions")
+}
+
+model SupportTicket {
+  id          String    @id @default(cuid())
+  tenantId    String    @map("tenant_id")
+  userId      String    @map("user_id")
+  title       String
+  description String    @db.Text
+  status      String    @default("open") // open, in_progress, resolved, closed
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  tenant            Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replies           SupportReply[]
+  attachments       SupportAttachment[]
+
+  @@map("support_tickets")
+}
+
+model SupportReply {
+  id        String   @id @default(cuid())
+  ticketId  String   @map("ticket_id")
+  userId    String   @map("user_id")
+  replyText String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("support_replies")
+}
+
+model SupportAttachment {
+  id       String @id @default(cuid())
+  ticketId String @map("ticket_id")
+  filePath String @map("file_path")
+  fileType String @map("file_type")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@map("support_attachments")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  tenantId  String?  @map("tenant_id")
+  userId    String   @map("user_id")
+  action    String
+  details   Json?
+  ipAddress String?  @map("ip_address")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("audit_logs")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model LoginDevice {
+  id           String    @id @default(cuid())
+  userId       String    @map("user_id")
+  deviceInfo   Json      @map("device_info")
+  ipAddress    String?   @map("ip_address")
+  lastActiveAt DateTime  @default(now()) @map("last_active_at")
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("login_devices")
+}

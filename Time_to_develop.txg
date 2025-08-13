@@ -1,0 +1,35 @@
+Given everything you’ve listed — a multi-tenant scalable API with MySQL, TypeScript, Zod validation, role-based permissions, pagination, search, filters, structured API responses, plus the Next.js + Tailwind admin panel with skeleton loaders, error boundaries, custom modals, shadcn UI components, Redux Toolkit with persist, TanStack Query, auth guard, logger utility, and a notification system — we’re talking about a large-scale project.
+For a senior developer who’s already experienced with these technologies, here’s a realistic estimate:
+
+Backend (APIs + MySQL + Validation + Permissions)
+Database schema design & migrations – 1.5 to 2 days
+Core auth system (JWT keys, login, registration, refresh tokens) – 1.5 to 2 days
+Role & permission module with middleware – 2 to 3 days
+Tenant management (settings, login restrictions) – 2 days
+Menu + dynamic submenu system – 1.5 days
+Filters, pagination, search for all APIs – 2 days
+Standardized API response wrapper – 0.5 days
+Jest + Supertest E2E testing for backend – 2 to 3 days
+Backend Total: ~13–16 working days
+Frontend (Next.js + Tailwind + State Management)
+Base project setup with folder structure – 0.5 days
+AuthGuard implementation – 0.5 to 1 day
+Redux Toolkit + Persist config – 0.5 day
+TanStack Query API hooks for mutations & queries – 1.5 days
+Dynamic menu rendering (with role & permission checks) – 1.5 days
+Skeleton loader implementation for all pages – 1 day
+Error boundary for UI failures – 0.5 day
+Notification library integration – 0.5 day
+Custom modal & confirmation modal (shadcn) – 1 day
+Tenant settings UI – 1.5 days
+E2E integration testing for frontend – 1.5 days
+Frontend Total: ~10–11 working days
+Extras
+Logger utility – 0.5 day
+Environment configs for multiple environments – 0.5 day
+Helper functions & constants setup – 0.5 day
+Extras Total: ~1.5 days
+Grand Total
+25–29 working days (roughly 5–6 weeks for one senior developer working solo).
+If there’s a team of 2 senior devs (split frontend/backend), this could be reduced to 2.5–3 weeks.
+If testing, refinements, and bug fixing are thorough, add another 1–1.5 weeks buffer.
