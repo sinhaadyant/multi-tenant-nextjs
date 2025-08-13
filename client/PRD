@@ -1,0 +1,159 @@
+You are to implement a complete scalable **multi-tenant API** in **TypeScript** using **MySQL** as the database.  
+Use the database name: `multi-tenant-scale`.
+
+### **Folder Structure**
+Follow this exact structure:
+- `/src`
+  - `/constants` → Static constants (role names, status values, module names, etc.)
+  - `/utils` → Generic reusable utilities (date formatting, password hashing, JWT creation, pagination)
+  - `/environment` → Environment-specific configs (DB connection details, login restrictions, API URLs)
+  - `/jwt` → Store keys: `public.key`, `private.key`, `secret.key`
+  - `/api-assets` → Static files & assets
+  - `/helpers` → Helper functions (response formatter, error handler)
+  - `/interfaces` → All TypeScript interfaces & types
+  - `/libraries` → Validation functions, 3rd party integrations
+  - `/middleware` → Auth middleware, role/permission checks, tenant resolver, rate limiter
+  - `/routes` → API route definitions (grouped by module)
+  - `/services` → Business logic services (UserService, TenantService, AuthService, RoleService)
+  - `/strings` → System messages, error strings
+  - `/validation-schemas` → Zod schemas for request validation
+- `/tests`
+  - `/unit` → Unit tests (Jest)
+  - `/e2e` → End-to-end tests (simulate full API requests using Jest & Supertest)
+
+### **Database**
+Using MySQL, create tables for:
+1. **users**
+   - id (PK)
+   - tenant_id (FK)
+   - name
+   - email (unique)
+   - password_hash
+   - is_active (boolean)
+   - is_superadmin (boolean)
+   - last_login_at
+   - created_at
+   - updated_at
+
+2. **tenants**
+   - id (PK)
+   - name
+   - domain
+   - is_active
+   - login_restrictions (JSON) → {max_devices, allow_multiple_sessions, session_timeout}
+   - created_at
+   - updated_at
+
+3. **roles**
+   - id (PK)
+   - tenant_id (nullable for global roles)
+   - name
+   - description
+   - is_global (boolean)
+   - created_at
+   - updated_at
+
+4. **modules**
+   - id (PK)
+   - name
+   - description
+   - is_active
+   - order_index
+   - created_at
+   - updated_at
+
+5. **submodules**
+   - id (PK)
+   - module_id (FK)
+   - name
+   - description
+   - order_index
+   - is_active
+   - created_at
+   - updated_at
+
+6. **role_permissions**
+   - id (PK)
+   - role_id (FK)
+   - module_id (FK)
+   - submodule_id (FK, nullable)
+   - can_create
+   - can_read
+   - can_update
+   - can_delete
+
+7. **audit_logs**
+   - id (PK)
+   - tenant_id
+   - user_id
+   - action
+   - details (JSON)
+   - ip_address
+   - created_at
+
+8. **support_tickets**
+   - id (PK)
+   - tenant_id
+   - user_id
+   - title
+   - description
+   - status
+   - created_at
+   - updated_at
+
+9. **support_attachments**
+   - id (PK)
+   - ticket_id (FK)
+   - file_path
+   - file_type
+   - created_at
+
+10. **support_replies**
+    - id (PK)
+    - ticket_id (FK)
+    - user_id
+    - reply_text
+    - created_at
+
+11. **refresh_tokens**
+    - id (PK)
+    - user_id (FK)
+    - token
+    - expires_at
+    - created_at
+
+12. **login_devices**
+    - id (PK)
+    - user_id (FK)
+    - device_info
+    - ip_address
+    - last_active_at
+    - is_active (boolean)
+    - created_at
+
+### **Authentication & Authorization**
+- JWT-based auth with access & refresh tokens.
+- Store JWT keys in `/jwt`.
+- Middleware for:
+  - **Auth check**
+  - **Role & permission check**
+  - **Tenant scoping** (superadmin sees all tenants, others only their tenant data unless granted access)
+
+### **Dynamic Menus**
+- Menu & submenu data is fetched from DB.
+- Controlled by `modules` & `submodules` tables.
+- Respect `role_permissions` when generating menu.
+
+### **Validation**
+- Use **Zod** for:
+  - Request payload validation
+  - Environment variable validation
+
+### **Standards**
+- All API responses follow a standard JSON structure:
+  ```json
+  {
+    "success": true,
+    "message": "Operation successful",
+    "data": {}
+  }
