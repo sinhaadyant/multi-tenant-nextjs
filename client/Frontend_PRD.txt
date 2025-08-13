@@ -1,202 +1,6 @@
-# PRD: Multi‑Tenant Scalable Platform — Backend + Frontend
 
-**Purpose:**
-This document is a full, actionable Product Requirements Document (PRD) and implementation plan for a multi‑tenant SaaS platform with a TypeScript backend (MySQL) and a Next.js + Tailwind admin frontend. It contains features, architecture, detailed step‑by‑step work items (>=40 steps), and ready‑to‑use Cursor prompts for every step so you can automate scaffolding and implementation.
 
----
-
-# 1. High Level Goals
-
-* Build a secure, scalable multi‑tenant platform with tenant isolation and SuperAdmin control.
-* Provide dynamic modules and menus (submenus supported), RBAC with tenant + global roles.
-* Unified login (superadmin + tenant users) with `is_superadmin` flag support.
-* Full API standards: pagination, search, sorting, filtering, standardized response format, Zod validation.
-* Frontend: Next.js + Tailwind UI with shadcn components, skeleton loaders, error boundaries, custom modal & confirmation modal, TanStack Query for data fetching, Axios, Redux Toolkit + Redux Persist.
-* Testing: Jest + Supertest (backend), Playwright (frontend) or Playwright for e2e — E2E environment using a MySQL test DB.
-* Observability: Audit logs, request logging, metrics-ready design.
-
----
-
-# 2. Key Features (summary)
-
-* Multi‑tenant data model (tenants, users with tenant\_id, roles, modules, role\_permissions)
-* Modules & dynamic menus with nesting (parent\_id) and ordering
-* RBAC: role\_permissions per module/submodule; `can_view_all` or `scope` (`own/all`)
-* Auth: JWT access + refresh (rotation), login devices tracking, revoke device
-* API standards: structured JSON response, error format, Zod validation
-* Search, Filter, Sort, Pagination (cursor & offset)
-* Support system: tickets, replies, attachments
-* Audit logs for all critical actions
-* Frontend: authGuard, skeleton loaders, error boundary, shadcn modals, notification library, confirmation modal
-* Testing & CI: Jest unit/integration, Supertest e2e, Playwright UI e2e, CI pipelines, migrations
-
----
-
-# 3. API Response Standard
-
-All APIs must return this shape:
-
-```json
-{
-  "success": true|false,
-  "message": "string",
-  "data": any,               // optional
-  "errors": any|null,        // optional
-  "meta": {                  // optional for lists
-    "page": 1,
-    "limit": 10,
-    "total": 100,
-    "cursor": "..."        // optional for cursor pagination
-  }
-}
-```
-
-Use HTTP status codes appropriately: 200, 201, 204, 400, 401, 403, 404, 422, 500.
-
----
-
-# 4. Database (summary)
-
-**DB:** MySQL (`multi-tenant-scale`)
-Core tables (brief):
-
-* tenants
-* tenant\_settings
-* users (tenant\_id NULL for superadmins, is\_superadmin boolean)
-* roles
-* modules (menu items) with parent\_id for submenu
-* role\_permissions (role\_id, module\_id, can\_create, can\_read, can\_update, can\_delete, can\_view\_all)
-* user\_roles
-* support\_tickets, support\_replies, support\_attachments
-* audit\_logs (old\_values/new\_values JSON)
-* refresh\_tokens
-* reset\_tokens
-* login\_devices
-* system\_settings
-
-Add indexes on tenant\_id, user\_id, created\_at and searchable fields (name, email, title).
-
----
-
-# 5. Validation & Contracts
-
-* Use Zod for request validation and (where useful) response validation in development
-* Keep a central `/validation-schemas` folder for each route entity
-* Typescript interfaces auto-generated from Prisma types or kept in `/interfaces`
-
----
-
-# 6. Authorization Flow
-
-* Middleware (server) sequence:
-
-  1. authMiddleware (verify JWT, attach user object)
-  2. tenantResolver (derive tenant context from token/subdomain/header)
-  3. permissionGuard(moduleKey, action) — checks merged permissions from global roles + tenant roles + tenant overrides; bypass if user.is\_superadmin
-
-* permission resolution rules: merge all roles assigned to user → union of permissions; tenantRolePermissions override global ones for the tenant when present.
-
----
-
-# 7. Frontend AuthGuard behavior
-
-* Protect pages using `AuthGuard` component/hook which:
-
-  * checks auth token validity (via TanStack Query auth state)
-  * ensures `is_active` and tenant active flag
-  * resolves permissions (from Redux + React Query) before rendering
-  * shows skeleton loaders while permissions load
-  * redirects to login if unauthenticated or unauthorized
-
----
-
-# 8. Features by Module (functional breakdown)
-
-Below each module lists the API features, validation, permissions, and UI expectations.
-
-## 8.1 Auth
-
-* Endpoints: `/auth/login`, `/auth/logout`, `/auth/refresh`, `/auth/forgot`, `/auth/reset`, `/auth/revoke-device`
-* Validation: email, password, tenantSlug (optional)
-* Workflow: login → issue access token (short) + refresh token (httpOnly cookie) + store refresh token record + login\_device record
-* Permissions: None
-* Frontend: Login form, forgot password, device list and revoke
-
-## 8.2 Tenants (SuperAdmin)
-
-* Endpoints: CRUD, list (filters, pagination, search), settings override, activate/deactivate
-* Permissions: SuperAdmin only
-* Frontend: Tenant management UI, tenant detail, tenant settings
-
-## 8.3 Users
-
-* Endpoints: CRUD (with invite token flow), list (filters, search, pagination), assign roles
-* Permissions: TenantAdmin can manage within tenant; SuperAdmin across tenants
-* Frontend: Users table, create/edit user modal, role assignment UI
-
-## 8.4 Roles & Permissions
-
-* Endpoints: roles CRUD, assign permissions per module/submodule
-* Data: role\_permissions rows for each (role, module, CRUD flags, can\_view\_all)
-* Frontend: Role editor with permission matrix UI (modules x actions) and save
-
-## 8.5 Modules & Menus
-
-* Endpoints: modules CRUD, submodule CRUD, reorder endpoint
-* Frontend: Menu builder UI; sidebar consumes menu for current user
-
-## 8.6 Support System
-
-* Endpoints: tickets CRUD, replies, attachments upload, list (filters, search, pagination). Admin scopes: tenant vs global
-* Frontend: Ticket list, ticket detail, reply composer with attachments
-
-## 8.7 Audit Logs
-
-* Endpoints: list, single, export
-* Filters: action, user, date range, module
-* Frontend: Audit viewer with filters & export
-
-## 8.8 Login Devices / Sessions
-
-* Endpoints: list devices per user, revoke device, revoke all
-* Frontend: Device list with revoke action and session counts
-
----
-
-# 9. Testing Strategy
-
-* Unit tests: services, utils, helpers using Jest
-* Integration tests: endpoints using Supertest + Jest
-* E2E tests: Playwright (frontend flows) or Supertest end-to-end with test DB
-* Use a dedicated test MySQL database and migration/seeding process for tests
-* Add test coverage thresholds and CI checks
-
----
-
-# 10. Observability & Security
-
-* pino/winston logging, structured logs
-* Audit logs for business events
-* Rate limiting per IP & per user
-* Helmet, CORS, HPP, CSRF protections
-* Security scanning in CI
-
----
-
-# 11. Deliverables
-
-* Full PRD (this document)
-* Database schema (Prisma/MySQL create scripts)
-* Backend TypeScript project with endpoints & tests
-* Frontend Next.js + Tailwind project with authGuard, menus, modals, notifications
-* CI pipeline with tests and migrations
-* Seed data for two tenants & sample users
-
----
-
-# 12. Implementation Plan — Step by step (≥ 40 steps)
-
-Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to scaffold/automate the work. Run steps one by one.
+Each step includes: *goal*, *acceptance criteria*, and a ** prompt** to scaffold/automate the work. Run steps one by one.
 
 **Preparation & Repo**
 
@@ -204,7 +8,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
    * Goal: Create repo, setup Node/TypeScript, ESLint, Prettier, package.json
    * Acceptance: `yarn dev` runs a stub server
-   * Cursor prompt:
+   *  prompt:
 
      ```text
      Create a new TypeScript Node project named "multi-tenant-backend" with Express, TypeScript, ESLint, Prettier, and common npm scripts (dev, build, start, test). Initialize git and create basic README.
@@ -214,7 +18,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
    * Goal: prisma init, datasource set to MySQL env var
    * Acceptance: `prisma generate` succeeds
-   * Cursor prompt:
+   *  prompt:
 
      ```text
      Add Prisma to the project and configure it for MySQL. Set datasource url to process.env.DATABASE_URL and database name multi-tenant-scale. Generate prisma client.
@@ -224,7 +28,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
    * Goal: Add `.env.example` and environment loader using Zod to validate required env vars
    * Acceptance: app errors if env missing
-   * Cursor prompt:
+   *  prompt:
 
      ```text
      Create .env.example with DB, JWT keys path, PORT, and NODE_ENV. Implement a Zod-based env loader in src/config/env.ts that throws when required variables are missing.
@@ -234,7 +38,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
    * Goal: Place `jwt-keys/private.key`, `public.key`, `secret.key` and reference them in env
    * Acceptance: auth helper reads keys
-   * Cursor prompt:
+   *  prompt:
 
      ```text
      Add jwt-keys folder and generate RSA private/public keys and a fallback HMAC secret key. Add reading logic in src/helpers/jwt.ts to load keys from ENV paths.
@@ -246,7 +50,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
    * Goal: Full schema created, indexed
    * Acceptance: prisma migrate dev creates DB
-   * Cursor prompt:
+   *  prompt:
 
      ```text
      Create a Prisma schema that defines tenants, tenant_settings, users (with is_superadmin), roles, modules (parent_id), submodules, role_permissions, user_roles, support_tickets, support_replies, support_attachments, audit_logs, refresh_tokens, reset_tokens, login_devices, system_settings. Include indexes and FK constraints. Run prisma migrate dev.
@@ -256,7 +60,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
    * Goal: seed.ts populates DB with sample data
    * Acceptance: sample data present
-   * Cursor prompt:
+   *  prompt:
 
      ```text
      Create prisma/seed.ts that inserts modules (dashboard, users, roles, support, notifications), default global roles (superadmin, global_support), two tenants (tenantA, tenantB), a superadmin user and sample tenant admin and users. Run the seed via prisma.
@@ -268,7 +72,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
    * Goal: Single exported Prisma client instance and base repository
    * Acceptance: Services import repositories
-   * Cursor prompt:
+   *  prompt:
 
      ```text
      Add src/repositories/prisma.ts with exported Prisma client and create base repository files for users, tenants, roles, modules, support, tokens, audit.
@@ -278,7 +82,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
    * Goal: CRUD user service with password hashing
    * Acceptance: unit tests for user service
-   * Cursor prompt:
+   *  prompt:
 
      ```text
      Implement UserService with functions createUser, getUserById, listUsers (filters/pagination/search), updateUser, softDeleteUser. Use bcrypt for hashing and Zod for input validation.
@@ -288,7 +92,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
    * Goal: tenant CRUD and tenant\_settings merge with global defaults
    * Acceptance: tenant settings API returns merged result
-   * Cursor prompt:
+   *  prompt:
 
      ```text
      Implement TenantService with createTenant, updateTenant, getTenantWithSettings that merges tenant_settings with system defaults.
@@ -298,7 +102,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: CRUD for modules & submodules, build menu tree
     * Acceptance: menu builder returns nested array ordered by order\_index
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Implement ModuleService with createModule, createSubmodule, updateOrder, getMenuForUser(userId) that filters by role_permissions and is_active and returns nested menus.
@@ -308,7 +112,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: Role CRUD and assign permissions (matrix)
     * Acceptance: rolePermissions endpoints accept bulk assignment
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Implement RoleService and PermissionService to manage roles and role_permissions; include an endpoint to apply bulk permission updates and resolve effective permissions for a user.
@@ -320,7 +124,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: Secure JWT RS256 tokens with access + refresh rotation
     * Acceptance: refresh token rotation on refresh endpoint
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Implement AuthService with login(email,password,tenantSlug), generateAccessToken(user), generateRefreshToken(user, deviceId), refreshToken(oldToken), logout(token) and rotate refresh tokens. Store refresh token records in DB with device info.
@@ -330,7 +134,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: create login\_devices records on login and support revoke endpoint
     * Acceptance: revoke sets is\_active=false and invalidates refresh tokens
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Implement LoginDeviceService: registerDevice(user, deviceInfo), listDevices(user), revokeDevice(deviceId) that marks device inactive and revokes related refresh tokens.
@@ -340,7 +144,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: generate reset token, email stub, apply reset
     * Acceptance: reset token expires and is single-use
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Implement ResetTokenService that creates one-time tokens stored in DB and a controller that validates and resets user password.
@@ -352,7 +156,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: Centralized error types and handler middleware
     * Acceptance: errors returned in standard response shape
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Add error classes (AppError) and global errorHandler middleware that returns standardized JSON responses. Integrate pino logger and request-id middleware.
@@ -362,7 +166,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: Verify JWT, load user, attach req.user
     * Acceptance: protected routes return 401 without token
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Implement authMiddleware that verifies access token (RS256), loads user from DB and attaches req.user; on missing or invalid token return 401.
@@ -372,7 +176,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: Determine tenant context (token, header, or hostname)
     * Acceptance: req.tenant available for downstream
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Implement tenantResolver middleware which resolves tenant based on X-Tenant header or subdomain, validates tenant active flag and attaches tenant context to req.tenant.
@@ -382,7 +186,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: Check user permissions for module & action, respect is\_superadmin
     * Acceptance: returns 403 when not allowed
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Implement permissionGuard(moduleKey:string,action:'create'|'read'|'update'|'delete') middleware that computes effective permissions for req.user and returns 403 if not permitted.
@@ -394,7 +198,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: central routes index and modular route files
     * Acceptance: routes mount under /api
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Create route files for auth, tenants, users, roles, modules, support, audit, tokens and an index route that mounts them under /api.
@@ -404,7 +208,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: login, refresh, logout, revoke-device, reset
     * Acceptance: passing integration tests
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Implement /api/auth endpoints with Zod validation and controllers that call AuthService. Include device registration on login.
@@ -414,7 +218,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: list users with search, filters, pagination, sorting; create/update
     * Acceptance: support query params page/limit/search/sort/filter
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Implement /api/users endpoints with list (filters, search, pagination), create, update, soft-delete. Enforce tenant scope via tenantResolver and permissionGuard.
@@ -424,7 +228,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: create roles, assign permissions matrix, list effective permissions for a user
     * Acceptance: role editor works end-to-end
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Implement /api/roles endpoints for CRUD and /api/roles/:id/permissions to get/set role permissions; implement endpoint to compute effective permissions for a user.
@@ -434,7 +238,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: modules CRUD, submodules CRUD, reorder API, menu tree API per user
     * Acceptance: menu API returns nested active menu items filtered by permissions
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Implement /api/modules and /api/modules/:id/submodules routes and /api/menu that returns the menu tree for the authenticated user.
@@ -444,7 +248,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: ticket CRUD, replies, attachments (S3 or local), file validation
     * Acceptance: attachments upload and replies stored and returned
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Implement /api/support/tickets, /api/support/tickets/:id/replies and attachments endpoints with file upload middleware, validation, and permission checks.
@@ -454,7 +258,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: store audit entries from important actions and provide listing/export
     * Acceptance: audit entries created on user changes, role changes, tenant changes
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Implement audit logging helper and /api/audit endpoints; add hooks to services to create audit logs for create/update/delete actions.
@@ -464,12 +268,12 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
 26. Implement generic pagination & search utility
 
-    * Goal: helper that converts query params into prisma/mysql queries supporting cursor and offset
+    * Goal: helper that converts query params into prisma/mysql queries supporting  and offset
     * Acceptance: used by all list endpoints
-    * Cursor prompt:
+    *  prompt:
 
       ```text
-      Implement utils/pagination.ts and utils/search.ts to parse query params (page, limit, cursor, sortBy, sortOrder, q) and return prisma-compatible filter objects.
+      Implement utils/pagination.ts and utils/search.ts to parse query params (page, limit, , sortBy, sortOrder, q) and return prisma-compatible filter objects.
       ```
 
 **Validation & Contracts**
@@ -478,7 +282,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: schema files for auth, user, tenant, role, module, support
     * Acceptance: validation middleware applied to routes
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Create Zod schemas in src/validation-schemas for auth (login/refresh/reset), user (create/update), tenant (create/update), role (create/update), module and support endpoints, and add middleware to validate requests.
@@ -490,7 +294,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: jest, ts-jest and test DB connection
     * Acceptance: tests run with npm test
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Add Jest (ts-jest) configuration, setup test environment variables for MySQL test DB, and create a helper to run migrations and seed test data before tests.
@@ -500,7 +304,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: cover business logic, edge cases
     * Acceptance: high coverage for services
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Write Jest unit tests for UserService, AuthService and RoleService focusing on create, update, password hashing, and permission resolution logic.
@@ -510,7 +314,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: login + protected endpoints tests, refresh token flow
     * Acceptance: passing integration tests for auth and users
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Create Supertest integration tests for /api/auth and /api/users endpoints covering login, refresh, list users with filtering and permission behaviors.
@@ -522,7 +326,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: repo with Next.js app, Tailwind, shadcn integration
     * Acceptance: `yarn dev` serves app
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Create a Next.js + TypeScript project named multi-tenant-frontend with TailwindCSS and shadcn UI preconfigured. Add eslint, prettier, and basic layout pages.
@@ -532,7 +336,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: central store for auth and UI, queryClient for server state
     * Acceptance: auth slice and persisted store implemented
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Implement Redux Toolkit store with authSlice, tenantSlice, UI slice. Add redux-persist to persist auth. Setup Axios instance with interceptors and TanStack Query Provider.
@@ -542,7 +346,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: HOC/component `AuthGuard` that checks Redux auth & permissions and redirects to login
     * Acceptance: protected pages inaccessible without login
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Implement an AuthGuard component that checks token presence and permissions from Redux/ReactQuery and protects pages; integrate with Next.js _app.tsx routing.
@@ -552,7 +356,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: reusable Skeleton component and ErrorBoundary wrapper
     * Acceptance: used around heavy components and pages
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Add a Skeleton component library and an ErrorBoundary component that logs errors and shows a friendly fallback UI. Wrap route-level components with ErrorBoundary.
@@ -562,7 +366,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: modal system using shadcn Dialog primitives; confirmation modal returns a promise
     * Acceptance: reusable modal with forms and confirm dialog
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Integrate shadcn UI and implement a ModalService with a reusable Dialog-based Modal and a ConfirmModal with promise resolution for confirmations.
@@ -572,7 +376,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: integrate `sonner` or `react-hot-toast` and a wrapper to use in services
     * Acceptance: global notifications for API responses and errors
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Add a NotificationService wrapped around sonner or react-hot-toast to show success/error/info notifications; integrate with Axios interceptors to show API errors.
@@ -582,7 +386,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: sidebar reads menu from API and renders nested menus filtered by permissions
     * Acceptance: sidebar shows allowed modules only
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Implement Sidebar component that fetches /api/menu for authenticated user and renders nested menus; enforce collapsing and active route highlighting.
@@ -592,7 +396,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: DataTable component that supports server-side pagination/sorting/search
     * Acceptance: reuse for users, tenants, support lists
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Create a DataTable component that accepts api endpoint and query params, uses TanStack Query for fetching, supports server-side pagination, sorting, filtering and search.
@@ -602,7 +406,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: Create/edit forms with validation and optimistic UI updates
     * Acceptance: use forms for user/role/module CRUD
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Integrate React Hook Form with Zod resolver and create reusable form components. Implement mutation hooks using TanStack Query's useMutation for create/update flows.
@@ -612,7 +416,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: show active devices and allow revoke; reflect counts vs tenant limits
     * Acceptance: revoke disables refresh token/server session
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Implement Devices page that lists login devices via /api/devices and allows revoke actions. Integrate with Auth state to force logout when current device revoked.
@@ -622,7 +426,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: ticket list, detail view with reply composer and attachments
     * Acceptance: attachments upload to API and show in thread
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Implement Support pages: ticket list (with filters), ticket detail with replies and attachment upload using a file input and progress bars.
@@ -632,7 +436,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: view audit logs with filters and export CSV
     * Acceptance: Audit export downloads filtered CSV
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Implement Audit page that supports filters by action, user, date range and an export button calling /api/audit/export.
@@ -644,7 +448,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: Dockerfiles for both apps and docker-compose for local dev
     * Acceptance: docker-compose up brings services up
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Create Dockerfiles for backend and frontend and a docker-compose.yml for local dev with mysql, adminer, backend, frontend, and run scripts for migrations and seeding.
@@ -654,7 +458,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: pipeline runs on PRs and merges
     * Acceptance: fail on lint/test errors
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Add GitHub Actions workflow that runs install, lint, test (unit + integration), and runs prisma migrate:deploy on main branch. Include code scanning step.
@@ -664,7 +468,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: readiness/liveness endpoints, metric exposition
     * Acceptance: GET /health returns status and DB check
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Add /health and /metrics endpoints; integrate pino for structured logs and expose basic metrics for monitoring.
@@ -676,7 +480,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: auto-generated docs and /docs route
     * Acceptance: OpenAPI JSON available
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Generate OpenAPI spec for all endpoints using tsdoc annotations or a generator and serve Swagger UI at /docs.
@@ -686,7 +490,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: clear README with env vars, migrations, seed, run and test commands
     * Acceptance: a new dev can bootstrap project in 30 minutes
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Create README.md with setup, env variable descriptions, migration steps, seed instructions, and commands for running tests and starting dev servers.
@@ -696,7 +500,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: easy manual testing
     * Acceptance: collection exported for team
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Export a Postman collection including example auth flows (login, refresh, protected endpoints) and add to repo under /docs/postman.
@@ -706,7 +510,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: run a checklist and address issues
     * Acceptance: checklist completed and documented
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Produce a security checklist including SQL injection review, XSS, CSRF, token storage, CORS policies, rate limits and ensure code implements recommendations.
@@ -716,7 +520,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
     * Goal: run Lighthouse, accessibility tests, fix major items
     * Acceptance: baseline performance and accessibility scores documented
-    * Cursor prompt:
+    *  prompt:
 
       ```text
       Run Lighthouse and axe-core audits and produce a report; fix high severity issues and document remaining items for future sprints.
@@ -724,9 +528,9 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 
 ---
 
-# 13. Cursor Prompts (Grouped)
+# 13.  Prompts (Grouped)
 
-Each of the 50 steps above includes a concise Cursor prompt. Use them in sequence. If you want a single file containing all the prompts ready to paste into Cursor, ask me and I'll export them as one combined prompt file.
+Each of the 50 steps above includes a concise  prompt. Use them in sequence. If you want a single file containing all the prompts ready to paste into , ask me and I'll export them as one combined prompt file.
 
 ---
 
@@ -753,7 +557,7 @@ This section explains how a developer should approach learning and implementing 
 4. **Week 4 — Advanced Backend**
 
    * RBAC models, permission resolution algorithms
-   * Pagination & cursor-based pagination
+   * Pagination & -based pagination
 5. **Week 5 — Frontend Advanced**
 
    * Next.js + Tailwind + shadcn UI
@@ -773,8 +577,7 @@ This section explains how a developer should approach learning and implementing 
 ## Performance tips
 
 * Index search fields, use pagination, limit joins.
-* Cache frequently-read tenant settings in Redis if needed.
-* Use connection pooling and prepared statements.
+ * Use connection pooling and prepared statements.
 
 ## How to iterate
 
@@ -787,9 +590,9 @@ This section explains how a developer should approach learning and implementing 
 
 # 15. Next Actions & How I Can Help
 
-* I created step-by-step prompts for Cursor per step above (in each step block). If you want, I can:
+* I created step-by-step prompts for  per step above (in each step block). If you want, I can:
 
-  1. Export a single combined Cursor script that creates the entire backend scaffold.
+  1. Export a single combined  script that creates the entire backend scaffold.
   2. Generate the initial Prisma schema SQL and seed file now.
   3. Scaffold the frontend repo with AuthGuard, skeletons, modals and shadcn integration.
 

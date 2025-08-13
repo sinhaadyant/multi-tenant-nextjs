@@ -1,108 +1,203 @@
- Project: Multi-Tenant Scalable API Backend
-Database: MySQL (Database name: multi-tenant-scale)
-Language: TypeScript
-Validation: Zod
-Testing: Jest + Supabase (E2E tests)
-Architecture: Modular, scalable API structure with constants, utils, interfaces, services, middleware, routes, helpers, and validation schemas.
-Auth: JWT (public/private/secret keys in /jwt-keys)
-Config: Environment-wise config in /environment
-Assets: /api-assets folder for static files
-Core Requirements
-Folder Structure
-src/
- ├── constants/
- ├── environment/
- ├── helpers/
- ├── interfaces/
- ├── libraries/
- ├── middleware/
- ├── routes/
- ├── services/
- ├── strings/
- ├── validation-schemas/
- ├── jwt-keys/
- └── api-assets/
-tests/
-Database Tables
-users (with is_active, is_superadmin, tenant_id, role, login restriction flags)
-tenants (with default settings, login restrictions, is_active)
-roles (global + tenant-specific)
-permissions (with module/submodule mapping)
-modules (with is_active, ordering, parent_id for submenus)
-role_permissions (role-module-permission mapping)
-audit_logs (actions by user)
-support_tickets (attachments, replies)
-login_devices (tracking devices, revoke access option)
-refresh_tokens & reset_tokens
-tenant_settings (tenant-specific login restrictions overriding global)
-API Standards
-All APIs must include:
-Filters (query params like status, created_at, module_id, etc.)
-Pagination (page, limit)
-Search (global text search across defined fields)
-Sorting (sortBy, sortOrder)
-Role & permission checks:
-Superadmin → can view all tenant data
-Tenant admin → can view only own tenant data
-User → limited module access
-API Response format (standardized)
+# PRD: Multi‑Tenant Scalable Platform — Backend + Frontend
+
+**Purpose:**
+This document is a full, actionable Product Requirements Document (PRD) and implementation plan for a multi‑tenant SaaS platform with a TypeScript backend (MySQL) and a Next.js + Tailwind admin frontend. It contains features, architecture, detailed step‑by‑step work items (>=40 steps), and ready‑to‑use Cursor prompts for every step so you can automate scaffolding and implementation.
+
+---
+
+# 1. High Level Goals
+
+* Build a secure, scalable multi‑tenant platform with tenant isolation and SuperAdmin control.
+* Provide dynamic modules and menus (submenus supported), RBAC with tenant + global roles.
+* Unified login (superadmin + tenant users) with `is_superadmin` flag support.
+* Full API standards: pagination, search, sorting, filtering, standardized response format, Zod validation.
+* Frontend: Next.js + Tailwind UI with shadcn components, skeleton loaders, error boundaries, custom modal & confirmation modal, TanStack Query for data fetching, Axios, Redux Toolkit + Redux Persist.
+* Testing: Jest + Supertest (backend), Playwright (frontend) or Playwright for e2e — E2E environment using a MySQL test DB.
+* Observability: Audit logs, request logging, metrics-ready design.
+
+---
+
+# 2. Key Features (summary)
+
+* Multi‑tenant data model (tenants, users with tenant\_id, roles, modules, role\_permissions)
+* Modules & dynamic menus with nesting (parent\_id) and ordering
+* RBAC: role\_permissions per module/submodule; `can_view_all` or `scope` (`own/all`)
+* Auth: JWT access + refresh (rotation), login devices tracking, revoke device
+* API standards: structured JSON response, error format, Zod validation
+* Search, Filter, Sort, Pagination (cursor & offset)
+* Support system: tickets, replies, attachments
+* Audit logs for all critical actions
+* Frontend: authGuard, skeleton loaders, error boundary, shadcn modals, notification library, confirmation modal
+* Testing & CI: Jest unit/integration, Supertest e2e, Playwright UI e2e, CI pipelines, migrations
+
+---
+
+# 3. API Response Standard
+
+All APIs must return this shape:
+
+```json
 {
-  success: boolean;
-  message: string;
-  data?: any;
-  meta?: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
-  errors?: string[];
+  "success": true|false,
+  "message": "string",
+  "data": any,               // optional
+  "errors": any|null,        // optional
+  "meta": {                  // optional for lists
+    "page": 1,
+    "limit": 10,
+    "total": 100,
+    "cursor": "..."        // optional for cursor pagination
+  }
 }
-Endpoints
-Auth
-/auth/login
-/auth/refresh-token
-/auth/logout
-/auth/reset-password
-/auth/revoke-device
-Users
-GET (filters, search, pagination, permissions)
-POST (create user with validation)
-PUT/PATCH (update user)
-DELETE (soft delete)
-Tenants
-Full CRUD with filters/search
-Roles & Permissions
-CRUD for roles (global & tenant)
-Assign/revoke permissions
-Modules
-CRUD with submenus
-Support System
-Create ticket, reply, add attachment
-Audit Logs
-View logs (filters by date, user, action)
-Login Devices
-View active devices
-Revoke device session
-Tenant Settings
-Update per-tenant login restriction
-Fetch defaults from superadmin settings
-Validation
-Use Zod in /validation-schemas
-Reusable constants for field limits
-Environment configs for pagination limits
-Security
-JWT auth middleware
-Role & permission middleware
-SQL injection prevention
-Activity logs for every CRUD action
-Testing
-Jest for unit & integration tests
-Supabase test DB for E2E tests
-Mock role & permission data for permission-based response tests
+```
+
+Use HTTP status codes appropriately: 200, 201, 204, 400, 401, 403, 404, 422, 500.
+
+---
+
+# 4. Database (summary)
+
+**DB:** MySQL (`multi-tenant-scale`)
+Core tables (brief):
+
+* tenants
+* tenant\_settings
+* users (tenant\_id NULL for superadmins, is\_superadmin boolean)
+* roles
+* modules (menu items) with parent\_id for submenu
+* role\_permissions (role\_id, module\_id, can\_create, can\_read, can\_update, can\_delete, can\_view\_all)
+* user\_roles
+* support\_tickets, support\_replies, support\_attachments
+* audit\_logs (old\_values/new\_values JSON)
+* refresh\_tokens
+* reset\_tokens
+* login\_devices
+* system\_settings
+
+Add indexes on tenant\_id, user\_id, created\_at and searchable fields (name, email, title).
+
+---
+
+# 5. Validation & Contracts
+
+* Use Zod for request validation and (where useful) response validation in development
+* Keep a central `/validation-schemas` folder for each route entity
+* Typescript interfaces auto-generated from Prisma types or kept in `/interfaces`
+
+---
+
+# 6. Authorization Flow
+
+* Middleware (server) sequence:
+
+  1. authMiddleware (verify JWT, attach user object)
+  2. tenantResolver (derive tenant context from token/subdomain/header)
+  3. permissionGuard(moduleKey, action) — checks merged permissions from global roles + tenant roles + tenant overrides; bypass if user.is\_superadmin
+
+* permission resolution rules: merge all roles assigned to user → union of permissions; tenantRolePermissions override global ones for the tenant when present.
+
+---
+
+# 7. Frontend AuthGuard behavior
+
+* Protect pages using `AuthGuard` component/hook which:
+
+  * checks auth token validity (via TanStack Query auth state)
+  * ensures `is_active` and tenant active flag
+  * resolves permissions (from Redux + React Query) before rendering
+  * shows skeleton loaders while permissions load
+  * redirects to login if unauthenticated or unauthorized
+
+---
+
+# 8. Features by Module (functional breakdown)
+
+Below each module lists the API features, validation, permissions, and UI expectations.
+
+## 8.1 Auth
+
+* Endpoints: `/auth/login`, `/auth/logout`, `/auth/refresh`, `/auth/forgot`, `/auth/reset`, `/auth/revoke-device`
+* Validation: email, password, tenantSlug (optional)
+* Workflow: login → issue access token (short) + refresh token (httpOnly cookie) + store refresh token record + login\_device record
+* Permissions: None
+* Frontend: Login form, forgot password, device list and revoke
+
+## 8.2 Tenants (SuperAdmin)
+
+* Endpoints: CRUD, list (filters, pagination, search), settings override, activate/deactivate
+* Permissions: SuperAdmin only
+* Frontend: Tenant management UI, tenant detail, tenant settings
+
+## 8.3 Users
+
+* Endpoints: CRUD (with invite token flow), list (filters, search, pagination), assign roles
+* Permissions: TenantAdmin can manage within tenant; SuperAdmin across tenants
+* Frontend: Users table, create/edit user modal, role assignment UI
+
+## 8.4 Roles & Permissions
+
+* Endpoints: roles CRUD, assign permissions per module/submodule
+* Data: role\_permissions rows for each (role, module, CRUD flags, can\_view\_all)
+* Frontend: Role editor with permission matrix UI (modules x actions) and save
+
+## 8.5 Modules & Menus
+
+* Endpoints: modules CRUD, submodule CRUD, reorder endpoint
+* Frontend: Menu builder UI; sidebar consumes menu for current user
+
+## 8.6 Support System
+
+* Endpoints: tickets CRUD, replies, attachments upload, list (filters, search, pagination). Admin scopes: tenant vs global
+* Frontend: Ticket list, ticket detail, reply composer with attachments
+
+## 8.7 Audit Logs
+
+* Endpoints: list, single, export
+* Filters: action, user, date range, module
+* Frontend: Audit viewer with filters & export
+
+## 8.8 Login Devices / Sessions
+
+* Endpoints: list devices per user, revoke device, revoke all
+* Frontend: Device list with revoke action and session counts
+
+---
+
+# 9. Testing Strategy
+
+* Unit tests: services, utils, helpers using Jest
+* Integration tests: endpoints using Supertest + Jest
+* E2E tests: Playwright (frontend flows) or Supertest end-to-end with test DB
+* Use a dedicated test MySQL database and migration/seeding process for tests
+* Add test coverage thresholds and CI checks
+
+---
+
+# 10. Observability & Security
+
+* pino/winston logging, structured logs
+* Audit logs for business events
+* Rate limiting per IP & per user
+* Helmet, CORS, HPP, CSRF protections
+* Security scanning in CI
+
+---
+
+# 11. Deliverables
+
+* Full PRD (this document)
+* Database schema (Prisma/MySQL create scripts)
+* Backend TypeScript project with endpoints & tests
+* Frontend Next.js + Tailwind project with authGuard, menus, modals, notifications
+* CI pipeline with tests and migrations
+* Seed data for two tenants & sample users
+
+---
+
+# 12. Implementation Plan — Step by step (≥ 40 steps)
 
 ### **Database**
-Using MySQL, create tables for:
+tables:
 1. **users**
    - id (PK)
    - tenant_id (FK)
@@ -213,15 +308,3 @@ Using MySQL, create tables for:
 
 
   =====
-
-Generate TypeScript code for all above APIs using Express + MySQL with Zod validation, following the folder structure, naming conventions, and standard API response format.
-Implement filters, pagination, search, sorting, and role-based access control in all GET APIs.
-Create helper functions in /helpers for pagination, filtering, and role/permission checking.
-Store all constants in /constants.
-Store validation schemas in /validation-schemas.
-Implement E2E tests with Supabase in /tests.
-Use environment variables from /environment config.
-Use MySQL connection pooling with prepared statements.
-
-Also a logger utuil which helps to show logs 
-as per the env settings
