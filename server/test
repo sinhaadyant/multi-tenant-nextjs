@@ -1,0 +1,195 @@
+# PRD: Multi‑Tenant Scalable Platform — Backend + Frontend
+
+**Purpose:**
+This document is a full, actionable Product Requirements Document (PRD) and implementation plan for a multi‑tenant SaaS platform with a TypeScript backend (MySQL) and a Next.js + Tailwind admin frontend. It contains features, architecture, detailed step‑by‑step work items (>=40 steps), and ready‑to‑use Cursor prompts for every step so you can automate scaffolding and implementation.
+
+---
+
+# 1. High Level Goals
+
+- Build a secure, scalable multi‑tenant platform with tenant isolation and SuperAdmin control.
+- Provide dynamic modules and menus (submenus supported), RBAC with tenant + global roles.
+- Unified login (superadmin + tenant users) with `is_superadmin` flag support.
+- Full API standards: pagination, search, sorting, filtering, standardized response format, Zod validation.
+- Frontend: Next.js + Tailwind UI with shadcn components, skeleton loaders, error boundaries, custom modal & confirmation modal, TanStack Query for data fetching, Axios, Redux Toolkit + Redux Persist.
+- Testing: Jest + Supertest (backend), Playwright (frontend) or Playwright for e2e — E2E environment using a MySQL test DB.
+- Observability: Audit logs, request logging, metrics-ready design.
+
+---
+
+# 2. Key Features (summary)
+
+- Multi‑tenant data model (tenants, users with tenant_id, roles, modules, role_permissions)
+- Modules & dynamic menus with nesting (parent_id) and ordering
+- RBAC: role_permissions per module/submodule; `can_view_all` or `scope` (`own/all`)
+- Auth: JWT access + refresh (rotation), login devices tracking, revoke device
+- API standards: structured JSON response, error format, Zod validation
+- Search, Filter, Sort, Pagination (cursor & offset)
+- Support system: tickets, replies, attachments
+- Audit logs for all critical actions
+- Frontend: authGuard, skeleton loaders, error boundary, shadcn modals, notification library, confirmation modal
+- Testing & CI: Jest unit/integration, Supertest e2e, Playwright UI e2e, CI pipelines, migrations
+
+---
+
+# 3. API Response Standard
+
+All APIs must return this shape:
+
+```json
+{
+  "success": true|false,
+  "message": "string",
+  "data": any,               // optional
+  "errors": any|null,        // optional
+  "meta": {                  // optional for lists
+    "page": 1,
+    "limit": 10,
+    "total": 100,
+    "cursor": "..."        // optional for cursor pagination
+  }
+}
+```
+
+Use HTTP status codes appropriately: 200, 201, 204, 400, 401, 403, 404, 422, 500.
+
+---
+
+# 4. Database (summary)
+
+**DB:** MySQL (`multi-tenant-scale`)
+Core tables (brief):
+
+- tenants
+- tenant_settings
+- users (tenant_id NULL for superadmins, is_superadmin boolean)
+- roles
+- modules (menu items) with parent_id for submenu
+- role_permissions (role_id, module_id, can_create, can_read, can_update, can_delete, can_view_all)
+- user_roles
+- support_tickets, support_replies, support_attachments
+- audit_logs (old_values/new_values JSON)
+- refresh_tokens
+- reset_tokens
+- login_devices
+- system_settings
+
+Add indexes on tenant_id, user_id, created_at and searchable fields (name, email, title).
+
+---
+
+# 5. Validation & Contracts
+
+- Use Zod for request validation and (where useful) response validation in development
+- Keep a central `/validation-schemas` folder for each route entity
+- Typescript interfaces auto-generated from Prisma types or kept in `/interfaces`
+
+---
+
+# 6. Authorization Flow
+
+- Middleware (server) sequence:
+  1. authMiddleware (verify JWT, attach user object)
+  2. tenantResolver (derive tenant context from token/subdomain/header)
+  3. permissionGuard(moduleKey, action) — checks merged permissions from global roles + tenant roles + tenant overrides; bypass if user.is_superadmin
+
+- permission resolution rules: merge all roles assigned to user → union of permissions; tenantRolePermissions override global ones for the tenant when present.
+
+---
+
+# 7. Frontend AuthGuard behavior
+
+- Protect pages using `AuthGuard` component/hook which:
+  - checks auth token validity (via TanStack Query auth state)
+  - ensures `is_active` and tenant active flag
+  - resolves permissions (from Redux + React Query) before rendering
+  - shows skeleton loaders while permissions load
+  - redirects to login if unauthenticated or unauthorized
+
+---
+
+# 8. Features by Module (functional breakdown)
+
+Below each module lists the API features, validation, permissions, and UI expectations.
+
+## 8.1 Auth
+
+- Endpoints: `/auth/login`, `/auth/logout`, `/auth/refresh`, `/auth/forgot`, `/auth/reset`, `/auth/revoke-device`
+- Validation: email, password, tenantSlug (optional)
+- Workflow: login → issue access token (short) + refresh token (httpOnly cookie) + store refresh token record + login_device record
+- Permissions: None
+- Frontend: Login form, forgot password, device list and revoke
+
+## 8.2 Tenants (SuperAdmin)
+
+- Endpoints: CRUD, list (filters, pagination, search), settings override, activate/deactivate
+- Permissions: SuperAdmin only
+- Frontend: Tenant management UI, tenant detail, tenant settings
+
+## 8.3 Users
+
+- Endpoints: CRUD (with invite token flow), list (filters, search, pagination), assign roles
+- Permissions: TenantAdmin can manage within tenant; SuperAdmin across tenants
+- Frontend: Users table, create/edit user modal, role assignment UI
+
+## 8.4 Roles & Permissions
+
+- Endpoints: roles CRUD, assign permissions per module/submodule
+- Data: role_permissions rows for each (role, module, CRUD flags, can_view_all)
+- Frontend: Role editor with permission matrix UI (modules x actions) and save
+
+## 8.5 Modules & Menus
+
+- Endpoints: modules CRUD, submodule CRUD, reorder endpoint
+- Frontend: Menu builder UI; sidebar consumes menu for current user
+
+## 8.6 Support System
+
+- Endpoints: tickets CRUD, replies, attachments upload, list (filters, search, pagination). Admin scopes: tenant vs global
+- Frontend: Ticket list, ticket detail, reply composer with attachments
+
+## 8.7 Audit Logs
+
+- Endpoints: list, single, export
+- Filters: action, user, date range, module
+- Frontend: Audit viewer with filters & export
+
+## 8.8 Login Devices / Sessions
+
+- Endpoints: list devices per user, revoke device, revoke all
+- Frontend: Device list with revoke action and session counts
+
+---
+
+# 9. Testing Strategy
+
+- Unit tests: services, utils, helpers using Jest
+- Integration tests: endpoints using Supertest + Jest
+- E2E tests: Playwright (frontend flows) or Supertest end-to-end with test DB
+- Use a dedicated test MySQL database and migration/seeding process for tests
+- Add test coverage thresholds and CI checks
+
+---
+
+# 10. Observability & Security
+
+- pino/winston logging, structured logs
+- Audit logs for business events
+- Rate limiting per IP & per user
+- Helmet, CORS, HPP, CSRF protections
+- Security scanning in CI
+
+---
+
+# 11. Deliverables
+
+- Full PRD (this document)
+- Database schema (Prisma/MySQL create scripts)
+- Backend TypeScript project with endpoints & tests
+- Frontend Next.js + Tailwind project with authGuard, menus, modals, notifications
+- CI pipeline with tests and migrations
+- Seed data for two tenants & sample users
+
+---
+
+# 12. Implementation Plan — Step by step (≥ 40 steps)
