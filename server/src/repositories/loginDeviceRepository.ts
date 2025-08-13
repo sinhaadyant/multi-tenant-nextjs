@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+// PrismaClient is imported in base repository
 import { BaseRepository } from './prisma';
 
 export interface LoginDeviceFilters {
@@ -47,7 +47,7 @@ export class LoginDeviceRepository extends BaseRepository<any> {
       where.OR = [
         { ipAddress: { contains: filters.search } },
         {
-          deviceInfo: { path: ['userAgent'], string_contains: filters.search },
+          userAgent: { contains: filters.search },
         },
       ];
     }
@@ -103,7 +103,7 @@ export class LoginDeviceRepository extends BaseRepository<any> {
       where.OR = [
         { ipAddress: { contains: filters.search } },
         {
-          deviceInfo: { path: ['userAgent'], string_contains: filters.search },
+          userAgent: { contains: filters.search },
         },
       ];
     }
@@ -111,100 +111,82 @@ export class LoginDeviceRepository extends BaseRepository<any> {
     return this.prisma.loginDevice.count({ where });
   }
 
-  // Device management methods
-  async registerDevice(
-    userId: string,
-    deviceInfo: any,
-    ipAddress?: string
-  ): Promise<any> {
-    return this.create({
-      userId,
-      deviceInfo,
-      ipAddress,
-      lastActiveAt: new Date(),
-      isActive: true,
+  // Enhanced methods for LoginDeviceService
+  async getDeviceById(deviceId: string): Promise<any> {
+    return this.prisma.loginDevice.findFirst({
+      where: { deviceId },
+      include: {
+        user: true,
+      },
     });
   }
 
-  async updateDeviceActivity(id: string): Promise<any> {
-    return this.update(id, {
-      lastActiveAt: new Date(),
+  async getUserDevices(userId: string): Promise<any[]> {
+    return this.prisma.loginDevice.findMany({
+      where: {
+        userId,
+        isActive: true,
+      },
+      orderBy: { lastUsedAt: 'desc' },
+      include: {
+        user: true,
+      },
     });
   }
 
-  async revokeDevice(id: string): Promise<any> {
-    return this.update(id, {
-      isActive: false,
+  async getAllUserDevices(userId: string): Promise<any[]> {
+    return this.prisma.loginDevice.findMany({
+      where: { userId },
+      orderBy: { lastUsedAt: 'desc' },
+      include: {
+        user: true,
+      },
     });
   }
 
-  async revokeAllDevicesForUser(userId: string): Promise<any> {
+  async updateLastUsed(deviceId: string): Promise<any> {
+    return this.prisma.loginDevice.update({
+      where: { deviceId },
+      data: { lastUsedAt: new Date() },
+    });
+  }
+
+  async revokeDevice(deviceId: string): Promise<any> {
+    return this.prisma.loginDevice.update({
+      where: { deviceId },
+      data: { isActive: false },
+    });
+  }
+
+  async revokeAllUserDevices(userId: string): Promise<any> {
     return this.prisma.loginDevice.updateMany({
       where: { userId },
       data: { isActive: false },
     });
   }
 
-  async getActiveDevicesForUser(userId: string): Promise<any[]> {
-    return this.prisma.loginDevice.findMany({
-      where: {
-        userId,
-        isActive: true,
-      },
-      include: {
-        user: true,
-      },
-      orderBy: { lastActiveAt: 'desc' },
-    });
-  }
-
-  async getDeviceStats(userId?: string): Promise<any> {
-    const where: any = {};
-    if (userId) {
-      where.userId = userId;
-    }
-
-    const [totalDevices, activeDevices, inactiveDevices] = await Promise.all([
-      this.prisma.loginDevice.count({ where }),
-      this.prisma.loginDevice.count({ where: { ...where, isActive: true } }),
-      this.prisma.loginDevice.count({ where: { ...where, isActive: false } }),
-    ]);
-
-    return {
-      totalDevices,
-      activeDevices,
-      inactiveDevices,
-    };
-  }
-
-  // Cleanup inactive devices older than specified days
-  async cleanupInactiveDevices(daysThreshold: number = 30): Promise<any> {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - daysThreshold);
-
-    return this.prisma.loginDevice.deleteMany({
+  async deleteOldInactiveDevices(cutoffDate: Date): Promise<number> {
+    const result = await this.prisma.loginDevice.deleteMany({
       where: {
         isActive: false,
-        lastActiveAt: {
+        updatedAt: {
           lt: cutoffDate,
         },
       },
     });
+    return result.count;
   }
 
   // Find device by fingerprint (basic device identification)
   async findDeviceByFingerprint(userId: string, deviceInfo: any): Promise<any> {
     // This is a simplified approach - in production you might want more sophisticated device fingerprinting
     const userAgent = deviceInfo.userAgent || '';
-    const platform = deviceInfo.platform || '';
+    // const _platform = deviceInfo.platform || '';
 
     return this.prisma.loginDevice.findFirst({
       where: {
         userId,
-        deviceInfo: {
-          path: ['userAgent'],
-          equals: userAgent,
-        },
+        userAgent: userAgent,
         isActive: true,
       },
       include: {

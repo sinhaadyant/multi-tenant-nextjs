@@ -137,12 +137,15 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
       Implement RoleService and PermissionService to manage roles and role_permissions; include an endpoint to apply bulk permission updates and resolve effective permissions for a user.
       ```
 
-* Push this code to GitHub after testing with title "Core Services & Repositories dynamic" as per the title.
 
 * Insert test data if applicable.
 * Run unit/integration/E2E tests for this step's feature.
 * Fix any errors or failing tests.
 * Re-run tests to confirm all pass before moving to next step.
+* Push this code to GitHub after testing with title "Core Services & Repositories dynamic" as per the title.
+
+
+
 
 **Authentication, Tokens & Device Management**
 
@@ -182,6 +185,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
 * Run unit/integration/E2E tests for this step's feature.
 * Fix any errors or failing tests.
 * Re-run tests to confirm all pass before moving to next step.
+
 
 **Middleware & Guards**
 
@@ -225,12 +229,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
       Implement permissionGuard(moduleKey:string,action:'create'|'read'|'update'|'delete') middleware that computes effective permissions for req.user and returns 403 if not permitted.
       ```
 
-* Push this code to GitHub after testing with title "Middleware & Guards dynamic" as per the title.
-
-* Insert test data if applicable.
-* Run unit/integration/E2E tests for this step's feature.
-* Fix any errors or failing tests.
-* Re-run tests to confirm all pass before moving to next step.
+?==>
 
 **API Routes & Controllers**
 
@@ -304,12 +303,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
       Implement audit logging helper and /api/audit endpoints; add hooks to services to create audit logs for create/update/delete actions.
       ```
 
-* Push this code to GitHub after testing with title "API Routes & Controllers dynamic" as per the title.
-
-* Insert test data if applicable.
-* Run unit/integration/E2E tests for this step's feature.
-* Fix any errors or failing tests.
-* Re-run tests to confirm all pass before moving to next step.
+ 
 
 **Pagination/Search/Filter Utilities**
 
@@ -366,6 +360,8 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
       ```text
       Create Supertest integration tests for /api/auth and /api/users endpoints covering login, refresh, list users with filtering and permission behaviors.
       ```
+
+===================
 
 **Frontend – Setup & Core Features**
 
@@ -489,6 +485,13 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
       Implement Audit page that supports filters by action, user, date range and an export button calling /api/audit/export.
       ```
 
+* Push this code to GitHub after testing with title "Frontend – Setup & Core Features dynamic" as per the title.
+
+* Insert test data if applicable.
+* Run unit/integration/E2E tests for this step's feature.
+* Fix any errors or failing tests.
+* Re-run tests to confirm all pass before moving to next step.
+
 **CI / Deployment / DevOps**
 
 43. Dockerize backend & frontend with multi-stage builds
@@ -520,6 +523,13 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
       ```text
       Add /health and /metrics endpoints; integrate pino for structured logs and expose basic metrics for monitoring.
       ```
+
+* Push this code to GitHub after testing with title "CI / Deployment / DevOps dynamic" as per the title.
+
+* Insert test data if applicable.
+* Run unit/integration/E2E tests for this step's feature.
+* Fix any errors or failing tests.
+* Re-run tests to confirm all pass before moving to next step.
 
 **Polish & Documentation**
 
@@ -572,6 +582,8 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
       ```text
       Run Lighthouse and axe-core audits and produce a report; fix high severity issues and document remaining items for future sprints.
       ```
+
+* Push this code to GitHub after testing with title "Polish & Documentation dynamic" as per the title.
 
 ---
 

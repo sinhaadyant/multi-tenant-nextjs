@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken, JWTPayload } from '@/utils/jwt';
-import { unauthorizedResponse } from '@/utils/apiResponse';
+import { UserService } from '@/services/userService';
+import { AuthenticationError, AuthorizationError } from '@/utils/errors';
 
 // Extend Express Request interface to include user
 declare global {
@@ -11,38 +12,49 @@ declare global {
   }
 }
 
+const userService = new UserService();
+
 // Authentication middleware
 export const authMiddleware = async (
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      unauthorizedResponse(res, 'Access token required');
-      return;
+      throw new AuthenticationError('Access token required');
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
     try {
       const decoded = verifyAccessToken(token);
+
+      // Load user from database to ensure they still exist and are active
+      const user = await userService.getUserById(decoded.userId);
+      if (!user || !user.isActive) {
+        throw new AuthenticationError('User not found or inactive');
+      }
+
       req.user = decoded;
       next();
     } catch (error) {
-      unauthorizedResponse(res, 'Invalid or expired token');
+      if (error instanceof AuthenticationError) {
+        throw error;
+      }
+      throw new AuthenticationError('Invalid or expired token');
     }
   } catch (error) {
-    unauthorizedResponse(res, 'Authentication failed');
+    next(error);
   }
 };
 
 // Optional authentication middleware (doesn't fail if no token)
 export const optionalAuthMiddleware = async (
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
@@ -69,17 +81,15 @@ export const optionalAuthMiddleware = async (
 // Superadmin only middleware
 export const superadminMiddleware = (
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): void => {
   if (!req.user) {
-    unauthorizedResponse(res, 'Authentication required');
-    return;
+    throw new AuthenticationError('Authentication required');
   }
 
   if (!req.user.isSuperadmin) {
-    unauthorizedResponse(res, 'Superadmin access required');
-    return;
+    throw new AuthorizationError('Superadmin access required');
   }
 
   next();
@@ -88,22 +98,19 @@ export const superadminMiddleware = (
 // Tenant user middleware (non-superadmin)
 export const tenantUserMiddleware = (
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): void => {
   if (!req.user) {
-    unauthorizedResponse(res, 'Authentication required');
-    return;
+    throw new AuthenticationError('Authentication required');
   }
 
   if (req.user.isSuperadmin) {
-    unauthorizedResponse(res, 'Tenant user access required');
-    return;
+    throw new AuthorizationError('Tenant user access required');
   }
 
   if (!req.user.tenantId) {
-    unauthorizedResponse(res, 'Tenant context required');
-    return;
+    throw new AuthorizationError('Tenant context required');
   }
 
   next();

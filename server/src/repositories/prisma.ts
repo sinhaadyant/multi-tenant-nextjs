@@ -32,27 +32,27 @@ export abstract class BaseRepository<T> {
   }
 
   // Generic CRUD operations
-  async findById(id: string): Promise<T | null> {
+  async findById(_id: string): Promise<T | null> {
     throw new Error('findById must be implemented by subclass');
   }
 
-  async findMany(params?: any): Promise<T[]> {
+  async findMany(_params?: any): Promise<T[]> {
     throw new Error('findMany must be implemented by subclass');
   }
 
-  async create(data: any): Promise<T> {
+  async create(_data: any): Promise<T> {
     throw new Error('create must be implemented by subclass');
   }
 
-  async update(id: string, data: any): Promise<T> {
+  async update(_id: string, _data: any): Promise<T> {
     throw new Error('update must be implemented by subclass');
   }
 
-  async delete(id: string): Promise<T> {
+  async delete(_id: string): Promise<T> {
     throw new Error('delete must be implemented by subclass');
   }
 
-  async count(params?: any): Promise<number> {
+  async count(_params?: any): Promise<number> {
     throw new Error('count must be implemented by subclass');
   }
 }

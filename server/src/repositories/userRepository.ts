@@ -1,4 +1,4 @@
-import { User, Prisma } from '@prisma/client';
+// PrismaClient is imported in base repository
 import { BaseRepository } from './prisma';
 
 export interface UserFilters {
@@ -12,11 +12,11 @@ export interface UserListParams {
   page?: number;
   limit?: number;
   filters?: UserFilters;
-  orderBy?: Prisma.UserOrderByWithRelationInput;
+  orderBy?: any;
 }
 
-export class UserRepository extends BaseRepository<User> {
-  async findById(id: string): Promise<User | null> {
+export class UserRepository extends BaseRepository<any> {
+  override async findById(id: string): Promise<any | null> {
     return this.prisma.user.findUnique({
       where: { id },
       include: {
@@ -30,7 +30,7 @@ export class UserRepository extends BaseRepository<User> {
     });
   }
 
-  async findByEmail(email: string): Promise<User | null> {
+  async findByEmail(email: string): Promise<any | null> {
     return this.prisma.user.findUnique({
       where: { email },
       include: {
@@ -44,7 +44,7 @@ export class UserRepository extends BaseRepository<User> {
     });
   }
 
-  async findMany(params: UserListParams = {}): Promise<User[]> {
+  override async findMany(params: UserListParams = {}): Promise<any[]> {
     const {
       page = 1,
       limit = 10,
@@ -53,7 +53,7 @@ export class UserRepository extends BaseRepository<User> {
     } = params;
     const skip = (page - 1) * limit;
 
-    const where: Prisma.UserWhereInput = {};
+    const where: any = {};
 
     if (filters.tenantId) {
       where.tenantId = filters.tenantId;
@@ -69,8 +69,8 @@ export class UserRepository extends BaseRepository<User> {
 
     if (filters.search) {
       where.OR = [
-        { name: { contains: filters.search, mode: 'insensitive' } },
-        { email: { contains: filters.search, mode: 'insensitive' } },
+        { name: { contains: filters.search } },
+        { email: { contains: filters.search } },
       ];
     }
 
@@ -90,7 +90,7 @@ export class UserRepository extends BaseRepository<User> {
     });
   }
 
-  async create(data: Prisma.UserCreateInput): Promise<User> {
+  override async create(data: any): Promise<any> {
     return this.prisma.user.create({
       data,
       include: {
@@ -104,7 +104,7 @@ export class UserRepository extends BaseRepository<User> {
     });
   }
 
-  async update(id: string, data: Prisma.UserUpdateInput): Promise<User> {
+  override async update(id: string, data: any): Promise<any> {
     return this.prisma.user.update({
       where: { id },
       data,
@@ -119,7 +119,7 @@ export class UserRepository extends BaseRepository<User> {
     });
   }
 
-  async softDelete(id: string): Promise<User> {
+  async softDelete(id: string): Promise<any> {
     return this.prisma.user.update({
       where: { id },
       data: { isActive: false },
@@ -134,14 +134,14 @@ export class UserRepository extends BaseRepository<User> {
     });
   }
 
-  async delete(id: string): Promise<User> {
+  override async delete(id: string): Promise<any> {
     return this.prisma.user.delete({
       where: { id },
     });
   }
 
-  async count(filters: UserFilters = {}): Promise<number> {
-    const where: Prisma.UserWhereInput = {};
+  override async count(filters: UserFilters = {}): Promise<number> {
+    const where: any = {};
 
     if (filters.tenantId) {
       where.tenantId = filters.tenantId;
@@ -157,15 +157,15 @@ export class UserRepository extends BaseRepository<User> {
 
     if (filters.search) {
       where.OR = [
-        { name: { contains: filters.search, mode: 'insensitive' } },
-        { email: { contains: filters.search, mode: 'insensitive' } },
+        { name: { contains: filters.search } },
+        { email: { contains: filters.search } },
       ];
     }
 
     return this.prisma.user.count({ where });
   }
 
-  async updateLastLogin(id: string): Promise<User> {
+  async updateLastLogin(id: string): Promise<any> {
     return this.prisma.user.update({
       where: { id },
       data: { lastLoginAt: new Date() },

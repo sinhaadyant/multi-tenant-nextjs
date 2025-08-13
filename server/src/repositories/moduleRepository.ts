@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+// PrismaClient is imported in base repository
 import { BaseRepository } from './prisma';
 
 export interface ModuleFilters {
@@ -205,5 +205,44 @@ export class ModuleRepository extends BaseRepository<any> {
         })
       )
     );
+  }
+
+  async getSubmodulesByModuleId(moduleId: string): Promise<any[]> {
+    return this.prisma.submodule.findMany({
+      where: { moduleId },
+      orderBy: { orderIndex: 'asc' },
+      include: {
+        module: true,
+        rolePermissions: {
+          include: {
+            role: true,
+          },
+        },
+      },
+    });
+  }
+
+  async getSubmoduleById(id: string): Promise<any | null> {
+    return this.prisma.submodule.findUnique({
+      where: { id },
+      include: {
+        module: true,
+        rolePermissions: {
+          include: {
+            role: true,
+          },
+        },
+      },
+    });
+  }
+
+  async countSubmodules(filters: any = {}): Promise<number> {
+    const where: any = {};
+
+    if (filters.isActive !== undefined) {
+      where.isActive = filters.isActive;
+    }
+
+    return this.prisma.submodule.count({ where });
   }
 }

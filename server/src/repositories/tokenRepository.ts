@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+// PrismaClient is imported in base repository
 import { BaseRepository } from './prisma';
 
 export class TokenRepository extends BaseRepository<any> {
@@ -98,15 +98,111 @@ export class TokenRepository extends BaseRepository<any> {
     });
   }
 
-  async deleteResetToken(id: string): Promise<any> {
-    return this.prisma.resetToken.delete({
+  async updateResetToken(id: string, data: any): Promise<any> {
+    return this.prisma.resetToken.update({
       where: { id },
+      data,
+      include: {
+        user: true,
+      },
     });
   }
 
-  async deleteResetTokenByToken(token: string): Promise<any> {
-    return this.prisma.resetToken.delete({
+  // Enhanced methods for AuthService
+  async getRefreshToken(token: string): Promise<any> {
+    return this.prisma.refreshToken.findUnique({
       where: { token },
+    });
+  }
+
+  async getUserRefreshTokens(userId: string): Promise<any[]> {
+    return this.prisma.refreshToken.findMany({
+      where: {
+        userId,
+        isActive: true,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getAllUserRefreshTokens(userId: string): Promise<any[]> {
+    return this.prisma.refreshToken.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getAllRefreshTokens(): Promise<any[]> {
+    return this.prisma.refreshToken.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async invalidateRefreshToken(token: string): Promise<any> {
+    return this.prisma.refreshToken.update({
+      where: { token },
+      data: { isActive: false },
+    });
+  }
+
+  async invalidateAllUserRefreshTokens(userId: string): Promise<any> {
+    return this.prisma.refreshToken.updateMany({
+      where: { userId },
+      data: { isActive: false },
+    });
+  }
+
+  async invalidateDeviceRefreshTokens(deviceId: string): Promise<any> {
+    return this.prisma.refreshToken.updateMany({
+      where: { deviceId },
+      data: { isActive: false },
+    });
+  }
+
+  async deleteExpiredTokens(): Promise<any> {
+    return this.prisma.refreshToken.deleteMany({
+      where: {
+        expiresAt: {
+          lt: new Date(),
+        },
+      },
+    });
+  }
+
+  // Reset token methods
+  async getResetToken(token: string): Promise<any> {
+    return this.prisma.resetToken.findUnique({
+      where: { token },
+    });
+  }
+
+  async getUserResetTokens(userId: string): Promise<any[]> {
+    return this.prisma.resetToken.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getAllResetTokens(): Promise<any[]> {
+    return this.prisma.resetToken.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async markResetTokenAsUsed(token: string): Promise<any> {
+    return this.prisma.resetToken.update({
+      where: { token },
+      data: { isUsed: true },
+    });
+  }
+
+  async revokeUserResetTokens(userId: string): Promise<any> {
+    return this.prisma.resetToken.updateMany({
+      where: { userId },
+      data: { isUsed: true },
     });
   }
 
@@ -117,12 +213,6 @@ export class TokenRepository extends BaseRepository<any> {
           lt: new Date(),
         },
       },
-    });
-  }
-
-  async deleteAllResetTokensForUser(userId: string): Promise<any> {
-    return this.prisma.resetToken.deleteMany({
-      where: { userId },
     });
   }
 

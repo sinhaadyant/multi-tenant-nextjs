@@ -32,9 +32,13 @@ model User {
   supportReplies  SupportReply[]
   auditLogs       AuditLog[]
   refreshTokens   RefreshToken[]
+  resetTokens     ResetToken[]
   loginDevices    LoginDevice[]
 
   @@map("users")
+  @@index([email])
+  @@index([tenantId])
+  @@index([isActive])
 }
 
 model Tenant {
@@ -53,6 +57,8 @@ model Tenant {
   auditLogs           AuditLog[]
 
   @@map("tenants")
+  @@index([domain])
+  @@index([isActive])
 }
 
 model Role {
@@ -70,6 +76,8 @@ model Role {
   rolePermissions   RolePermission[]
 
   @@map("roles")
+  @@index([tenantId])
+  @@index([isGlobal])
 }
 
 model Module {
@@ -86,6 +94,8 @@ model Module {
   rolePermissions   RolePermission[]
 
   @@map("modules")
+  @@index([isActive])
+  @@index([orderIndex])
 }
 
 model Submodule {
@@ -103,6 +113,9 @@ model Submodule {
   rolePermissions   RolePermission[]
 
   @@map("submodules")
+  @@index([moduleId])
+  @@index([isActive])
+  @@index([orderIndex])
 }
 
 model UserRole {
@@ -158,6 +171,10 @@ model SupportTicket {
   attachments       SupportAttachment[]
 
   @@map("support_tickets")
+  @@index([tenantId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model SupportReply {
@@ -201,32 +218,70 @@ model AuditLog {
   user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("audit_logs")
+  @@index([tenantId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
 }
 
 model RefreshToken {
   id        String   @id @default(cuid())
   userId    String   @map("user_id")
+  deviceId  String?  @map("device_id")
   token     String   @unique
+  isActive  Boolean  @default(true) @map("is_active")
   expiresAt DateTime @map("expires_at")
   createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("refresh_tokens")
+  @@index([userId])
+  @@index([deviceId])
+  @@index([isActive])
+  @@index([expiresAt])
+}
+
+model ResetToken {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  isUsed    Boolean  @default(false) @map("is_used")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("reset_tokens")
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([isUsed])
 }
 
 model LoginDevice {
   id           String    @id @default(cuid())
   userId       String    @map("user_id")
-  deviceInfo   Json      @map("device_info")
-  ipAddress    String?   @map("ip_address")
-  lastActiveAt DateTime  @default(now()) @map("last_active_at")
+  deviceId     String    @unique @map("device_id")
+  userAgent    String    @map("user_agent")
+  ipAddress    String    @map("ip_address")
+  deviceType   String?   @map("device_type")
+  browser      String?   @map("browser")
+  os           String?   @map("os")
+  platform     String?   @map("platform")
+  lastUsedAt   DateTime  @default(now()) @map("last_used_at")
   isActive     Boolean   @default(true) @map("is_active")
   createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("login_devices")
+  @@index([userId])
+  @@index([deviceId])
+  @@index([isActive])
+  @@index([lastUsedAt])
 }

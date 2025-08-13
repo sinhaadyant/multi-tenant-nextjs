@@ -39,7 +39,7 @@ export const generateAccessToken = (payload: JWTPayload): string => {
       expiresIn: env.JWT_ACCESS_TOKEN_EXPIRY,
       issuer: 'multi-tenant-platform',
       audience: 'multi-tenant-platform-users',
-    });
+    } as jwt.SignOptions);
   } catch (error) {
     throw new Error(`Failed to generate access token: ${error}`);
   }
@@ -55,7 +55,7 @@ export const generateRefreshToken = (
       expiresIn: env.JWT_REFRESH_TOKEN_EXPIRY,
       issuer: 'multi-tenant-platform',
       audience: 'multi-tenant-platform-users',
-    });
+    } as jwt.SignOptions);
   } catch (error) {
     throw new Error(`Failed to generate refresh token: ${error}`);
   }

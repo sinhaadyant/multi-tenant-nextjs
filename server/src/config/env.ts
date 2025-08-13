@@ -17,11 +17,7 @@ const envSchema = z.object({
   JWT_REFRESH_TOKEN_EXPIRY: z.string().default('7d'),
 
   // Server
-  PORT: z
-    .string()
-    .transform(Number)
-    .pipe(z.number().positive())
-    .default('3001'),
+  PORT: z.string().transform(Number).pipe(z.number().positive()).default(3001),
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
     .default('development'),
@@ -31,14 +27,14 @@ const envSchema = z.object({
     .string()
     .transform(Number)
     .pipe(z.number().positive())
-    .default('12'),
+    .default(12),
 
   // File Upload
   MAX_FILE_SIZE: z
     .string()
     .transform(Number)
     .pipe(z.number().positive())
-    .default('10485760'),
+    .default(10485760),
   UPLOAD_PATH: z.string().default('./uploads'),
 
   // Logging
@@ -49,12 +45,12 @@ const envSchema = z.object({
     .string()
     .transform(Number)
     .pipe(z.number().positive())
-    .default('900000'),
+    .default(900000),
   RATE_LIMIT_MAX_REQUESTS: z
     .string()
     .transform(Number)
     .pipe(z.number().positive())
-    .default('100'),
+    .default(100),
 });
 
 // Parse and validate environment variables
@@ -63,8 +59,8 @@ const parseEnv = () => {
     return envSchema.parse(process.env);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const missingVars = error.errors
-        .map(err => err.path.join('.'))
+      const missingVars = (error as z.ZodError).issues
+        .map((err: z.ZodIssue) => err.path.join('.'))
         .join(', ');
       throw new Error(
         `Missing or invalid environment variables: ${missingVars}`

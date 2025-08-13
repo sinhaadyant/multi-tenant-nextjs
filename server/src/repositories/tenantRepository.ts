@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+// PrismaClient is imported in base repository
 import { BaseRepository } from './prisma';
 
 export interface TenantFilters {
