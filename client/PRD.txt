@@ -1,0 +1,227 @@
+ Project: Multi-Tenant Scalable API Backend
+Database: MySQL (Database name: multi-tenant-scale)
+Language: TypeScript
+Validation: Zod
+Testing: Jest + Supabase (E2E tests)
+Architecture: Modular, scalable API structure with constants, utils, interfaces, services, middleware, routes, helpers, and validation schemas.
+Auth: JWT (public/private/secret keys in /jwt-keys)
+Config: Environment-wise config in /environment
+Assets: /api-assets folder for static files
+Core Requirements
+Folder Structure
+src/
+ ├── constants/
+ ├── environment/
+ ├── helpers/
+ ├── interfaces/
+ ├── libraries/
+ ├── middleware/
+ ├── routes/
+ ├── services/
+ ├── strings/
+ ├── validation-schemas/
+ ├── jwt-keys/
+ └── api-assets/
+tests/
+Database Tables
+users (with is_active, is_superadmin, tenant_id, role, login restriction flags)
+tenants (with default settings, login restrictions, is_active)
+roles (global + tenant-specific)
+permissions (with module/submodule mapping)
+modules (with is_active, ordering, parent_id for submenus)
+role_permissions (role-module-permission mapping)
+audit_logs (actions by user)
+support_tickets (attachments, replies)
+login_devices (tracking devices, revoke access option)
+refresh_tokens & reset_tokens
+tenant_settings (tenant-specific login restrictions overriding global)
+API Standards
+All APIs must include:
+Filters (query params like status, created_at, module_id, etc.)
+Pagination (page, limit)
+Search (global text search across defined fields)
+Sorting (sortBy, sortOrder)
+Role & permission checks:
+Superadmin → can view all tenant data
+Tenant admin → can view only own tenant data
+User → limited module access
+API Response format (standardized)
+{
+  success: boolean;
+  message: string;
+  data?: any;
+  meta?: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  errors?: string[];
+}
+Endpoints
+Auth
+/auth/login
+/auth/refresh-token
+/auth/logout
+/auth/reset-password
+/auth/revoke-device
+Users
+GET (filters, search, pagination, permissions)
+POST (create user with validation)
+PUT/PATCH (update user)
+DELETE (soft delete)
+Tenants
+Full CRUD with filters/search
+Roles & Permissions
+CRUD for roles (global & tenant)
+Assign/revoke permissions
+Modules
+CRUD with submenus
+Support System
+Create ticket, reply, add attachment
+Audit Logs
+View logs (filters by date, user, action)
+Login Devices
+View active devices
+Revoke device session
+Tenant Settings
+Update per-tenant login restriction
+Fetch defaults from superadmin settings
+Validation
+Use Zod in /validation-schemas
+Reusable constants for field limits
+Environment configs for pagination limits
+Security
+JWT auth middleware
+Role & permission middleware
+SQL injection prevention
+Activity logs for every CRUD action
+Testing
+Jest for unit & integration tests
+Supabase test DB for E2E tests
+Mock role & permission data for permission-based response tests
+
+### **Database**
+Using MySQL, create tables for:
+1. **users**
+   - id (PK)
+   - tenant_id (FK)
+   - name
+   - email (unique)
+   - password_hash
+   - is_active (boolean)
+   - is_superadmin (boolean)
+   - last_login_at
+   - created_at
+   - updated_at
+
+2. **tenants**
+   - id (PK)
+   - name
+   - domain
+   - is_active
+   - login_restrictions (JSON) → {max_devices, allow_multiple_sessions, session_timeout}
+   - created_at
+   - updated_at
+
+3. **roles**
+   - id (PK)
+   - tenant_id (nullable for global roles)
+   - name
+   - description
+   - is_global (boolean)
+   - created_at
+   - updated_at
+
+4. **modules**
+   - id (PK)
+   - name
+   - description
+   - is_active
+   - order_index
+   - created_at
+   - updated_at
+
+5. **submodules**
+   - id (PK)
+   - module_id (FK)
+   - name
+   - description
+   - order_index
+   - is_active
+   - created_at
+   - updated_at
+
+6. **role_permissions**
+   - id (PK)
+   - role_id (FK)
+   - module_id (FK)
+   - submodule_id (FK, nullable)
+   - can_create
+   - can_read
+   - can_update
+   - can_delete
+
+7. **audit_logs**
+   - id (PK)
+   - tenant_id
+   - user_id
+   - action
+   - details (JSON)
+   - ip_address
+   - created_at
+
+8. **support_tickets**
+   - id (PK)
+   - tenant_id
+   - user_id
+   - title
+   - description
+   - status
+   - created_at
+   - updated_at
+
+9. **support_attachments**
+   - id (PK)
+   - ticket_id (FK)
+   - file_path
+   - file_type
+   - created_at
+
+10. **support_replies**
+    - id (PK)
+    - ticket_id (FK)
+    - user_id
+    - reply_text
+    - created_at
+
+11. **refresh_tokens**
+    - id (PK)
+    - user_id (FK)
+    - token
+    - expires_at
+    - created_at
+
+12. **login_devices**
+    - id (PK)
+    - user_id (FK)
+    - device_info
+    - ip_address
+    - last_active_at
+    - is_active (boolean)
+    - created_at
+
+
+  =====
+
+Generate TypeScript code for all above APIs using Express + MySQL with Zod validation, following the folder structure, naming conventions, and standard API response format.
+Implement filters, pagination, search, sorting, and role-based access control in all GET APIs.
+Create helper functions in /helpers for pagination, filtering, and role/permission checking.
+Store all constants in /constants.
+Store validation schemas in /validation-schemas.
+Implement E2E tests with Supabase in /tests.
+Use environment variables from /environment config.
+Use MySQL connection pooling with prepared statements.
+
+Also a logger utuil which helps to show logs 
+as per the env settings
