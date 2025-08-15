@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import {
-  getUserDevices,
+  getUserLoginDevices,
   getUserDeviceStats,
   revokeDevice,
   revokeAllDevices,
@@ -26,7 +26,7 @@ router.use(authMiddleware);
  *     summary: Get user's active devices
  *     tags: [Devices]
  */
-router.get('/', getUserDevices);
+router.get('/', getUserLoginDevices);
 
 /**
  * @swagger

@@ -260,7 +260,9 @@ export const getCurrentUser = async (
       return;
     }
 
-    const user = await authService.validateAccessToken(req.headers.authorization?.replace('Bearer ', '') || '');
+    const user = await authService.validateAccessToken(
+      req.headers.authorization?.replace('Bearer ', '') || ''
+    );
     const { passwordHash, ...userData } = user;
 
     successResponse(res, 'User information retrieved successfully', userData);

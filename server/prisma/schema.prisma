@@ -34,11 +34,17 @@ model User {
   refreshTokens   RefreshToken[]
   resetTokens     ResetToken[]
   loginDevices    LoginDevice[]
+  notifications   Notification[]
+  notificationPreferences UserNotificationPreferences?
+  savedSearches   SavedSearch[]
+  notificationTemplates NotificationTemplate[] @relation("NotificationTemplateCreator")
+  fileUploads     FileUpload[] @relation("FileUploads")
 
   @@map("users")
   @@index([email])
   @@index([tenantId])
   @@index([isActive])
+  @@index([tenantId, isActive])
 }
 
 model Tenant {
@@ -55,6 +61,9 @@ model Tenant {
   roles               Role[]
   supportTickets      SupportTicket[]
   auditLogs           AuditLog[]
+  notifications       Notification[]
+  notificationTemplates NotificationTemplate[]
+  fileUploads         FileUpload[]
 
   @@map("tenants")
   @@index([domain])
@@ -78,6 +87,7 @@ model Role {
   @@map("roles")
   @@index([tenantId])
   @@index([isGlobal])
+  @@index([tenantId, isGlobal])
 }
 
 model Module {
@@ -130,6 +140,7 @@ model UserRole {
 
   @@unique([userId, roleId])
   @@map("user_roles")
+  @@index([userId, roleId])
 }
 
 model RolePermission {
@@ -152,6 +163,12 @@ model RolePermission {
 
   @@unique([roleId, moduleId, submoduleId])
   @@map("role_permissions")
+  @@index([roleId, moduleId])
+  @@index([moduleId, canRead, canViewAll])
+  @@index([submoduleId, canRead, canViewAll])
+  @@index([roleId])
+  @@index([moduleId])
+  @@index([submoduleId])
 }
 
 model SupportTicket {
@@ -175,6 +192,8 @@ model SupportTicket {
   @@index([userId])
   @@index([status])
   @@index([createdAt])
+  @@index([tenantId, status])
+  @@index([userId, status])
 }
 
 model SupportReply {
@@ -208,6 +227,7 @@ model AuditLog {
   id        String   @id @default(cuid())
   tenantId  String?  @map("tenant_id")
   userId    String   @map("user_id")
+  fileUploadId String? @map("file_upload_id")
   action    String
   details   Json?
   ipAddress String?  @map("ip_address")
@@ -216,12 +236,15 @@ model AuditLog {
   // Relations
   tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileUpload FileUpload? @relation(fields: [fileUploadId], references: [id], onDelete: SetNull)
 
   @@map("audit_logs")
   @@index([tenantId])
   @@index([userId])
+  @@index([fileUploadId])
   @@index([action])
   @@index([createdAt])
+  @@index([tenantId, userId])
 }
 
 model RefreshToken {
@@ -242,6 +265,7 @@ model RefreshToken {
   @@index([deviceId])
   @@index([isActive])
   @@index([expiresAt])
+  @@index([userId, isActive])
 }
 
 model ResetToken {
@@ -259,6 +283,7 @@ model ResetToken {
   @@index([userId])
   @@index([expiresAt])
   @@index([isUsed])
+  @@index([userId, isUsed])
 }
 
 model LoginDevice {
@@ -284,4 +309,122 @@ model LoginDevice {
   @@index([deviceId])
   @@index([isActive])
   @@index([lastUsedAt])
+  @@index([userId, isActive])
+}
+
+model Notification {
+  id          String    @id @default(cuid())
+  userId      String    @map("user_id")
+  tenantId    String?   @map("tenant_id")
+  title       String
+  message     String    @db.Text
+  type        String    @default("info") // info, success, warning, error
+  priority    String    @default("medium") // low, medium, high, urgent
+  channels    Json      // Array of channels: in_app, email, sms
+  isRead      Boolean   @default(false) @map("is_read")
+  readAt      DateTime? @map("read_at")
+  metadata    Json?     // Additional metadata
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@map("notifications")
+  @@index([userId])
+  @@index([tenantId])
+  @@index([isRead])
+  @@index([type])
+  @@index([priority])
+  @@index([createdAt])
+  @@index([userId, isRead])
+}
+
+model UserNotificationPreferences {
+  id                   String    @id @default(cuid())
+  userId               String    @unique @map("user_id")
+  emailNotifications   Boolean   @default(true) @map("email_notifications")
+  smsNotifications     Boolean   @default(false) @map("sms_notifications")
+  inAppNotifications   Boolean   @default(true) @map("in_app_notifications")
+  notificationTypes    Json      // Object with notification type preferences
+  quietHours           Json?     // Object with quiet hours settings
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_notification_preferences")
+}
+
+model NotificationTemplate {
+  id          String    @id @default(cuid())
+  name        String
+  subject     String
+  body        String    @db.Text
+  variables   Json?     // Array of variable names
+  isGlobal    Boolean   @default(false) @map("is_global")
+  tenantId    String?   @map("tenant_id")
+  createdBy   String    @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  tenant    Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  createdByUser User @relation("NotificationTemplateCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@map("notification_templates")
+  @@index([tenantId])
+  @@index([isGlobal])
+  @@index([createdBy])
+}
+
+model SavedSearch {
+  id          String    @id @default(cuid())
+  userId      String    @map("user_id")
+  name        String
+  description String?
+  query       Json      // Search query object
+  isPublic    Boolean   @default(false) @map("is_public")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("saved_searches")
+  @@index([userId])
+  @@index([isPublic])
+  @@index([createdAt])
+}
+
+model FileUpload {
+  id            String    @id @default(cuid())
+  originalName  String    @map("original_name")
+  fileName      String    @map("file_name")
+  filePath      String    @map("file_path")
+  mimeType      String    @map("mime_type")
+  fileSize      Int       @map("file_size")
+  description   String?
+  tags          Json?     // Array of tags
+  isPublic      Boolean   @default(false) @map("is_public")
+  uploadedBy    String    @map("uploaded_by")
+  tenantId      String?   @map("tenant_id")
+  fileHash      String    @map("file_hash")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  uploadedByUser User    @relation("FileUploads", fields: [uploadedBy], references: [id], onDelete: Cascade)
+  tenant         Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  auditLogs      AuditLog[]
+
+  @@map("file_uploads")
+  @@index([uploadedBy])
+  @@index([tenantId])
+  @@index([isPublic])
+  @@index([mimeType])
+  @@index([createdAt])
+  @@index([fileHash])
 }

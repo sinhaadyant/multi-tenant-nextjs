@@ -15,13 +15,13 @@ export const requestIdMiddleware = (
   next: NextFunction
 ): void => {
   // Use existing request ID from header or generate new one
-  const requestId = req.headers['x-request-id'] as string || uuidv4();
-  
+  const requestId = (req.headers['x-request-id'] as string) || uuidv4();
+
   // Attach request ID to request object
   req.requestId = requestId;
-  
+
   // Add request ID to response headers
   res.setHeader('X-Request-ID', requestId);
-  
+
   next();
 };

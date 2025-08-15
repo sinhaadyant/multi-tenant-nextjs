@@ -1,521 +1,862 @@
 import { Request, Response } from 'express';
-import { UserService } from '@/services/userService';
-import {
-  successResponse,
-  errorResponse,
-  badRequestResponse,
-  notFoundResponse,
-} from '@/utils/apiResponse';
-import {
-  createUserSchema,
-  updateUserSchema,
-  userListParamsSchema,
-} from '@/validation/userValidation';
+import { PrismaClient } from '@prisma/client';
+import { z } from 'zod';
+import bcrypt from 'bcryptjs';
+import { PermissionService } from '@/services/PermissionService';
+import { createAuditLog } from '../services/auditService';
 
-const userService = new UserService();
+const prisma = new PrismaClient();
+const permissionService = PermissionService.getInstance();
 
-/**
- * @swagger
- * /api/users:
- *   post:
- *     summary: Create a new user
- *     description: Create a new user with the provided information
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/CreateUserRequest'
- *     responses:
- *       201:
- *         description: User created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: User created successfully
- *                 data:
- *                   $ref: '#/components/schemas/User'
- *       400:
- *         description: Validation error or user already exists
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       401:
- *         description: Unauthorized
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
-export const createUser = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    // Validate request body
-    const validationResult = createUserSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      badRequestResponse(
-        res,
-        'Validation failed',
-        validationResult.error.issues
+// Validation schemas
+const createUserSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
+  phone: z.string().optional(),
+  tenantId: z.string().optional(),
+  roleIds: z.array(z.string()).optional(),
+});
+
+const updateUserSchema = z.object({
+  email: z.string().email('Invalid email format').optional(),
+  firstName: z.string().min(1, 'First name is required').optional(),
+  lastName: z.string().min(1, 'Last name is required').optional(),
+  phone: z.string().optional(),
+  isActive: z.boolean().optional(),
+  roleIds: z.array(z.string()).optional(),
+});
+
+const bulkOperationSchema = z.object({
+  userIds: z.array(z.string()).min(1, 'At least one user ID is required'),
+  action: z.enum(['activate', 'deactivate', 'delete']),
+  reason: z.string().optional(),
+});
+
+export class UserController {
+  // Create user
+  async createUser(req: Request, res: Response): Promise<void> {
+    try {
+      // Check permission
+      if (!req.user || !req?.user?.id) {
+        res.status(401).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+        return;
+      }
+      const hasPermission = await permissionService.hasPermission(
+        req?.user?.id,
+        'users',
+        'create'
       );
-      return;
+      if (!hasPermission) {
+        res.status(403).json({
+          success: false,
+          message: 'Insufficient permissions to create users',
+        });
+        return;
+      }
+
+      // Validate input
+      const validatedData = createUserSchema.parse(req.body);
+
+      // Check if user already exists
+      const existingUser = await prisma?.user?.findUnique({
+        where: { email: validatedData.email },
+      });
+
+      if (existingUser) {
+        res.status(400).json({
+          success: false,
+          message: 'User with this email already exists',
+        });
+        return;
+      }
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(validatedData.password, 12);
+
+      // Create user
+      const user = await prisma?.user?.create({
+        data: {
+          email: validatedData.email,
+          passwordHash: hashedPassword,
+          name: `${validatedData.firstName} ${validatedData.lastName}`,
+          tenantId: validatedData.tenantId || req.user?.tenantId,
+          isActive: true,
+        },
+        include: {
+          tenant: true,
+          userRoles: {
+            include: {
+              role: true,
+            },
+          },
+        },
+      });
+
+      // Assign roles if provided
+      if (validatedData.roleIds && validatedData?.roleIds?.length > 0) {
+        const roleAssignments = validatedData?.roleIds?.map(roleId => ({
+          userId: user?.id,
+          roleId,
+        }));
+
+        await prisma?.userRole?.createMany({
+          data: roleAssignments,
+          skipDuplicates: true,
+        });
+      }
+
+      // Create audit log
+      await createAuditLog({
+        action: 'CREATE',
+        resource: 'user',
+        userId: req.user?.id || 'system',
+        tenantId: req.user?.tenantId,
+        details: { email: user?.email },
+        ipAddress: req.ip,
+      });
+
+      res.status(201).json({
+        success: true,
+        message: 'User created successfully',
+        data: {
+          user: {
+            id: user?.id,
+            email: user?.email,
+            name: user?.name,
+            isActive: user?.isActive,
+            tenantId: user?.tenantId,
+            createdAt: user?.createdAt,
+          },
+        },
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: error.errors,
+        });
+      }
+
+      console.error('Error creating user:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
     }
-
-    const userData = validationResult.data;
-    const auditUserId = req.user?.userId;
-
-    const user = await userService.createUser(userData, auditUserId);
-    const { passwordHash, ...userResponse } = user;
-
-    successResponse(res, 'User created successfully', userResponse, 201);
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Failed to create user';
-    errorResponse(res, message, 500);
   }
-};
 
-/**
- * @swagger
- * /api/users:
- *   get:
- *     summary: Get list of users
- *     description: Retrieve a paginated list of users with optional filtering
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Page number for pagination
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: Number of items per page
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *         description: Search term for name or email
- *       - in: query
- *         name: tenantId
- *         schema:
- *           type: string
- *         description: Filter by tenant ID
- *       - in: query
- *         name: isActive
- *         schema:
- *           type: boolean
- *         description: Filter by active status
- *       - in: query
- *         name: isSuperadmin
- *         schema:
- *           type: boolean
- *         description: Filter by superadmin status
- *       - in: query
- *         name: orderBy
- *         schema:
- *           type: string
- *           enum: [name, email, createdAt, lastLoginAt]
- *           default: createdAt
- *         description: Field to order by
- *       - in: query
- *         name: orderDirection
- *         schema:
- *           type: string
- *           enum: [asc, desc]
- *           default: desc
- *         description: Order direction
- *     responses:
- *       200:
- *         description: Users retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/PaginatedResponse'
- *       401:
- *         description: Unauthorized
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
-export const getUsers = async (req: Request, res: Response): Promise<void> => {
-  try {
-    // Validate query parameters
-    const validationResult = userListParamsSchema.safeParse(req.query);
-    if (!validationResult.success) {
-      badRequestResponse(
-        res,
-        'Invalid query parameters',
-        validationResult.error.issues
+  // Get users with pagination and filtering
+  async getUsers(req: Request, res: Response): Promise<void> {
+    try {
+      // Check permission
+      if (!req.user?.id) {
+        res.status(401).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+        return;
+      }
+      const hasPermission = await permissionService.hasPermission(
+        req?.user?.id,
+        'users',
+        'read'
       );
-      return;
-    }
+      if (!hasPermission) {
+        res.status(403).json({
+          success: false,
+          message: 'Insufficient permissions to view users',
+        });
+        return;
+      }
 
-    const params = validationResult.data;
-    const result = await userService.listUsers(params);
+      const {
+        page = 1,
+        limit = 10,
+        sortBy = 'createdAt',
+        sortOrder = 'desc',
+      } = req.query;
 
-    successResponse(
-      res,
-      {
-        users: result.users.map(user => {
-          const { passwordHash, ...userData } = user;
-          return userData;
+      const pageNum = parseInt(page as string);
+      const limitNum = parseInt(limit as string);
+      const offset = (pageNum - 1) * limitNum;
+
+      // Build where clause with data scope
+      let whereClause: any = {};
+
+      // Superadmin can see all users, others can only see users in their tenant
+      if (!req.user?.isSuperadmin) {
+        whereClause.tenantId = req.user?.tenantId;
+      }
+
+      // Get users with pagination
+      const [users, total] = await Promise.all([
+        prisma?.user?.findMany({
+          where: whereClause,
+          include: {
+            tenant: {
+              select: {
+                id: true,
+                name: true,
+                domain: true,
+              },
+            },
+            userRoles: {
+              include: {
+                role: {
+                  select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: {
+            [sortBy as string]: sortOrder as 'asc' | 'desc',
+          },
+          skip: offset,
+          take: limitNum,
         }),
-        total: result.total,
-        meta: result.meta,
-      },
-      'Users retrieved successfully'
-    );
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Failed to retrieve users';
-    errorResponse(res, message, 500);
-  }
-};
+        prisma?.user?.count({ where: whereClause }),
+      ]);
 
-/**
- * @swagger
- * /api/users/{id}:
- *   get:
- *     summary: Get user by ID
- *     description: Retrieve a specific user by their ID
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: User ID
- *     responses:
- *       200:
- *         description: User retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: User retrieved successfully
- *                 data:
- *                   $ref: '#/components/schemas/User'
- *       404:
- *         description: User not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       401:
- *         description: Unauthorized
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
-export const getUserById = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const { id } = req.params;
+      const totalPages = Math.ceil(total / limitNum);
 
-    if (!id) {
-      badRequestResponse(res, 'User ID is required');
-      return;
-    }
-
-    const user = await userService.getUserById(id);
-    const { passwordHash, ...userData } = user;
-
-    successResponse(res, 'User retrieved successfully', userData);
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Failed to retrieve user';
-    if (message.includes('not found')) {
-      notFoundResponse(res, 'User not found');
-    } else {
-      errorResponse(res, message, 500);
+      res.json({
+        success: true,
+        message: 'Users retrieved successfully',
+        data: {
+          users: users.map(user => ({
+            id: user?.id,
+            email: user?.email,
+            name: user?.name,
+            isActive: user?.isActive,
+            tenantId: user?.tenantId,
+            tenant: user?.tenant,
+            roles: user?.userRoles.map(ur => ur.role),
+            createdAt: user?.createdAt,
+            updatedAt: user?.updatedAt,
+          })),
+        },
+        meta: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages,
+        },
+      });
+    } catch (error) {
+      console.error('Error retrieving users:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
     }
   }
-};
 
-/**
- * @swagger
- * /api/users/{id}:
- *   put:
- *     summary: Update user
- *     description: Update an existing user's information
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: User ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/UpdateUserRequest'
- *     responses:
- *       200:
- *         description: User updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: User updated successfully
- *                 data:
- *                   $ref: '#/components/schemas/User'
- *       400:
- *         description: Validation error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       404:
- *         description: User not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       401:
- *         description: Unauthorized
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
-export const updateUser = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const { id } = req.params;
+  // Get user by ID
+  async getUserById(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
 
-    if (!id) {
-      badRequestResponse(res, 'User ID is required');
-      return;
-    }
-
-    // Validate request body
-    const validationResult = updateUserSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      badRequestResponse(
-        res,
-        'Validation failed',
-        validationResult.error.issues
+      // Check permission
+      if (!req.user?.id) {
+        res.status(401).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+        return;
+      }
+      const hasPermission = await permissionService.hasPermission(
+        req?.user?.id,
+        'users',
+        'read'
       );
-      return;
-    }
+      if (!hasPermission) {
+        res.status(403).json({
+          success: false,
+          message: 'Insufficient permissions to view users',
+        });
+        return;
+      }
 
-    const userData = validationResult.data;
-    const auditUserId = req.user?.userId;
+      // Build where clause with data scope
+      let whereClause: any = { id };
 
-    const user = await userService.updateUser(id, userData, auditUserId);
-    const { passwordHash, ...userResponse } = user;
+      // Superadmin can see all users, others can only see users in their tenant
+      if (!req.user?.isSuperadmin) {
+        whereClause.tenantId = req.user?.tenantId;
+      }
 
-    successResponse(res, 'User updated successfully', userResponse);
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Failed to update user';
-    if (message.includes('not found')) {
-      notFoundResponse(res, 'User not found');
-    } else {
-      errorResponse(res, message, 500);
-    }
-  }
-};
+      const user = await prisma?.user?.findFirst({
+        where: whereClause,
+        include: {
+          tenant: {
+            select: {
+              id: true,
+              name: true,
+              domain: true,
+            },
+          },
+          userRoles: {
+            include: {
+              role: {
+                select: {
+                  id: true,
+                  name: true,
+                  description: true,
+                },
+              },
+            },
+          },
+        },
+      });
 
-/**
- * @swagger
- * /api/users/{id}:
- *   delete:
- *     summary: Delete user
- *     description: Soft delete a user (mark as inactive)
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: User ID
- *     responses:
- *       200:
- *         description: User deleted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: User deleted successfully
- *                 data:
- *                   $ref: '#/components/schemas/User'
- *       404:
- *         description: User not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       401:
- *         description: Unauthorized
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
-export const deleteUser = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const auditUserId = req.user?.userId;
+      if (!user) {
+        res.status(404).json({
+          success: false,
+          message: 'User not found',
+        });
+      }
 
-    if (!id) {
-      badRequestResponse(res, 'User ID is required');
-      return;
-    }
-
-    const user = await userService.softDeleteUser(id, auditUserId);
-    const { passwordHash, ...userResponse } = user;
-
-    successResponse(res, 'User deleted successfully', userResponse);
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Failed to delete user';
-    if (message.includes('not found')) {
-      notFoundResponse(res, 'User not found');
-    } else {
-      errorResponse(res, message, 500);
+      res.json({
+        success: true,
+        message: 'User retrieved successfully',
+        data: {
+          user: {
+            id: user?.id,
+            email: user?.email,
+            name: user?.name,
+            isActive: user?.isActive,
+            tenantId: user?.tenantId,
+            tenant: user?.tenant,
+            roles: user?.userRoles.map(ur => ur.role),
+            createdAt: user?.createdAt,
+            updatedAt: user?.updatedAt,
+          },
+        },
+      });
+    } catch (error) {
+      console.error('Error retrieving user:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
     }
   }
-};
 
-/**
- * @swagger
- * /api/users/stats:
- *   get:
- *     summary: Get user statistics
- *     description: Retrieve user statistics and metrics
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: tenantId
- *         schema:
- *           type: string
- *         description: Filter statistics by tenant ID
- *     responses:
- *       200:
- *         description: User statistics retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: User statistics retrieved successfully
- *                 data:
- *                   type: object
- *                   properties:
- *                     totalUsers:
- *                       type: number
- *                       example: 100
- *                     activeUsers:
- *                       type: number
- *                       example: 85
- *                     inactiveUsers:
- *                       type: number
- *                       example: 15
- *                     superadmins:
- *                       type: number
- *                       example: 2
- *                     regularUsers:
- *                       type: number
- *                       example: 98
- *       401:
- *         description: Unauthorized
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
-export const getUserStats = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const { tenantId } = req.query;
-    const stats = await userService.getUserStats(tenantId as string);
+  // Update user
+  async updateUser(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
 
-    successResponse(res, 'User statistics retrieved successfully', stats);
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : 'Failed to retrieve user statistics';
-    errorResponse(res, message, 500);
+      // Check permission
+      if (!req.user?.id) {
+        res.status(401).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+        return;
+      }
+      const hasPermission = await permissionService.hasPermission(
+        req?.user?.id,
+        'users',
+        'update'
+      );
+      if (!hasPermission) {
+        res.status(403).json({
+          success: false,
+          message: 'Insufficient permissions to update users',
+        });
+        return;
+      }
+
+      // Validate input
+      const validatedData = updateUserSchema.parse(req.body);
+
+      // Check if user exists and user has access
+      let whereClause: any = { id };
+
+      // Superadmin can see all users, others can only see users in their tenant
+      if (!req.user?.isSuperadmin) {
+        whereClause.tenantId = req.user?.tenantId;
+      }
+
+      const existingUser = await prisma?.user?.findFirst({
+        where: whereClause,
+      });
+
+      if (!existingUser) {
+        res.status(404).json({
+          success: false,
+          message: 'User not found',
+        });
+        return;
+      }
+
+      // Check if email is being changed and if it's already taken
+      if (validatedData.email && validatedData.email !== existingUser?.email) {
+        const emailExists = await prisma?.user?.findUnique({
+          where: { email: validatedData.email },
+        });
+
+        if (emailExists) {
+          res.status(400).json({
+            success: false,
+            message: 'Email already exists',
+          });
+          return;
+        }
+      }
+
+      // Update user
+      const updateData: any = {};
+      if (validatedData.email) updateData.email = validatedData.email;
+      if (validatedData.firstName || validatedData.lastName) {
+        updateData.name = `${validatedData.firstName || existingUser?.name.split(' ')[0]} ${validatedData.lastName || existingUser?.name.split(' ')[1]}`;
+      }
+      if (validatedData.isActive !== undefined)
+        updateData.isActive = validatedData.isActive;
+
+      const updatedUser = await prisma?.user?.update({
+        where: { id },
+        data: updateData,
+        include: {
+          tenant: true,
+          userRoles: {
+            include: {
+              role: true,
+            },
+          },
+        },
+      });
+
+      // Update roles if provided
+      if (validatedData.roleIds) {
+        // Remove existing roles
+        await prisma?.userRole?.deleteMany({
+          where: { userId: id },
+        });
+
+        // Add new roles
+        if (validatedData?.roleIds?.length > 0) {
+          const roleAssignments = validatedData?.roleIds?.map(roleId => ({
+            userId: id || '',
+            roleId,
+          }));
+
+          await prisma?.userRole?.createMany({
+            data: roleAssignments,
+          });
+        }
+      }
+
+      // Create audit log
+      await createAuditLog({
+        action: 'UPDATE',
+
+        userId: req.user?.id || 'system',
+        tenantId: req.user?.tenantId,
+        details: { updatedFields: Object.keys(updateData) },
+        ipAddress: req.ip,
+      });
+
+      res.json({
+        success: true,
+        message: 'User updated successfully',
+        data: {
+          user: {
+            id: updatedUser.id,
+            email: updatedUser.email,
+            name: updatedUser.name,
+            isActive: updatedUser.isActive,
+            tenantId: updatedUser.tenantId,
+            createdAt: updatedUser.createdAt,
+            updatedAt: updatedUser.updatedAt,
+          },
+        },
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: error.errors,
+        });
+      }
+
+      console.error('Error updating user:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
   }
-};
+
+  // Delete user
+  async deleteUser(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+
+      // Check permission
+      if (!req.user?.id) {
+        res.status(401).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+        return;
+      }
+      const hasPermission = await permissionService.hasPermission(
+        req?.user?.id,
+        'users',
+        'delete'
+      );
+      if (!hasPermission) {
+        res.status(403).json({
+          success: false,
+          message: 'Insufficient permissions to delete users',
+        });
+        return;
+      }
+
+      // Check if user exists and user has access
+      let whereClause: any = { id };
+
+      // Superadmin can see all users, others can only see users in their tenant
+      if (!req.user?.isSuperadmin) {
+        whereClause.tenantId = req.user?.tenantId;
+      }
+
+      const existingUser = await prisma?.user?.findFirst({
+        where: whereClause,
+      });
+
+      if (!existingUser) {
+        res.status(404).json({
+          success: false,
+          message: 'User not found',
+        });
+        return;
+      }
+
+      // Prevent deletion of superadmin
+      if (existingUser?.isSuperadmin) {
+        res.status(400).json({
+          success: false,
+          message: 'Cannot delete superadmin user',
+        });
+        return;
+      }
+
+      // Delete user (cascade will handle related records)
+      await prisma?.user?.delete({
+        where: { id },
+      });
+
+      // Create audit log
+      await createAuditLog({
+        action: 'DELETE',
+        resource: 'user',
+        userId: req.user?.id || 'system',
+        tenantId: req.user?.tenantId,
+        details: { email: existingUser?.email },
+        ipAddress: req.ip,
+      });
+
+      res.json({
+        success: true,
+        message: 'User deleted successfully',
+      });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  }
+
+  // Bulk operations
+  async bulkOperation(req: Request, res: Response): Promise<void> {
+    try {
+      // Check permission
+      if (!req.user?.id) {
+        res.status(401).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+        return;
+      }
+      const hasPermission = await permissionService.hasPermission(
+        req?.user?.id,
+        'users',
+        'update'
+      );
+      if (!hasPermission) {
+        res.status(403).json({
+          success: false,
+          message: 'Insufficient permissions to perform bulk operations',
+        });
+        return;
+      }
+
+      // Validate input
+      const validatedData = bulkOperationSchema.parse(req.body);
+
+      // Build where clause with data scope
+      let whereClause: any = {};
+
+      // Superadmin can see all users, others can only see users in their tenant
+      if (!req.user?.isSuperadmin) {
+        whereClause.tenantId = req.user?.tenantId;
+      }
+
+      // Get users that user has access to
+      const accessibleUsers = await prisma?.user?.findMany({
+        where: whereClause,
+        select: { id: true, email: true, isSuperadmin: true },
+      });
+
+      if (accessibleUsers.length === 0) {
+        res.status(404).json({
+          success: false,
+          message: 'No accessible users found',
+        });
+        return;
+      }
+
+      const userIds = accessibleUsers.map(user => user?.id);
+
+      // Perform bulk operation
+      let updateData: any = {};
+      let operationMessage = '';
+
+      switch (validatedData.action) {
+        case 'activate':
+          updateData.isActive = true;
+          operationMessage = 'activated';
+          break;
+        case 'deactivate':
+          updateData.isActive = false;
+          operationMessage = 'deactivated';
+          break;
+        case 'delete':
+          // Prevent deletion of superadmin users
+          const superadminUsers = accessibleUsers.filter(
+            user => user?.isSuperadmin
+          );
+          if (superadminUsers.length > 0) {
+            res.status(400).json({
+              success: false,
+              message: 'Cannot delete superadmin users',
+              data: {
+                superadminEmails: superadminUsers.map(user => user?.email),
+              },
+            });
+            return;
+          }
+
+          await prisma?.user?.deleteMany({
+            where: { id: { in: userIds } },
+          });
+          operationMessage = 'deleted';
+          break;
+      }
+
+      if (validatedData.action !== 'delete') {
+        await prisma?.user?.updateMany({
+          where: { id: { in: userIds } },
+          data: updateData,
+        });
+      }
+
+      // Create audit log
+      await createAuditLog({
+        action: validatedData?.action?.toUpperCase(),
+        resource: 'user',
+        userId: req.user?.id || 'system',
+        tenantId: req.user?.tenantId,
+        details: {
+          action: validatedData.action,
+          userIds,
+          reason: validatedData.reason,
+        },
+        ipAddress: req.ip,
+      });
+
+      res.json({
+        success: true,
+        message: `${userIds.length} users ${operationMessage} successfully`,
+        data: {
+          processedCount: userIds.length,
+          action: validatedData.action,
+        },
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: error.errors,
+        });
+      }
+
+      console.error('Error performing bulk operation:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  }
+
+  // Get current user profile
+  async getCurrentUser(req: Request, res: Response): Promise<void> {
+    try {
+      const user = await prisma?.user?.findUnique({
+        where: { id: req.user?.id },
+        include: {
+          tenant: {
+            select: {
+              id: true,
+              name: true,
+              domain: true,
+            },
+          },
+          userRoles: {
+            include: {
+              role: {
+                select: {
+                  id: true,
+                  name: true,
+                  description: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!user) {
+        res.status(404).json({
+          success: false,
+          message: 'User not found',
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'User profile retrieved successfully',
+        data: {
+          user: {
+            id: user?.id,
+            email: user?.email,
+            name: user?.name,
+            isActive: user?.isActive,
+            isSuperadmin: user?.isSuperadmin,
+            tenantId: user?.tenantId,
+            tenant: user?.tenant,
+            roles: user?.userRoles.map(ur => ur.role),
+            createdAt: user?.createdAt,
+            updatedAt: user?.updatedAt,
+          },
+        },
+      });
+    } catch (error) {
+      console.error('Error retrieving current user:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  }
+
+  // Update current user profile
+  async updateCurrentUser(req: Request, res: Response): Promise<void> {
+    try {
+      // const { firstName, lastName, phone } = req.body;
+
+      // Validate input
+      const updateSchema = z.object({
+        firstName: z.string().min(1, 'First name is required').optional(),
+        lastName: z.string().min(1, 'Last name is required').optional(),
+        phone: z.string().optional(),
+      });
+
+      const validatedData = updateSchema.parse(req.body);
+
+      // Update user
+      const updateData: any = {};
+      if (validatedData.firstName || validatedData.lastName) {
+        const currentName = req.user?.email.split(' ');
+        updateData.name = `${validatedData.firstName || currentName?.[0] || 'User'} ${validatedData.lastName || currentName?.[1] || 'Name'}`;
+      }
+      if (validatedData.phone !== undefined)
+        updateData.phone = validatedData.phone;
+
+      const updatedUser = await prisma?.user?.update({
+        where: { id: req.user?.id },
+        data: updateData,
+        include: {
+          tenant: true,
+          userRoles: {
+            include: {
+              role: true,
+            },
+          },
+        },
+      });
+
+      // Create audit log
+      await createAuditLog({
+        action: 'UPDATE',
+        resource: 'user',
+        userId: req.user?.id || 'system',
+        tenantId: req.user?.tenantId,
+        details: { updatedFields: Object.keys(updateData) },
+        ipAddress: req.ip,
+      });
+
+      res.json({
+        success: true,
+        message: 'Profile updated successfully',
+        data: {
+          user: {
+            id: updatedUser.id,
+            email: updatedUser.email,
+            name: updatedUser.name,
+            isActive: updatedUser.isActive,
+            isSuperadmin: updatedUser.isSuperadmin,
+            tenantId: updatedUser.tenantId,
+            tenant: updatedUser.tenant,
+            roles: updatedUser?.userRoles?.map(ur => ur.role),
+            createdAt: updatedUser.createdAt,
+            updatedAt: updatedUser.updatedAt,
+          },
+        },
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: error.errors,
+        });
+      }
+
+      console.error('Error updating current user:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  }
+}
+
+export const userController = new UserController();

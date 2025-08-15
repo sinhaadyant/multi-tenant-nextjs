@@ -1,15 +1,12 @@
 import { Router } from 'express';
-import { authMiddleware } from '@/middleware/auth';
-import { requireTenant } from '@/middleware/tenantResolver';
-import { requireRead, requireDelete } from '@/middleware/permissionGuard';
-import { asyncHandler } from '@/middleware/errorHandler';
 import {
-  getUserTokens,
-  getUserTokenStats,
-  revokeToken,
+  getUserRefreshTokens,
+  getRefreshTokenById,
+  revokeRefreshToken,
   revokeAllUserTokens,
-  getTokenUsageStats,
 } from '@/controllers/tokenController';
+import { authMiddleware, requireTenant } from '@/middleware/auth';
+import { asyncHandler } from '@/middleware/errorHandler';
 
 const router = Router();
 
@@ -28,36 +25,28 @@ router.use(requireTenant);
  * @swagger
  * /api/tokens:
  *   get:
- *     summary: Get user tokens
+ *     summary: Get user refresh tokens
  *     tags: [Tokens]
  */
-router.get('/', requireRead('token-management'), asyncHandler(getUserTokens));
+router.get('/', asyncHandler(getUserRefreshTokens));
 
 /**
  * @swagger
- * /api/tokens/stats:
+ * /api/tokens/{id}:
  *   get:
- *     summary: Get user token statistics
+ *     summary: Get refresh token by ID
  *     tags: [Tokens]
  */
-router.get(
-  '/stats',
-  requireRead('token-management'),
-  asyncHandler(getUserTokenStats)
-);
+router.get('/:id', asyncHandler(getRefreshTokenById));
 
 /**
  * @swagger
- * /api/tokens/{tokenId}:
+ * /api/tokens/{id}:
  *   delete:
- *     summary: Revoke specific token
+ *     summary: Revoke refresh token
  *     tags: [Tokens]
  */
-router.delete(
-  '/:tokenId',
-  requireDelete('token-management'),
-  asyncHandler(revokeToken)
-);
+router.delete('/:id', asyncHandler(revokeRefreshToken));
 
 /**
  * @swagger
@@ -66,23 +55,6 @@ router.delete(
  *     summary: Revoke all user tokens
  *     tags: [Tokens]
  */
-router.post(
-  '/revoke-all',
-  requireDelete('token-management'),
-  asyncHandler(revokeAllUserTokens)
-);
-
-/**
- * @swagger
- * /api/tokens/usage-stats:
- *   get:
- *     summary: Get token usage statistics
- *     tags: [Tokens]
- */
-router.get(
-  '/usage-stats',
-  requireRead('token-management'),
-  asyncHandler(getTokenUsageStats)
-);
+router.post('/revoke-all', asyncHandler(revokeAllUserTokens));
 
 export default router;

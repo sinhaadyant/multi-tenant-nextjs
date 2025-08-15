@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { env } from '@/config/env';
 import { logger } from '@/config/logger';
+// import { connectRedis } from '@/config/redis';
 import { setupSwagger } from '@/middleware/swagger';
 import { requestIdMiddleware } from '@/middleware/requestId';
 import { errorHandler, notFoundHandler } from '@/middleware/errorHandler';

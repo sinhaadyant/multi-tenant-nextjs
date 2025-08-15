@@ -55,13 +55,31 @@ export class ValidationError extends AppError {
 
 export class AuthenticationError extends AppError {
   constructor(message: string = 'Authentication failed', details?: any) {
-    super(message, ErrorType.AUTHENTICATION, 401, 'AUTHENTICATION_ERROR', details);
+    super(
+      message,
+      ErrorType.AUTHENTICATION,
+      401,
+      'AUTHENTICATION_ERROR',
+      details
+    );
   }
 }
 
 export class AuthorizationError extends AppError {
   constructor(message: string = 'Access denied', details?: any) {
-    super(message, ErrorType.AUTHORIZATION, 403, 'AUTHORIZATION_ERROR', details);
+    super(
+      message,
+      ErrorType.AUTHORIZATION,
+      403,
+      'AUTHORIZATION_ERROR',
+      details
+    );
+  }
+}
+
+export class ForbiddenError extends AppError {
+  constructor(message: string = 'Forbidden', details?: any) {
+    super(message, ErrorType.AUTHORIZATION, 403, 'FORBIDDEN_ERROR', details);
   }
 }
 

@@ -1,123 +1,31 @@
 import { Router } from 'express';
-import { authMiddleware } from '@/middleware/auth';
-import { requireTenant } from '@/middleware/tenantResolver';
-import {
-  requireRead,
-  requireCreate,
-  requireUpdate,
-  requireDelete,
-} from '@/middleware/permissionGuard';
-import { asyncHandler } from '@/middleware/errorHandler';
-import {
-  getAllRoles,
-  getRoleById,
-  createRole,
-  updateRole,
-  deleteRole,
-  getRolePermissions,
-  updateRolePermissions,
-  getUserEffectivePermissions,
-} from '@/controllers/roleController';
+import { roleController } from '../controllers/roleController';
+import { authMiddleware } from '../middleware/auth';
+import { validateRequest } from '../middleware/validation';
 
 const router = Router();
 
-/**
- * @swagger
- * tags:
- *   name: Roles
- *   description: Role and permission management
- */
-
-// All role routes require authentication and tenant context
+// Apply authentication middleware to all routes
 router.use(authMiddleware);
-router.use(requireTenant);
 
-/**
- * @swagger
- * /api/roles:
- *   get:
- *     summary: Get all roles
- *     tags: [Roles]
- */
-router.get('/', requireRead('role-management'), asyncHandler(getAllRoles));
-
-/**
- * @swagger
- * /api/roles:
- *   post:
- *     summary: Create a new role
- *     tags: [Roles]
- */
-router.post('/', requireCreate('role-management'), asyncHandler(createRole));
-
-/**
- * @swagger
- * /api/roles/{id}:
- *   get:
- *     summary: Get role by ID
- *     tags: [Roles]
- */
-router.get('/:id', requireRead('role-management'), asyncHandler(getRoleById));
-
-/**
- * @swagger
- * /api/roles/{id}:
- *   put:
- *     summary: Update role
- *     tags: [Roles]
- */
-router.put('/:id', requireUpdate('role-management'), asyncHandler(updateRole));
-
-/**
- * @swagger
- * /api/roles/{id}:
- *   delete:
- *     summary: Delete role
- *     tags: [Roles]
- */
-router.delete(
-  '/:id',
-  requireDelete('role-management'),
-  asyncHandler(deleteRole)
+// Role management routes
+router.post(
+  '/',
+  validateRequest,
+  roleController.createRole.bind(roleController)
 );
-
-/**
- * @swagger
- * /api/roles/{id}/permissions:
- *   get:
- *     summary: Get role permissions
- *     tags: [Roles]
- */
-router.get(
-  '/:id/permissions',
-  requireRead('role-management'),
-  asyncHandler(getRolePermissions)
-);
-
-/**
- * @swagger
- * /api/roles/{id}/permissions:
- *   put:
- *     summary: Update role permissions
- *     tags: [Roles]
- */
+router.get('/', roleController.getRoles.bind(roleController));
+router.get('/:id', roleController.getRoleById.bind(roleController));
 router.put(
-  '/:id/permissions',
-  requireUpdate('role-management'),
-  asyncHandler(updateRolePermissions)
+  '/:id',
+  validateRequest,
+  roleController.updateRole.bind(roleController)
 );
-
-/**
- * @swagger
- * /api/roles/user/{userId}/permissions:
- *   get:
- *     summary: Get user effective permissions
- *     tags: [Roles]
- */
-router.get(
-  '/user/:userId/permissions',
-  requireRead('role-management'),
-  asyncHandler(getUserEffectivePermissions)
+router.delete('/:id', roleController.deleteRole.bind(roleController));
+router.post(
+  '/:id/clone',
+  validateRequest,
+  roleController.cloneRole.bind(roleController)
 );
 
 export default router;

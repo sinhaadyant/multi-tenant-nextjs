@@ -5,24 +5,33 @@ module.exports = {
     sourceType: 'module',
     project: './tsconfig.json',
   },
-  plugins: ['@typescript-eslint'],
-  extends: [
-    'eslint:recommended',
-    '@typescript-eslint/recommended',
-    '@typescript-eslint/recommended-requiring-type-checking',
-  ],
+  plugins: ['@typescript-eslint', 'prettier'],
+  extends: ['eslint:recommended', '@typescript-eslint/recommended', 'prettier'],
   rules: {
-    '@typescript-eslint/no-unused-vars': 'error',
-    '@typescript-eslint/no-explicit-any': 'warn',
+    // TypeScript specific rules
+    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/explicit-module-boundary-types': 'off',
+    '@typescript-eslint/no-explicit-any': 'warn',
     '@typescript-eslint/no-non-null-assertion': 'warn',
+    '@typescript-eslint/prefer-const': 'error',
+    '@typescript-eslint/no-var-requires': 'error',
+    '@typescript-eslint/consistent-type-imports': 'error',
+
+    // General rules
+    'no-console': 'warn',
+    'no-debugger': 'error',
+    'no-duplicate-imports': 'error',
+    'no-unused-expressions': 'error',
     'prefer-const': 'error',
     'no-var': 'error',
+
+    // Prettier integration
+    'prettier/prettier': 'error',
   },
   env: {
     node: true,
-    es6: true,
+    es2020: true,
   },
-  ignorePatterns: ['dist/', 'node_modules/', '*.js'],
+  ignorePatterns: ['dist/', 'node_modules/', '*.js', '*.d.ts'],
 };

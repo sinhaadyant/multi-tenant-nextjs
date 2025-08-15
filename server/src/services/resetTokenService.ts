@@ -230,6 +230,4 @@ export class ResetTokenService {
   private generateSecureToken(): string {
     return crypto.randomBytes(32).toString('hex');
   }
-
-
 }

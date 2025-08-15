@@ -77,7 +77,7 @@ router.get(
       {
         message: 'This is authenticated data',
         user: {
-          id: req.user?.userId,
+          id: req.user?.id,
           email: req.user?.email,
           isSuperadmin: req.user?.isSuperadmin,
         },
@@ -124,7 +124,7 @@ router.get(
           domain: req.tenant?.domain,
         },
         user: {
-          id: req.user?.userId,
+          id: req.user?.id,
           email: req.user?.email,
         },
         requestId: req.requestId,
@@ -206,7 +206,7 @@ router.get(
       {
         message: 'This is superadmin-only data',
         user: {
-          id: req.user?.userId,
+          id: req.user?.id,
           email: req.user?.email,
           isSuperadmin: req.user?.isSuperadmin,
         },
@@ -254,7 +254,7 @@ router.get(
           name: req.tenant?.name,
         },
         user: {
-          id: req.user?.userId,
+          id: req.user?.id,
           email: req.user?.email,
         },
         requestId: req.requestId,

@@ -1,17 +1,22 @@
-// Export all services
 export { UserService } from './userService';
-export { TenantService } from './tenantService';
-export { ModuleService } from './moduleService';
 export { RoleService } from './roleService';
-export { PermissionService } from './permissionService';
-export { AuthService } from './authService';
+export { ModuleService } from './moduleService';
+export { PermissionService } from './PermissionService';
 export { LoginDeviceService } from './loginDeviceService';
-export { TokenService } from './tokenService';
-export { ResetTokenService } from './resetTokenService';
+export { TenantService } from './tenantService';
+export { DataScopeService } from './DataScopeService';
 
 // Export types and interfaces
-export type { MenuItem } from './moduleService';
 export type {
-  EffectivePermissions,
-  PermissionMatrixItem,
-} from './permissionService';
+  Permission,
+  UserPermissions,
+  DataScope,
+  RolePermission,
+  PermissionAction,
+} from './PermissionService';
+
+export type {
+  ScopeWhereClause,
+  DataScopeFilter,
+  TableConfig,
+} from './DataScopeService';

@@ -9,7 +9,16 @@ import supportRoutes from './supportRoutes';
 import auditRoutes from './auditRoutes';
 import tokenRoutes from './tokenRoutes';
 import exampleRoutes from './exampleRoutes';
+import searchRoutes from './searchRoutes';
+import analyticsRoutes from './analyticsRoutes';
+import notificationRoutes from './notificationRoutes';
+import fileRoutes from './fileRoutes';
+import sessionRoutes from './sessionRoutes';
+import securityRoutes from './securityRoutes';
+import backupRoutes from './backupRoutes';
 import { healthCheck, getSystemInfo } from '@/controllers/systemController';
+import healthRoutes from './healthRoutes';
+import documentationRoutes from './documentationRoutes';
 
 const router = Router();
 
@@ -95,5 +104,14 @@ router.use('/support', supportRoutes);
 router.use('/audit', auditRoutes);
 router.use('/tokens', tokenRoutes);
 router.use('/example', exampleRoutes);
+router.use('/search', searchRoutes);
+router.use('/analytics', analyticsRoutes);
+router.use('/notifications', notificationRoutes);
+router.use('/files', fileRoutes);
+router.use('/sessions', sessionRoutes);
+router.use('/security', securityRoutes);
+router.use('/backup', backupRoutes);
+router.use('/health', healthRoutes);
+router.use('/docs', documentationRoutes);
 
 export default router;

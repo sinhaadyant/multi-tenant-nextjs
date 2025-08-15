@@ -17,7 +17,11 @@ const envSchema = z.object({
   JWT_REFRESH_TOKEN_EXPIRY: z.string().default('7d'),
 
   // Server
-  PORT: z.string().transform(Number).pipe(z.number().positive()).default(3001),
+  PORT: z
+    .string()
+    .transform(Number)
+    .pipe(z.number().positive())
+    .default('3001'),
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
     .default('development'),
@@ -27,15 +31,18 @@ const envSchema = z.object({
     .string()
     .transform(Number)
     .pipe(z.number().positive())
-    .default(12),
+    .default('12'),
 
   // File Upload
   MAX_FILE_SIZE: z
     .string()
     .transform(Number)
     .pipe(z.number().positive())
-    .default(10485760),
+    .default('10485760'),
   UPLOAD_PATH: z.string().default('./uploads'),
+  ALLOWED_FILE_TYPES: z
+    .string()
+    .default('jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx,txt,csv'),
 
   // Logging
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
@@ -45,12 +52,18 @@ const envSchema = z.object({
     .string()
     .transform(Number)
     .pipe(z.number().positive())
-    .default(900000),
+    .default('900000'),
   RATE_LIMIT_MAX_REQUESTS: z
     .string()
     .transform(Number)
     .pipe(z.number().positive())
-    .default(100),
+    .default('100'),
+
+  // Redis Configuration
+  REDIS_URL: z.string().url().default('redis://localhost:6379'),
+
+  // CORS Configuration
+  CORS_ORIGIN: z.string().default('http://localhost:3000'),
 });
 
 // Parse and validate environment variables

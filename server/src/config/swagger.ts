@@ -297,10 +297,19 @@ const options: swaggerJsdoc.Options = {
           properties: {
             success: { type: 'boolean', example: false },
             message: { type: 'string', example: 'An error occurred' },
-            errorType: { 
-              type: 'string', 
-              enum: ['VALIDATION', 'AUTHENTICATION', 'AUTHORIZATION', 'NOT_FOUND', 'CONFLICT', 'INTERNAL', 'BAD_REQUEST', 'RATE_LIMIT'],
-              example: 'VALIDATION'
+            errorType: {
+              type: 'string',
+              enum: [
+                'VALIDATION',
+                'AUTHENTICATION',
+                'AUTHORIZATION',
+                'NOT_FOUND',
+                'CONFLICT',
+                'INTERNAL',
+                'BAD_REQUEST',
+                'RATE_LIMIT',
+              ],
+              example: 'VALIDATION',
             },
             errorCode: { type: 'string', example: 'VALIDATION_ERROR' },
             details: { type: 'object' },

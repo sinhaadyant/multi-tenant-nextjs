@@ -13,6 +13,7 @@ import {
   updateSubmoduleSchema,
   updateOrderSchema,
 } from '@/validation/moduleValidation';
+import { logger } from '@/config/logger';
 
 const moduleService = new ModuleService();
 
@@ -58,12 +59,10 @@ export const getAllModules = async (
       orderBy: 'orderIndex',
       orderDirection: 'asc',
     });
-
     successResponse(res, modules, 'Modules retrieved successfully');
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Failed to retrieve modules';
-    errorResponse(res, message, 500);
+    logger.error('Error in getAllModules:', error);
+    errorResponse(res, 'Failed to retrieve modules', 500);
   }
 };
 
@@ -113,20 +112,20 @@ export const getModuleById = async (
   try {
     const { id } = req.params;
     if (!id) {
-      badRequestResponse(res, 'Module ID is required');
+      errorResponse(res, 'Module ID is required', 400);
+      return;
+    }
+    const module = await moduleService.getModuleById(id);
+
+    if (!module) {
+      notFoundResponse(res, 'Module not found');
       return;
     }
 
-    const module = await moduleService.getModuleById(id);
     successResponse(res, module, 'Module retrieved successfully');
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Failed to retrieve module';
-    if (message.includes('not found')) {
-      notFoundResponse(res, 'Module not found');
-    } else {
-      errorResponse(res, message, 500);
-    }
+    logger.error('Error in getModuleById:', error);
+    errorResponse(res, 'Failed to retrieve module', 500);
   }
 };
 
@@ -205,19 +204,14 @@ export const createModule = async (
       return;
     }
 
-    const moduleData = {
-      ...validationResult.data,
-    };
-
     const module = await moduleService.createModule(
-      moduleData,
-      req.user?.userId
+      validationResult.data,
+      req.user?.id || ''
     );
     successResponse(res, module, 'Module created successfully', 201);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Failed to create module';
-    errorResponse(res, message, 500);
+    logger.error('Error in createModule:', error);
+    errorResponse(res, 'Failed to create module', 500);
   }
 };
 
@@ -291,12 +285,8 @@ export const updateModule = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    if (!id) {
-      badRequestResponse(res, 'Module ID is required');
-      return;
-    }
-
     const validationResult = updateModuleSchema.safeParse(req.body);
+
     if (!validationResult.success) {
       badRequestResponse(
         res,
@@ -307,19 +297,14 @@ export const updateModule = async (
     }
 
     const module = await moduleService.updateModule(
-      id,
+      id!,
       validationResult.data,
-      req.user?.userId
+      req.user?.id || ''
     );
     successResponse(res, module, 'Module updated successfully');
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Failed to update module';
-    if (message.includes('not found')) {
-      notFoundResponse(res, 'Module not found');
-    } else {
-      errorResponse(res, message, 500);
-    }
+    logger.error('Error in updateModule:', error);
+    errorResponse(res, 'Failed to update module', 500);
   }
 };
 
@@ -367,20 +352,14 @@ export const deleteModule = async (
   try {
     const { id } = req.params;
     if (!id) {
-      badRequestResponse(res, 'Module ID is required');
+      errorResponse(res, 'Module ID is required', 400);
       return;
     }
-
-    await moduleService.deleteModule(id, req.user?.userId);
+    await moduleService.deleteModule(id, req.user?.id || '');
     successResponse(res, null, 'Module deleted successfully');
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Failed to delete module';
-    if (message.includes('not found')) {
-      notFoundResponse(res, 'Module not found');
-    } else {
-      errorResponse(res, message, 500);
-    }
+    logger.error('Error in deleteModule:', error);
+    errorResponse(res, 'Failed to delete module', 500);
   }
 };
 
@@ -439,10 +418,7 @@ export const reorderModules = async (
       return;
     }
 
-    await moduleService.updateModuleOrder(
-      validationResult.data,
-      req.user?.userId
-    );
+    await moduleService.updateModuleOrder(validationResult.data, req.user?.id);
     successResponse(res, null, 'Modules reordered successfully');
   } catch (error) {
     const message =
@@ -599,7 +575,7 @@ export const createSubmodule = async (
 
     const submodule = await moduleService.createSubmodule(
       submoduleData,
-      req.user?.userId
+      req.user?.id || ''
     );
     successResponse(res, submodule, 'Submodule created successfully', 201);
   } catch (error) {
@@ -703,7 +679,7 @@ export const updateSubmodule = async (
     const submodule = await moduleService.updateSubmodule(
       submoduleId,
       validationResult.data,
-      req.user?.userId
+      req.user?.id || ''
     );
     successResponse(res, submodule, 'Submodule updated successfully');
   } catch (error) {
@@ -771,7 +747,7 @@ export const deleteSubmodule = async (
       return;
     }
 
-    await moduleService.deleteSubmodule(submoduleId, req.user?.userId);
+    await moduleService.deleteSubmodule(submoduleId, req.user?.id || '');
     successResponse(res, null, 'Submodule deleted successfully');
   } catch (error) {
     const message =
@@ -843,12 +819,10 @@ export const getUserMenu = async (
   res: Response
 ): Promise<void> => {
   try {
-    const menuTree = await moduleService.getMenuForUser(req.user?.userId!);
-
-    successResponse(res, menuTree, 'Menu tree retrieved successfully');
+    const menuTree = await moduleService.getMenuForUser(req.user?.id || '');
+    successResponse(res, menuTree, 'User menu retrieved successfully');
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Failed to retrieve menu tree';
-    errorResponse(res, message, 500);
+    logger.error('Error in getUserMenu:', error);
+    errorResponse(res, 'Failed to retrieve user menu', 500);
   }
 };

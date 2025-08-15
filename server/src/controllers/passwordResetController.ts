@@ -90,14 +90,12 @@ export const requestPasswordReset = async (
       ipAddress
     );
 
-    successResponse(
-      res,
-      null,
-      'Password reset email sent successfully'
-    );
+    successResponse(res, null, 'Password reset email sent successfully');
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : 'Failed to request password reset';
+      error instanceof Error
+        ? error.message
+        : 'Failed to request password reset';
     errorResponse(res, message, 500);
   }
 };
@@ -174,21 +172,17 @@ export const confirmPasswordReset = async (
     const ipAddress = req.ip || '127.0.0.1';
 
     // Reset password
-    await resetTokenService.resetPassword(
-      { token, newPassword },
-      ipAddress
-    );
+    await resetTokenService.resetPassword({ token, newPassword }, ipAddress);
 
-    successResponse(
-      res,
-      null,
-      'Password reset successfully'
-    );
+    successResponse(res, null, 'Password reset successfully');
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Failed to reset password';
-    
-    if (message.includes('Invalid reset token') || message.includes('not found')) {
+
+    if (
+      message.includes('Invalid reset token') ||
+      message.includes('not found')
+    ) {
       errorResponse(res, 'Invalid or expired reset token', 404);
     } else if (message.includes('already used')) {
       errorResponse(res, 'Reset token has already been used', 400);
@@ -262,11 +256,7 @@ export const validateResetToken = async (
     // Validate token
     const isValid = await resetTokenService.validateResetToken(token);
 
-    successResponse(
-      res,
-      { isValid },
-      'Token validation completed'
-    );
+    successResponse(res, { isValid }, 'Token validation completed');
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Failed to validate token';

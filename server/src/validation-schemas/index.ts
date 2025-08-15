@@ -5,6 +5,7 @@ export * from './tenantSchemas';
 export * from './roleSchemas';
 export * from './moduleSchemas';
 export * from './supportSchemas';
+export * from './fileSchemas';
 
 // Re-export commonly used schemas for convenience
 export {
