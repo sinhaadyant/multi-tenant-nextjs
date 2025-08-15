@@ -1,0 +1,715 @@
+# Backend Implementation Guide - Multi-Tenant Admin Panel API (Updated)
+
+## Prerequisites
+- Node.js 18+ installed
+- MySQL database
+- Understanding of Express.js, TypeScript, Prisma, and JWT authentication
+- Redis for session management and caching
+
+---
+
+## API Behavior Patterns and Data Scope Rules
+
+### **Permission-Based Data Scope:**
+```typescript
+// API Behavior Examples:
+
+// GET /api/users
+// Superadmin: Returns all users across all tenants
+// canViewAll: Returns users within same tenant  
+// canRead: Returns only the user's own profile
+
+// POST /api/users
+// Requires canCreate permission
+// Tenant scope: Can only create users in same tenant
+// Field validation based on permissions
+
+// PUT /api/users/:id
+// canUpdate + canViewAll: Can update any user in tenant
+// canUpdate only: Can update only own profile
+// Superadmin: Can update any user across tenants
+
+// DELETE /api/users/:id
+// canDelete + canViewAll: Can delete any user in tenant
+// canDelete only: Cannot delete (no access to others)
+// Superadmin: Can delete any user across tenants
+```
+
+### **Data Scope Middleware Implementation:**
+```typescript
+interface DataScopeContext {
+  userTenantId: string;
+  isSuperadmin: boolean;
+  canViewAll: boolean;
+  canCreate: boolean;
+  canRead: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
+  userId: string;
+}
+
+// Applied to all API endpoints for consistent behavior
+```
+
+---
+
+## Step 1: Initialize Node.js Project with TypeScript
+**Goal:** Create a new Node.js project with TypeScript configuration and essential development tools.
+
+**Implementation Details:**
+- Initialize npm project with TypeScript setup
+- Configure TypeScript with strict mode and modern settings
+- Set up ESLint and Prettier for code quality
+- Configure nodemon for development hot reload
+- Create basic folder structure
+
+**Acceptance Criteria:**
+- `npm run dev` starts the development server with hot reload
+- TypeScript compilation works without errors
+- ESLint and Prettier are properly configured
+
+**Cursor Prompt:**
+```
+Create a new Node.js backend project named "multi-tenant-admin-api" with:
+- TypeScript configuration with strict mode enabled
+- ESLint and Prettier setup with recommended rules
+- Nodemon for development with TypeScript support
+- Basic folder structure: src/, prisma/, uploads/, tests/, docs/
+- Package.json scripts for dev, build, start, lint, and test
+- .gitignore file with Node.js and environment variables
+- Environment variables setup with .env.example
+```
+
+---
+
+## Step 2: Install and Configure Core Dependencies
+**Goal:** Install all necessary packages for Express server, database, authentication, and utilities.
+
+**Implementation Details:**
+- Express.js with TypeScript support
+- Prisma ORM for database management
+- JWT for authentication
+- Bcrypt for password hashing
+- Express middleware for CORS, helmet, rate limiting
+- File upload handling with Multer
+
+**Dependencies to Install:**
+```json
+{
+  "express": "^4.18.2",
+  "@types/express": "^4.17.21",
+  "prisma": "^5.7.1",
+  "@prisma/client": "^5.7.1",
+  "jsonwebtoken": "^9.0.2",
+  "@types/jsonwebtoken": "^9.0.5",
+  "bcryptjs": "^2.4.3",
+  "@types/bcryptjs": "^2.4.6",
+  "cors": "^2.8.5",
+  "@types/cors": "^2.8.17",
+  "helmet": "^7.1.0",
+  "express-rate-limit": "^7.1.5",
+  "multer": "^1.4.5-lts.1",
+  "@types/multer": "^1.4.11",
+  "redis": "^4.6.11",
+  "dotenv": "^0.16.3",
+  "zod": "^3.22.4",
+  "winston": "^3.11.0"
+}
+```
+
+**Cursor Prompt:**
+```
+Install and configure these packages for the multi-tenant admin API:
+1. Express.js with TypeScript support and essential middleware
+2. Prisma ORM with MySQL client
+3. Authentication packages: jsonwebtoken, bcryptjs
+4. Security middleware: cors, helmet, express-rate-limit
+5. File handling: multer for file uploads
+6. Validation: zod for request/response validation
+7. Logging: winston for structured logging
+8. Cache/Session: redis client
+9. Environment: dotenv for environment variables
+Create basic server.ts file with Express setup and middleware configuration.
+```
+
+---
+
+## Step 3: Set Up Database Schema with Prisma
+**Goal:** Design and implement the complete database schema for the multi-tenant admin system.
+
+**Implementation Details:**
+- Design tables: Users, Tenants, Roles, Modules, Permissions, etc.
+- Set up relationships and foreign keys
+- Configure indexes for performance
+- Add audit fields (created_at, updated_at, created_by, etc.)
+- Implement soft delete pattern
+
+**Database Tables:**
+- **tenants** - Tenant management
+- **users** - User accounts with tenant association
+- **roles** - Role definitions
+- **user_roles** - Many-to-many user-role relationship
+- **modules** - Application modules/features
+- **submodules** - Sub-features within modules
+- **permissions** - Granular permissions (CRUD + ViewAll)
+- **support_tickets** - Support ticket system
+- **ticket_replies** - Ticket conversation threads
+- **audit_logs** - System activity tracking
+- **user_sessions** - Session management
+- **file_uploads** - File metadata tracking
+
+**Cursor Prompt:**
+```
+Create comprehensive Prisma schema for multi-tenant admin system:
+1. Tenants table with domain, settings, status, subscription info
+2. Users table with tenant association, profile info, and security fields
+3. Roles table supporting both global and tenant-specific roles
+4. User_roles junction table for many-to-many relationship
+5. Modules and Submodules tables for hierarchical feature structure
+6. Permissions table with granular CRUD + ViewAll permissions
+7. Support_tickets and Ticket_replies for support system
+8. Audit_logs table for comprehensive activity tracking
+9. User_sessions table for session management and device tracking
+10. File_uploads table for file metadata and security
+11. Add proper indexes, constraints, and relationships
+12. Include audit fields (created_at, updated_at, created_by, etc.)
+13. Implement soft delete with deleted_at fields where needed
+Configure MySQL connection and generate initial migration.
+```
+
+---
+
+## Step 4: Configure Environment and Database Connection
+**Goal:** Set up environment configuration and establish secure database connectivity.
+
+**Implementation Details:**
+- Environment variables for all configurations
+- Database connection with connection pooling
+- Redis connection for caching and sessions
+- JWT secret and token configuration
+- File upload path and size limits
+- CORS and security settings
+
+**Environment Variables:**
+```env
+NODE_ENV=development
+PORT=3001
+DATABASE_URL=mysql://username:password@localhost:3306/multi_tenant_admin
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=your-super-secret-jwt-key
+JWT_EXPIRES_IN=24h
+JWT_REFRESH_EXPIRES_IN=7d
+UPLOAD_PATH=./uploads
+MAX_FILE_SIZE=10485760
+CORS_ORIGIN=http://localhost:3000
+RATE_LIMIT_MAX=100
+RATE_LIMIT_WINDOW=15
+```
+
+**Cursor Prompt:**
+```
+Set up environment configuration and database connectivity:
+1. Environment variables configuration with validation using zod
+2. Prisma database connection with connection pooling
+3. Redis client setup for caching and session management
+4. JWT configuration with access and refresh token settings
+5. File upload configuration with size limits and allowed types
+6. CORS configuration with environment-based origins
+7. Rate limiting configuration with different limits per endpoint
+8. Logging configuration with different levels for dev/prod
+9. Database connection health check endpoint
+10. Environment validation middleware that checks required variables
+Create config/index.ts file that exports all configuration objects.
+```
+
+---
+
+## Step 5: Implement Authentication Middleware and JWT Utils
+**Goal:** Create comprehensive authentication system with JWT token management.
+
+**Implementation Details:**
+- JWT token generation and validation
+- Password hashing and verification
+- Authentication middleware for protected routes
+- Token refresh mechanism
+- User context extraction from tokens
+- Permission-based access control
+
+**Authentication Features:**
+- JWT access and refresh tokens
+- Password hashing with bcrypt
+- Token validation middleware
+- User context in request object
+- Permission checking utilities
+- Rate limiting for auth endpoints
+
+**Cursor Prompt:**
+```
+Create comprehensive authentication system:
+1. JWT utility functions for token generation, validation, and refresh
+2. Password hashing utilities with bcrypt (salt rounds configuration)
+3. Authentication middleware that validates JWT and extracts user context
+4. Permission middleware that checks user permissions for specific actions
+5. Rate limiting middleware specifically for auth endpoints
+6. User context type definitions and request object extension
+7. Token blacklisting system using Redis for logout functionality
+8. Device fingerprinting and session management utilities
+9. Multi-tenant context extraction from tokens or headers
+10. Authentication helper functions for permission checking
+Create middleware/, auth/, and utils/ directories with proper organization.
+```
+
+---
+
+## Step 6: Create Request/Response Validation with Zod
+**Goal:** Implement comprehensive request validation and response formatting using Zod schemas.
+
+**Implementation Details:**
+- Zod schemas for all API endpoints
+- Request validation middleware
+- Standardized response format
+- Error handling with proper validation messages
+- Type-safe request/response handling
+
+**Validation Features:**
+- Request body, query, and params validation
+- Standardized API response format
+- Validation error formatting
+- Type inference from Zod schemas
+- Reusable validation schemas
+
+**Response Format:**
+```typescript
+{
+  success: boolean;
+  message: string;
+  data?: any;
+  errors?: any;
+  meta?: {
+    page?: number;
+    limit?: number;
+    total?: number;
+    totalPages?: number;
+  };
+}
+```
+
+**Cursor Prompt:**
+```
+Create comprehensive validation and response formatting system:
+1. Zod schemas for all entities (User, Tenant, Role, Permission, etc.)
+2. Request validation schemas for create/update operations
+3. Query parameter schemas for filtering, pagination, and search
+4. Validation middleware that validates req.body, req.query, and req.params
+5. Standardized response formatter with success/error handling
+6. Error handling middleware that formats validation errors properly
+7. Type inference utilities to get TypeScript types from Zod schemas
+8. Reusable schema components (pagination, search, common fields)
+9. Response schemas for API documentation and type safety
+10. Custom validation rules for business logic (unique constraints, etc.)
+Create schemas/, validators/, and formatters/ directories with proper organization.
+```
+
+---
+
+## Step 7: Implement User Management API Endpoints
+**Goal:** Create comprehensive user management endpoints with CRUD operations and advanced features.
+
+**Implementation Details:**
+- User CRUD operations with proper validation
+- User search and filtering with pagination
+- Password reset functionality
+- User activation/deactivation
+- Bulk operations support
+- Profile management
+
+**API Behavior Examples:**
+```typescript
+// GET /api/users
+// Superadmin: Returns all users across all tenants
+// canViewAll: Returns users within same tenant
+// canRead: Returns only the user's own profile
+
+// POST /api/users
+// Requires canCreate permission
+// Tenant scope: Can only create users in same tenant
+// Field validation based on permissions
+
+// PUT /api/users/:id
+// canUpdate + canViewAll: Can update any user in tenant
+// canUpdate only: Can update only own profile
+// Superadmin: Can update any user across tenants
+
+// DELETE /api/users/:id
+// canDelete + canViewAll: Can delete any user in tenant
+// canDelete only: Cannot delete (no access to others)
+// Superadmin: Can delete any user across tenants
+```
+
+**User Endpoints:**
+- `GET /api/users` - List users with filtering and pagination
+- `POST /api/users` - Create new user
+- `GET /api/users/:id` - Get user details
+- `PUT /api/users/:id` - Update user
+- `DELETE /api/users/:id` - Delete user (soft delete)
+- `POST /api/users/bulk` - Bulk operations
+- `PUT /api/users/:id/password` - Change password
+- `POST /api/users/:id/reset-password` - Reset password
+
+**Cursor Prompt:**
+```
+Create comprehensive user management API endpoints with data scope behaviors:
+1. GET /api/users with permission-based data scope (superadmin/canViewAll/canRead behaviors)
+2. POST /api/users with tenant-scoped creation and canCreate permission checks
+3. GET /api/users/:id with access control based on canViewAll or own profile
+4. PUT /api/users/:id with permission-based update scope (own vs tenant vs all)
+5. DELETE /api/users/:id with canDelete + canViewAll permission requirements
+6. POST /api/users/bulk for bulk operations with proper permission validation
+7. PUT /api/users/:id/password with current password validation for own changes
+8. POST /api/users/:id/reset-password for admin password resets with permissions
+9. GET /api/users/:id/sessions for user session management with scope checking
+10. GET /api/users/:id/audit for user activity logs with permission filtering
+Include data scope middleware, permission validation, and tenant isolation for all endpoints.
+```
+
+---
+
+## Step 8: Build Authentication Endpoints (Login/Logout/Refresh)
+**Goal:** Implement secure authentication endpoints with session management and security features.
+
+**Implementation Details:**
+- Login with email/password and optional tenant slug
+- Logout with session cleanup
+- Token refresh mechanism
+- Multi-device session management
+- Login attempt tracking and rate limiting
+- Security logging for auth events
+
+**API Behavior Examples:**
+```typescript
+// POST /api/auth/login
+// Validates credentials against user's tenant
+// Returns user profile with tenant context and permissions
+// Creates session record with device fingerprint
+
+// POST /api/auth/refresh
+// Validates refresh token and user status
+// Returns new access token with updated permissions
+// Updates session last_activity timestamp
+
+// GET /api/auth/me
+// Returns current user with calculated permissions
+// Includes tenant information and effective role permissions
+// Filters returned data based on user's own access level
+```
+
+**Auth Endpoints:**
+- `POST /api/auth/login` - User authentication
+- `POST /api/auth/logout` - User logout
+- `POST /api/auth/refresh` - Token refresh
+- `GET /api/auth/me` - Current user info
+- `POST /api/auth/forgot-password` - Password reset request
+- `POST /api/auth/reset-password` - Password reset confirmation
+- `GET /api/auth/sessions` - User active sessions
+- `DELETE /api/auth/sessions/:id` - Revoke specific session
+
+**Cursor Prompt:**
+```
+Create comprehensive authentication API endpoints with security behaviors:
+1. POST /api/auth/login with tenant-aware authentication and device tracking
+2. POST /api/auth/logout with comprehensive session cleanup and token blacklisting
+3. POST /api/auth/refresh with security validation and permission updates
+4. GET /api/auth/me with user context, permissions, and tenant information
+5. POST /api/auth/forgot-password with rate limiting and email integration hooks
+6. POST /api/auth/reset-password with secure token validation and expiry
+7. GET /api/auth/sessions with device information and security context
+8. DELETE /api/auth/sessions/:id for individual session revocation
+9. POST /api/auth/change-password with current password validation
+10. Login attempt tracking with progressive lockout and security logging
+Include comprehensive audit logging, device fingerprinting, and security monitoring.
+```
+
+---
+
+## Step 9: Implement Role Management API
+**Goal:** Create role management endpoints with permission assignment and hierarchy support.
+
+**Implementation Details:**
+- Role CRUD operations
+- Permission assignment to roles
+- Role hierarchy management
+- Global vs tenant-specific roles
+- Role cloning functionality
+- User role assignment
+
+**API Behavior Examples:**
+```typescript
+// GET /api/roles
+// Superadmin: Returns all roles (global + all tenant roles)
+// canViewAll: Returns global roles + own tenant roles
+// canRead: Returns only roles assigned to current user
+
+// POST /api/roles
+// Requires canCreate permission
+// Tenant scope: Can only create tenant-specific roles
+// Superadmin: Can create global or tenant-specific roles
+
+// PUT /api/roles/:id/permissions
+// canUpdate permission required
+// Tenant scope: Can only modify tenant-specific roles
+// Permission validation: Cannot grant permissions user doesn't have
+```
+
+**Role Endpoints:**
+- `GET /api/roles` - List roles with filtering
+- `POST /api/roles` - Create new role
+- `GET /api/roles/:id` - Get role details with permissions
+- `PUT /api/roles/:id` - Update role
+- `DELETE /api/roles/:id` - Delete role
+- `POST /api/roles/:id/permissions` - Assign permissions
+- `POST /api/roles/clone` - Clone existing role
+- `GET /api/roles/:id/users` - Get users with specific role
+
+**Cursor Prompt:**
+```
+Create comprehensive role management API endpoints with permission-based behaviors:
+1. GET /api/roles with data scope filtering (superadmin/canViewAll/canRead behaviors)
+2. POST /api/roles with tenant-scoped creation and permission inheritance validation
+3. GET /api/roles/:id with detailed permissions and user assignment information
+4. PUT /api/roles/:id with permission validation and tenant scope restrictions
+5. DELETE /api/roles/:id with user dependency checking and cascading updates
+6. POST /api/roles/:id/permissions with granular permission assignment validation
+7. POST /api/roles/clone for role duplication with permission copying
+8. GET /api/roles/:id/users with user listing and assignment management
+9. PUT /api/roles/:id/users for bulk user role assignment with validation
+10. GET /api/roles/hierarchy for role relationship visualization and inheritance
+Include permission validation, tenant isolation, and audit logging for all operations.
+```
+
+---
+
+## Missing APIs Identified
+
+### **Step 10: Create Permission System API** ⚠️ **MISSING**
+**Goal:** Build granular permission management with module-based access control.
+
+**API Behavior Examples:**
+```typescript
+// GET /api/permissions/matrix
+// Superadmin: Full permission matrix across all tenants
+// canViewAll: Tenant-specific permission matrix
+// canRead: Only own permission summary
+
+// POST /api/permissions/check
+// Validates specific permission for current user
+// Considers data scope (own vs tenant vs global)
+// Returns permission result with scope information
+```
+
+**Permission Endpoints:**
+- `GET /api/modules` - List all modules and submodules
+- `POST /api/modules` - Create new module
+- `GET /api/permissions/matrix` - Permission matrix view
+- `PUT /api/permissions/matrix` - Update permission matrix
+- `GET /api/users/:id/permissions` - User effective permissions
+- `POST /api/permissions/check` - Check specific permission
+
+---
+
+### **Step 11: Build Tenant Management API (Multi-Tenancy)** ⚠️ **MISSING**
+**Goal:** Create comprehensive tenant management with isolation and configuration options.
+
+**API Behavior Examples:**
+```typescript
+// GET /api/tenants
+// Superadmin: Returns all tenants with full details
+// Regular users: Access denied (403)
+
+// POST /api/tenants
+// Superadmin only: Can create new tenants
+// Validates domain uniqueness and configuration
+
+// GET /api/tenants/:id/users
+// Superadmin: Can view any tenant's users
+// Tenant admin with canViewAll: Can view own tenant users only
+```
+
+**Tenant Endpoints:**
+- `GET /api/tenants` - List tenants (superadmin only)
+- `POST /api/tenants` - Create new tenant
+- `GET /api/tenants/:id` - Get tenant details
+- `PUT /api/tenants/:id` - Update tenant
+- `DELETE /api/tenants/:id` - Delete tenant
+- `GET /api/tenants/:id/users` - Tenant users
+- `GET /api/tenants/:id/analytics` - Usage analytics
+- `PUT /api/tenants/:id/settings` - Tenant settings
+
+---
+
+### **Step 12: Implement Support Ticket System API** ⚠️ **MISSING**
+**Goal:** Create a comprehensive support ticket system with threaded conversations and file attachments.
+
+**API Behavior Examples:**
+```typescript
+// GET /api/support/tickets
+// Superadmin: All tickets across all tenants
+// canViewAll: All tickets within tenant
+// canRead: Only own created tickets
+
+// POST /api/support/tickets/:id/replies
+// canCreate permission required
+// Tenant scope: Can only reply to accessible tickets
+// Auto-assigns tenant context from authenticated user
+```
+
+**Support Endpoints:**
+- `GET /api/support/tickets` - List tickets with filtering
+- `POST /api/support/tickets` - Create new ticket
+- `GET /api/support/tickets/:id` - Get ticket details
+- `PUT /api/support/tickets/:id` - Update ticket
+- `POST /api/support/tickets/:id/replies` - Add reply
+- `POST /api/support/tickets/:id/files` - Upload attachments
+- `GET /api/support/tickets/:id/files/:fileId` - Download file
+- `PUT /api/support/tickets/:id/status` - Update status
+
+---
+
+### **Step 13: Create Audit Logging System** ⚠️ **MISSING**
+**Goal:** Implement comprehensive audit logging for all system activities with advanced querying capabilities.
+
+**API Behavior Examples:**
+```typescript
+// GET /api/audit/logs
+// Superadmin: All audit logs across all tenants
+// canViewAll: Audit logs within tenant scope
+// canRead: Only own activity logs
+
+// GET /api/audit/export
+// Permission-based data export
+// Tenant scope filtering applied automatically
+// Includes only accessible audit entries
+```
+
+**Audit Endpoints:**
+- `GET /api/audit/logs` - List audit logs with filtering
+- `GET /api/audit/logs/:id` - Get detailed log entry
+- `GET /api/audit/export` - Export audit data
+- `GET /api/audit/stats` - Audit statistics
+- `POST /api/audit/search` - Advanced search
+- `GET /api/audit/users/:id` - User activity history
+
+---
+
+### **Additional Missing APIs:**
+
+#### **Menu and Navigation API**
+```typescript
+// GET /api/menu
+// Returns user-specific navigation menu
+// Filtered by user permissions and tenant access
+// Hierarchical structure with modules/submodules
+```
+
+#### **Analytics and Dashboard API**
+```typescript
+// GET /api/analytics/dashboard
+// Tenant-scoped analytics for regular users
+// Cross-tenant analytics for superadmins
+// Permission-based metric filtering
+```
+
+#### **File Management API**
+```typescript
+// GET /api/files
+// canViewAll: All files in tenant
+// canRead: Only own uploaded files
+// Superadmin: All files across tenants
+```
+
+#### **Settings and Configuration API**
+```typescript
+// GET /api/settings
+// User-specific settings always accessible
+// Tenant settings: canViewAll permission required
+// System settings: superadmin only
+```
+
+---
+
+## Data Scope Middleware Implementation
+
+### **Permission-Based Data Filtering:**
+```typescript
+interface DataScopeFilter {
+  // For superadmin
+  global?: boolean;
+  
+  // For canViewAll users
+  tenantId?: string;
+  
+  // For canRead only users  
+  userId?: string;
+  createdBy?: string;
+}
+
+// Applied consistently across all endpoints
+const applyDataScope = (query: any, context: DataScopeContext) => {
+  if (context.isSuperadmin) {
+    return query; // No filtering for superadmin
+  }
+  
+  if (context.canViewAll) {
+    return query.where({ tenantId: context.userTenantId });
+  }
+  
+  if (context.canRead) {
+    return query.where({ 
+      OR: [
+        { userId: context.userId },
+        { createdBy: context.userId }
+      ]
+    });
+  }
+  
+  throw new Error('Insufficient permissions');
+};
+```
+
+---
+
+## Next Implementation Steps
+
+### **Immediate Next Steps (Steps 10-13):**
+1. **Permission System API** - Module management and permission matrix
+2. **Tenant Management API** - Multi-tenant administration
+3. **Support Ticket System** - Customer support functionality  
+4. **Audit Logging System** - Activity tracking and compliance
+
+### **Additional Required APIs:**
+1. **Menu/Navigation API** - Dynamic menu generation
+2. **Analytics API** - Dashboard metrics and reporting
+3. **File Management API** - Secure file operations
+4. **Settings API** - User and system configuration
+5. **Session Management API** - Device and session control
+6. **Search API** - Global search across entities
+7. **Notification API** - In-app and email notifications
+
+Each API must implement the **permission-based data scope behaviors** shown in the examples above, ensuring proper tenant isolation and access control based on user permissions.
+
+---
+
+## Key Implementation Requirements
+
+### **All APIs Must Include:**
+1. **Data Scope Filtering** - Based on user permissions (superadmin/canViewAll/canRead)
+2. **Tenant Isolation** - Automatic tenant boundary enforcement
+3. **Permission Validation** - Check specific permissions before operations
+4. **Audit Logging** - Automatic activity tracking
+5. **Rate Limiting** - Endpoint-specific limits
+6. **Input Validation** - Comprehensive Zod schema validation
+7. **Error Handling** - Standardized error responses
+8. **Security Headers** - CORS, helmet, and security middleware
+
+### **Response Format Consistency:**
+All endpoints must use the standardized response format with proper HTTP status codes and consistent error messaging.
+
