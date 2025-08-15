@@ -1,0 +1,1198 @@
+Backend Implementation Guide - Multi-Tenant Admin Panel API
+Prerequisites
+
+Node.js 18+ installed
+Mysql database
+Understanding of Express.js, TypeScript, Prisma, and JWT authentication
+Redis for session management and caching
+
+
+Step 1: Initialize Node.js Project with TypeScript
+Goal: Create a new Node.js project with TypeScript configuration and essential development tools.
+Implementation Details:
+
+Initialize npm project with TypeScript setup
+Configure TypeScript with strict mode and modern settings
+Set up ESLint and Prettier for code quality
+Configure nodemon for development hot reload
+Create basic folder structure
+
+Acceptance Criteria:
+
+npm run dev starts the development server with hot reload
+TypeScript compilation works without errors
+ESLint and Prettier are properly configured
+
+Cursor Prompt:
+Create a new Node.js backend project named "multi-tenant-admin-api" with:
+- TypeScript configuration with strict mode enabled
+- ESLint and Prettier setup with recommended rules
+- Nodemon for development with TypeScript support
+- Basic folder structure: src/, prisma/, uploads/, tests/, docs/
+- Package.json scripts for dev, build, start, lint, and test
+- .gitignore file with Node.js and environment variables
+- Environment variables setup with .env.example
+====???
+Step 2: Install and Configure Core Dependencies
+Goal: Install all necessary packages for Express server, database, authentication, and utilities.
+Implementation Details:
+
+Express.js with TypeScript support
+Prisma ORM for database management
+JWT for authentication
+Bcrypt for password hashing
+Express middleware for CORS, helmet, rate limiting
+File upload handling with Multer
+
+Dependencies to Install:
+json{
+  "express":  
+  "@types/express": 
+  "prisma":  
+  "@prisma/client": 
+  "jsonwebtoken":  
+  "@types/jsonwebtoken":  
+  "bcryptjs": 
+  "@types/bcryptjs":  
+  "cors":  
+  "@types/cors": 
+  "helmet":  
+  "express-rate-limit":  
+  "multer": " 
+  "@types/multer": 
+  "redis": ,
+  "dotenv": 
+  "zod":  
+  "winston":  
+}
+Cursor Prompt:
+Install and configure these packages for the multi-tenant admin API:
+1. Express.js with TypeScript support and essential middleware
+2. Prisma ORM with Mysql client
+3. Authentication packages: jsonwebtoken, bcryptjs
+4. Security middleware: cors, helmet, express-rate-limit
+5. File handling: multer for file uploads
+6. Validation: zod for request/response validation
+7. Logging: winston for structured logging
+8. Cache/Session: redis client
+9. Environment: dotenv for environment variables
+Create basic server.ts file with Express setup and middleware configuration.
+
+Step 3: Set Up Database Schema with Prisma
+Goal: Design and implement the complete database schema for the multi-tenant admin system.
+Implementation Details:
+
+Design tables: Users, Tenants, Roles, Modules, Permissions, etc.
+Set up relationships and foreign keys
+Configure indexes for performance
+Add audit fields (created_at, updated_at, created_by, etc.)
+Implement soft delete pattern
+
+Database Tables:
+
+tenants - Tenant management
+users - User accounts with tenant association
+roles - Role definitions
+user_roles - Many-to-many user-role relationship
+modules - Application modules/features
+submodules - Sub-features within modules
+permissions - Granular permissions (CRUD + ViewAll)
+support_tickets - Support ticket system
+ticket_replies - Ticket conversation threads
+audit_logs - System activity tracking
+user_sessions - Session management
+file_uploads - File metadata tracking
+
+Cursor Prompt:
+Create comprehensive Prisma schema for multi-tenant admin system:
+1. Tenants table with domain, settings, status, subscription info
+2. Users table with tenant association, profile info, and security fields
+3. Roles table supporting both global and tenant-specific roles
+4. User_roles junction table for many-to-many relationship
+5. Modules and Submodules tables for hierarchical feature structure
+6. Permissions table with granular CRUD + ViewAll permissions
+7. Support_tickets and Ticket_replies for support system
+8. Audit_logs table for comprehensive activity tracking
+9. User_sessions table for session management and device tracking
+10. File_uploads table for file metadata and security
+11. Add proper indexes, constraints, and relationships
+12. Include audit fields (created_at, updated_at, created_by, etc.)
+13. Implement soft delete with deleted_at fields where needed
+Configure Mysql connection and generate initial migration.
+
+Step 4: Configure Environment and Database Connection
+Goal: Set up environment configuration and establish secure database connectivity.
+Implementation Details:
+
+Environment variables for all configurations
+Database connection with connection pooling
+Redis connection for caching and sessions
+JWT secret and token configuration
+File upload path and size limits
+CORS and security settings
+
+Environment Variables:
+envNODE_ENV=development
+PORT=3001
+DATABASE_URL=Mysql://username:password@localhost:5432/multi_tenant_admin
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=your-super-secret-jwt-key
+JWT_EXPIRES_IN=24h
+JWT_REFRESH_EXPIRES_IN=7d
+UPLOAD_PATH=./uploads
+MAX_FILE_SIZE=10485760
+CORS_ORIGIN=http://localhost:3000
+RATE_LIMIT_MAX=100
+RATE_LIMIT_WINDOW=15
+Cursor Prompt:
+Set up environment configuration and database connectivity:
+1. Environment variables configuration with validation using zod
+2. Prisma database connection with connection pooling
+3. Redis client setup for caching and session management
+4. JWT configuration with access and refresh token settings
+5. File upload configuration with size limits and allowed types
+6. CORS configuration with environment-based origins
+7. Rate limiting configuration with different limits per endpoint
+8. Logging configuration with different levels for dev/prod
+9. Database connection health check endpoint
+10. Environment validation middleware that checks required variables
+Create config/index.ts file that exports all configuration objects.
+
+Step 5: Implement Authentication Middleware and JWT Utils
+Goal: Create comprehensive authentication system with JWT token management.
+Implementation Details:
+
+JWT token generation and validation
+Password hashing and verification
+Authentication middleware for protected routes
+Token refresh mechanism
+User context extraction from tokens
+Permission-based access control
+
+Authentication Features:
+
+JWT access and refresh tokens
+Password hashing with bcrypt
+Token validation middleware
+User context in request object
+Permission checking utilities
+Rate limiting for auth endpoints
+
+Cursor Prompt:
+Create comprehensive authentication system:
+1. JWT utility functions for token generation, validation, and refresh
+2. Password hashing utilities with bcrypt (salt rounds configuration)
+3. Authentication middleware that validates JWT and extracts user context
+4. Permission middleware that checks user permissions for specific actions
+5. Rate limiting middleware specifically for auth endpoints
+6. User context type definitions and request object extension
+7. Token blacklisting system using Redis for logout functionality
+8. Device fingerprinting and session management utilities
+9. Multi-tenant context extraction from tokens or headers
+10. Authentication helper functions for permission checking
+Create middleware/, auth/, and utils/ directories with proper organization.
+
+??????=======>>>
+
+Step 6: Create Request/Response Validation with Zod
+Goal: Implement comprehensive request validation and response formatting using Zod schemas.
+Implementation Details:
+
+Zod schemas for all API endpoints
+Request validation middleware
+Standardized response format
+Error handling with proper validation messages
+Type-safe request/response handling
+
+Validation Features:
+
+Request body, query, and params validation
+Standardized API response format
+Validation error formatting
+Type inference from Zod schemas
+Reusable validation schemas
+
+Response Format:
+typescript{
+  success: boolean;
+  message: string;
+  data?: any;
+  errors?: any;
+  meta?: {
+    page?: number;
+    limit?: number;
+    total?: number;
+    totalPages?: number;
+  };
+}
+Cursor Prompt:
+Create comprehensive validation and response formatting system:
+1. Zod schemas for all entities (User, Tenant, Role, Permission, etc.)
+2. Request validation schemas for create/update operations
+3. Query parameter schemas for filtering, pagination, and search
+4. Validation middleware that validates req.body, req.query, and req.params
+5. Standardized response formatter with success/error handling
+6. Error handling middleware that formats validation errors properly
+7. Type inference utilities to get TypeScript types from Zod schemas
+8. Reusable schema components (pagination, search, common fields)
+9. Response schemas for API documentation and type safety
+10. Custom validation rules for business logic (unique constraints, etc.)
+Create schemas/, validators/, and formatters/ directories with proper organization.
+
+Step 7: Implement User Management API Endpoints
+Goal: Create comprehensive user management endpoints with CRUD operations and advanced features.
+Implementation Details:
+
+User CRUD operations with proper validation
+User search and filtering with pagination
+Password reset functionality
+User activation/deactivation
+Bulk operations support
+Profile management
+
+User Endpoints:
+
+GET /api/users - List users with filtering and pagination
+POST /api/users - Create new user
+GET /api/users/:id - Get user details
+PUT /api/users/:id - Update user
+DELETE /api/users/:id - Delete user (soft delete)
+POST /api/users/bulk - Bulk operations
+PUT /api/users/:id/password - Change password
+POST /api/users/:id/reset-password - Reset password
+
+Cursor Prompt:
+Create comprehensive user management API endpoints:
+1. GET /api/users with advanced filtering (name, email, role, status, tenant)
+2. POST /api/users for creating users with role assignment and validation
+3. GET /api/users/:id with detailed user info and permission summary
+4. PUT /api/users/:id for updating user profile and settings
+5. DELETE /api/users/:id with soft delete and dependency checking
+6. POST /api/users/bulk for bulk operations (activate, deactivate, delete)
+7. PUT /api/users/:id/password for password changes with current password validation
+8. POST /api/users/:id/reset-password for admin password resets
+9. GET /api/users/:id/sessions for user session management
+10. GET /api/users/:id/audit for user activity logs
+Include proper permission checks, input validation, and error handling for all endpoints.
+
+Step 8: Build Authentication Endpoints (Login/Logout/Refresh)
+Goal: Implement secure authentication endpoints with session management and security features.
+Implementation Details:
+
+Login with email/password and optional tenant slug
+Logout with session cleanup
+Token refresh mechanism
+Multi-device session management
+Login attempt tracking and rate limiting
+Security logging for auth events
+
+Auth Endpoints:
+
+POST /api/auth/login - User authentication
+POST /api/auth/logout - User logout
+POST /api/auth/refresh - Token refresh
+GET /api/auth/me - Current user info
+POST /api/auth/forgot-password - Password reset request
+POST /api/auth/reset-password - Password reset confirmation
+GET /api/auth/sessions - User active sessions
+DELETE /api/auth/sessions/:id - Revoke specific session
+
+Cursor Prompt:
+Create comprehensive authentication API endpoints:
+1. POST /api/auth/login with email/password validation and optional tenant slug
+2. POST /api/auth/logout with session cleanup and token blacklisting
+3. POST /api/auth/refresh for access token refresh using refresh tokens
+4. GET /api/auth/me returning current user info with permissions and tenant
+5. POST /api/auth/forgot-password with email sending and rate limiting
+6. POST /api/auth/reset-password with secure token validation
+7. GET /api/auth/sessions showing user's active sessions with device info
+8. DELETE /api/auth/sessions/:id for revoking specific sessions
+9. POST /api/auth/change-password for authenticated password changes
+10. Login attempt tracking with account lockout after failed attempts
+Include comprehensive security logging, rate limiting, and input validation.
+
+Step 9: Implement Role Management API
+Goal: Create role management endpoints with permission assignment and hierarchy support.
+Implementation Details:
+
+Role CRUD operations
+Permission assignment to roles
+Role hierarchy management
+Global vs tenant-specific roles
+Role cloning functionality
+User role assignment
+
+Role Endpoints:
+
+GET /api/roles - List roles with filtering
+POST /api/roles - Create new role
+GET /api/roles/:id - Get role details with permissions
+PUT /api/roles/:id - Update role
+DELETE /api/roles/:id - Delete role
+POST /api/roles/:id/permissions - Assign permissions
+POST /api/roles/clone - Clone existing role
+GET /api/roles/:id/users - Get users with specific role
+
+Cursor Prompt:
+Create comprehensive role management API endpoints:
+1. GET /api/roles with filtering by type (global/tenant), status, and search
+2. POST /api/roles for creating roles with initial permission assignment
+3. GET /api/roles/:id with detailed role info and associated permissions
+4. PUT /api/roles/:id for updating role details and permissions
+5. DELETE /api/roles/:id with dependency checking (users assigned)
+6. POST /api/roles/:id/permissions for bulk permission assignment/removal
+7. POST /api/roles/clone for duplicating existing roles with modifications
+8. GET /api/roles/:id/users showing users assigned to specific role
+9. PUT /api/roles/:id/users for bulk user role assignment/removal
+10. GET /api/roles/hierarchy for role inheritance and permission visualization
+Include permission validation, conflict resolution, and audit logging.
+
+Step 10: Create Permission System API
+Goal: Build granular permission management with module-based access control.
+Implementation Details:
+
+Module and submodule management
+Permission matrix (CRUD + ViewAll) per module
+Permission inheritance and calculation
+User effective permissions API
+Permission checking utilities
+Data scope management
+
+Permission Features:
+
+Module-based permissions
+CRUD + ViewAll granular control
+Data scope (own data vs all data)
+Permission inheritance
+Effective permission calculation
+permission checking
+
+Permission Endpoints:
+
+GET /api/modules - List all modules and submodules
+POST /api/modules - Create new module
+GET /api/permissions/matrix - Permission matrix view
+PUT /api/permissions/matrix - Update permission matrix
+GET /api/users/:id/permissions - User effective permissions
+POST /api/permissions/check - Check specific permission
+
+Cursor Prompt:
+Create comprehensive permission management system:
+1. GET /api/modules with hierarchical module/submodule structure
+2. POST /api/modules for creating new modules with permission definitions
+3. GET /api/permissions/matrix showing role vs module permission grid
+4. PUT /api/permissions/matrix for bulk permission updates
+5. GET /api/users/:id/permissions calculating effective user permissions
+6. POST /api/permissions/check for permission validation
+7. GET /api/permissions/data-scope for determining user data access scope
+8. PUT /api/modules/:id/order for module ordering and menu structure
+9. GET /api/menu generating user-specific navigation menu
+10. Permission inheritance calculation for role hierarchies and conflicts
+Include efficient permission caching and updates.
+
+Step 11: Build Tenant Management API (Multi-Tenancy)
+Goal: Create comprehensive tenant management with isolation and configuration options.
+Implementation Details:
+
+Tenant CRUD operations
+Tenant-specific settings and configurations
+User-tenant associations
+Data isolation enforcement
+Tenant analytics and usage metrics
+Subdomain/domain management
+
+Tenant Features:
+
+Tenant creation and configuration
+Domain and subdomain management
+Tenant-specific settings override
+User management per tenant
+Usage analytics and limits
+Billing integration hooks
+
+Tenant Endpoints:
+
+GET /api/tenants - List tenants (superadmin only)
+POST /api/tenants - Create new tenant
+GET /api/tenants/:id - Get tenant details
+PUT /api/tenants/:id - Update tenant
+DELETE /api/tenants/:id - Delete tenant
+GET /api/tenants/:id/users - Tenant users
+GET /api/tenants/:id/analytics - Usage analytics
+PUT /api/tenants/:id/settings - Tenant settings
+
+Cursor Prompt:
+Create comprehensive tenant management system:
+1. GET /api/tenants with superadmin filtering and tenant analytics
+2. POST /api/tenants for creating tenants with domain validation
+3. GET /api/tenants/:id with detailed tenant info and usage statistics
+4. PUT /api/tenants/:id for updating tenant settings and configurations
+5. DELETE /api/tenants/:id with proper data cleanup and confirmation
+6. GET /api/tenants/:id/users for tenant-specific user management
+7. PUT /api/tenants/:id/users for adding/removing users from tenants
+8. GET /api/tenants/:id/analytics for usage metrics and billing data
+9. POST /api/tenants/:id/clone for duplicating tenant configurations
+10. Tenant isolation middleware ensuring data access boundaries
+Include domain validation, usage tracking, and tenant-scoped queries.
+
+Step 12: Implement Support Ticket System API
+Goal: Create a comprehensive support ticket system with threaded conversations and file attachments.
+Implementation Details:
+
+Ticket CRUD operations with status workflow
+Threaded reply system
+File attachment support
+Priority and category management
+Assignment and escalation
+Email notification hooks
+
+Support System Features:
+
+Ticket creation and management
+Threaded conversation system
+File upload and download
+Status workflow automation
+Priority and SLA management
+Internal notes system
+
+Support Endpoints:
+
+GET /api/support/tickets - List tickets with filtering
+POST /api/support/tickets - Create new ticket
+GET /api/support/tickets/:id - Get ticket details
+PUT /api/support/tickets/:id - Update ticket
+POST /api/support/tickets/:id/replies - Add reply
+POST /api/support/tickets/:id/files - Upload attachments
+GET /api/support/tickets/:id/files/:fileId - Download file
+PUT /api/support/tickets/:id/status - Update status
+
+Cursor Prompt:
+Create comprehensive support ticket system API:
+1. GET /api/support/tickets with advanced filtering (status, priority, assignee)
+2. POST /api/support/tickets for creating tickets with file attachments
+3. GET /api/support/tickets/:id with full thread and attachment history
+4. PUT /api/support/tickets/:id for updating ticket details and assignment
+5. POST /api/support/tickets/:id/replies for threaded conversation system
+6. POST /api/support/tickets/:id/files for secure file upload handling
+7. GET /api/support/files/:id for secure file download with permissions
+8. PUT /api/support/tickets/:id/status for workflow state management
+9. POST /api/support/tickets/:id/notes for internal admin notes
+10. GET /api/support/analytics for ticket metrics and SLA reporting
+Include file security, email notifications, and workflow automation.
+
+Step 13: Create Audit Logging System
+Goal: Implement comprehensive audit logging for all system activities with advanced querying capabilities.
+Implementation Details:
+
+Automatic audit logging middleware
+User action tracking
+Data change logging (before/after)
+System event logging
+Advanced filtering and search
+Export functionality
+
+Audit Features:
+
+Automatic action logging
+Before/after data comparison
+User and IP tracking
+Advanced search and filtering
+Export capabilities
+Data retention policies
+
+Audit Endpoints:
+
+GET /api/audit/logs - List audit logs with filtering
+GET /api/audit/logs/:id - Get detailed log entry
+GET /api/audit/export - Export audit data
+GET /api/audit/stats - Audit statistics
+POST /api/audit/search - Advanced search
+GET /api/audit/users/:id - User activity history
+
+Cursor Prompt:
+Create comprehensive audit logging system:
+1. Audit middleware that automatically logs all API requests and responses
+2. GET /api/audit/logs with advanced filtering (user, action, date, module)
+3. GET /api/audit/logs/:id with detailed log entry and data changes
+4. POST /api/audit/search for complex audit queries with multiple criteria
+5. GET /api/audit/export for CSV/Excel export with date range filtering
+6. GET /api/audit/stats for audit analytics and activity dashboards
+7. GET /api/users/:id/audit for user-specific activity history
+8. Data change tracking with before/after JSON comparison
+9. System event logging for auth, permissions, and configuration changes
+10. Audit data retention and archival system with configurable policies
+Include IP tracking, user agent logging, and performance optimization for large datasets.
+
+Step 14: Implement File Upload and Management System
+Goal: Create secure file upload system with proper validation, storage, and access control.
+Implementation Details:
+
+Secure file upload with validation
+File type and size restrictions
+Virus scanning integration hooks
+Organized storage structure
+Access control and permissions
+File metadata management
+
+File Management Features:
+
+Secure upload endpoints
+File type validation
+Size limit enforcement
+Organized storage paths
+Access control checks
+File metadata tracking
+
+File Endpoints:
+
+POST /api/files/upload - Upload files
+GET /api/files/:id - Download file
+GET /api/files - List files with filtering
+DELETE /api/files/:id - Delete file
+GET /api/files/:id/info - File metadata
+POST /api/files/bulk-upload - Multiple file upload
+
+Cursor Prompt:
+Create comprehensive file management system:
+1. POST /api/files/upload with secure file upload, validation, and virus scanning
+2. GET /api/files/:id for secure file download with permission checks
+3. GET /api/files with file listing, filtering, and search capabilities
+4. DELETE /api/files/:id with proper cleanup and dependency checking
+5. GET /api/files/:id/info for file metadata and usage information
+6. POST /api/files/bulk-upload for multiple file handling
+7. File storage organization with tenant/user/module segregation
+8. File type validation with configurable allowed/blocked extensions
+9. Image processing for thumbnails and optimization
+10. File cleanup routines for orphaned and expired files
+Include comprehensive security, access control, and storage optimization.
+
+Step 15: Build Session Management System
+Goal: Implement comprehensive session management with device tracking and security features.
+Implementation Details:
+
+Session creation and validation
+Device fingerprinting
+Multi-device support with limits
+Session revocation capabilities
+Security monitoring
+Geographic and suspicious activity detection
+
+Session Features:
+
+Device tracking and identification
+Session limits per user
+Remote session revocation
+Security monitoring
+Login history tracking
+Suspicious activity detection
+
+Session Endpoints:
+
+GET /api/sessions - List user sessions
+DELETE /api/sessions/:id - Revoke specific session
+DELETE /api/sessions/others - Revoke all other sessions
+GET /api/sessions/history - Login history
+GET /api/sessions/devices - Device management
+POST /api/sessions/security-check - Security validation
+
+Cursor Prompt:
+Create comprehensive session management system:
+1. Session creation with device fingerprinting and geolocation tracking
+2. GET /api/sessions showing active sessions with device and location info
+3. DELETE /api/sessions/:id for individual session revocation
+4. DELETE /api/sessions/others for "log out all other devices" functionality
+5. GET /api/sessions/history for detailed login/logout history
+6. POST /api/sessions/security-check for suspicious activity validation
+7. Device limit enforcement with oldest session cleanup
+8. Session security monitoring with alerts for unusual patterns
+9. Geographic login tracking with suspicious location detection
+10. Session analytics for security dashboards and reports
+Include Redis-based session storage, device identification, and security monitoring.
+
+Step 16: Create Advanced Search and Filtering System
+Goal: Implement powerful search capabilities across all entities with intelligent filtering and suggestions.
+Implementation Details:
+
+Full-text search across multiple entities
+Advanced filter combinations
+Search suggestions and autocomplete
+Saved searches and bookmarks
+Search analytics and optimization
+Cross-tenant search for superadmins
+
+Search Features:
+
+Global search across entities
+Advanced filter builder
+Search suggestions
+Saved search functionality
+Search analytics
+Performance optimization
+
+Search Endpoints:
+
+GET /api/search/global - Global search across entities
+POST /api/search/advanced - Advanced search with filters
+GET /api/search/suggestions - Search autocomplete
+POST /api/search/save - Save search queries
+GET /api/search/saved - List saved searches
+GET /api/search/analytics - Search usage analytics
+
+Cursor Prompt:
+Create advanced search and filtering system:
+1. GET /api/search/global for cross-entity search with relevance scoring
+2. POST /api/search/advanced with complex filter combinations and operators
+3. GET /api/search/suggestions for real-time search autocomplete
+4. POST /api/search/save for user-specific saved search functionality
+5. GET /api/search/saved for managing and executing saved searches
+6. GET /api/search/analytics for search usage metrics and optimization
+7. Full-text search indexing with Mysql or Elasticsearch integration
+8. Filter builder supporting multiple data types and operators
+9. Search result aggregation and categorization
+10. Performance optimization with caching and pagination
+Include search result highlighting, faceted search, and intelligent ranking.
+
+Step 17: Implement API Rate Limiting and Security
+Goal: Create comprehensive security measures including rate limiting, request validation, and attack prevention.
+Implementation Details:
+
+Multi-tier rate limiting (global, user, endpoint)
+Request size limits and validation
+SQL injection and XSS prevention
+CSRF protection
+Security headers implementation
+Intrusion detection and blocking
+
+Security Features:
+
+Advanced rate limiting
+Request sanitization
+Attack pattern detection
+IP blocking capabilities
+Security monitoring
+Compliance logging
+
+Security Endpoints:
+
+GET /api/security/status - Security status dashboard
+GET /api/security/blocked-ips - Blocked IP management
+POST /api/security/unblock-ip - IP unblocking
+GET /api/security/alerts - Security alerts
+GET /api/security/metrics - Security metrics
+
+Cursor Prompt:
+Create comprehensive API security system:
+1. Multi-tier rate limiting with Redis (global, per-user, per-endpoint limits)
+2. Request validation and sanitization to prevent injection attacks
+3. Security headers middleware (HSTS, CSP, X-Frame-Options, etc.)
+4. IP blocking system with automatic threat detection
+5. Request size limits and payload validation
+6. CSRF protection with token validation
+7. GET /api/security/status for security monitoring dashboard
+8. Intrusion detection with pattern matching and automatic blocking
+9. Security event logging with alert system
+10. DDoS protection with adaptive rate limiting
+Include comprehensive security monitoring, threat intelligence, and automated responses.
+
+Step 18: Build Analytics and Reporting System
+Goal: Create comprehensive analytics system for usage metrics, performance monitoring, and business intelligence.
+Implementation Details:
+
+Usage analytics and metrics collection
+Performance monitoring
+Custom report generation
+Data aggregation and visualization APIs
+Export capabilities
+Scheduled reporting
+
+Analytics Features:
+
+User activity analytics
+System performance metrics
+Custom dashboard data
+Report generation
+Data export capabilities
+Trend analysis
+
+Analytics Endpoints:
+
+GET /api/analytics/dashboard - Main dashboard metrics
+GET /api/analytics/users - User analytics
+GET /api/analytics/performance - System performance
+POST /api/analytics/custom - Custom report generation
+GET /api/analytics/export - Data export
+GET /api/analytics/trends - Trend analysis
+
+Cursor Prompt:
+Create comprehensive analytics and reporting system:
+1. GET /api/analytics/dashboard with key metrics (users, tenants, tickets, etc.)
+2. GET /api/analytics/users for user activity and engagement metrics
+3. GET /api/analytics/performance for system performance monitoring
+4. POST /api/analytics/reports for custom report generation with parameters
+5. GET /api/analytics/export for data export in multiple formats
+6. GET /api/analytics/trends for historical data and trend analysis
+7. metrics collection and aggregation
+8. Performance monitoring with response times and error rates
+9. Business intelligence queries with complex aggregations
+10. Scheduled reporting system with email delivery
+Include data visualization helpers, caching for expensive queries, and export optimization.
+
+Step 19: Create Notification System API
+Goal: Implement comprehensive notification system for in-app, email, and system notifications.
+Implementation Details:
+
+Multi-channel notification support
+Template management system
+User notification preferences
+ Notification history and status
+Bulk notification capabilities
+
+Notification Features:
+
+In-app notifications
+Email notification templates
+User preference management
+Notification analytics
+Template customization
+
+Notification Endpoints:
+
+GET /api/notifications - List user notifications
+POST /api/notifications - Create notification
+PUT /api/notifications/:id/read - Mark as read
+GET /api/notifications/preferences - User preferences
+PUT /api/notifications/preferences - Update preferences
+POST /api/notifications/bulk - Bulk notifications
+
+Cursor Prompt:
+Create comprehensive notification system:
+1. GET /api/notifications with filtering (read/unread, type, date range)
+2. POST /api/notifications for creating targeted notifications
+3. PUT /api/notifications/:id/read for marking notifications as read
+4. GET /api/notifications/preferences for user notification settings
+5. PUT /api/notifications/preferences for updating notification preferences
+6. POST /api/notifications/bulk for mass notification delivery
+7. Email template management with dynamic content
+ 9. Notification scheduling and delayed delivery
+10. Notification analytics and delivery tracking
+Include template engine integration, delivery status tracking, and preference management.
+
+Step 20: Implement Backup and Data Export System
+Goal: Create comprehensive backup and data export capabilities with scheduling and restore functionality.
+Implementation Details:
+
+Automated database backups
+Selective data export
+Backup scheduling and retention
+Data restoration capabilities
+Export format options (JSON, CSV, SQL)
+Incremental backup support
+
+Backup Features:
+
+Automated backup scheduling
+Selective data export
+Multiple export formats
+Backup verification
+Restoration capabilities
+Cloud storage integration
+
+Backup Endpoints:
+
+POST /api/backup/create - Create backup
+GET /api/backup/list - List backups
+POST /api/backup/restore - Restore from backup
+GET /api/backup/export - Data export
+PUT /api/backup/schedule - Schedule backups
+GET /api/backup/status - Backup status
+
+Cursor Prompt:
+Create comprehensive backup and export system:
+1. POST /api/backup/create for on-demand database and file backups
+2. GET /api/backup/list showing available backups with metadata
+3. POST /api/backup/restore for selective data restoration
+4. GET /api/export/data for custom data export with filtering
+5. PUT /api/backup/schedule for automated backup configuration
+6. GET /api/backup/status for backup job monitoring
+7. Incremental backup system with change detection
+8. Multiple export formats (JSON, CSV, SQL, Excel)
+9. Cloud storage integration (AWS S3, Google Cloud, etc.)
+10. Backup verification and integrity checking
+Include compression, encryption, retention policies, and progress tracking.
+
+Step 21: Create Health Check and Monitoring System
+Goal: Implement comprehensive system monitoring with health checks, performance metrics, and alerting.
+Implementation Details:
+
+System health endpoints
+Database connectivity checks
+Redis connection monitoring
+Performance metrics collection
+Resource usage monitoring
+Alert system integration
+
+Monitoring Features:
+
+Health status endpoints
+Performance metrics
+Resource monitoring
+Dependency checks
+Alert thresholds
+Status dashboards
+
+Health Endpoints:
+
+GET /api/health - Basic health check
+GET /api/health/detailed - Detailed system status
+GET /api/health/database - Database connectivity
+GET /api/health/redis - Redis
+
+
+Health Endpoints (continued):
+
+GET /api/health/redis - Redis connectivity check
+GET /api/metrics - System performance metrics
+GET /api/status - Overall system status
+POST /api/alerts/test - Test alert systems
+
+Cursor Prompt:
+Create comprehensive health monitoring system:
+1. GET /api/health with basic system status (uptime, version, environment)
+2. GET /api/health/detailed with database, Redis, file system checks
+3. GET /api/health/database for connection pool and query performance
+4. GET /api/health/redis for cache connectivity and memory usage
+5. GET /api/metrics for system performance (CPU, memory, response times)
+6. GET /api/status for comprehensive system dashboard data
+7. Health check middleware with dependency validation
+8. Performance metrics collection with historical data
+9. Resource usage monitoring with threshold alerts
+10. Integration with monitoring services (Prometheus, DataDog, etc.)
+Include automated alerting, performance baselines, and diagnostic information.
+ 
+Step 23: Create API Documentation System
+Goal: Generate comprehensive API documentation with interactive testing capabilities.
+Implementation Details:
+
+OpenAPI/Swagger specification generation
+Interactive documentation interface
+Request/response examples
+Authentication documentation
+Code examples in multiple languages
+API versioning documentation
+
+Documentation Features:
+
+Auto-generated API docs
+Interactive testing interface
+Schema documentation
+Authentication examples
+Error code reference
+Rate limiting documentation
+
+Documentation Endpoints:
+
+GET /api/docs - Interactive API documentation
+GET /api/docs/openapi.json - OpenAPI specification
+GET /api/docs/postman - Postman collection
+GET /api/docs/changelog - API changelog
+GET /api/docs/examples - Code examples
+
+Cursor Prompt:
+Create comprehensive API documentation system:
+1. OpenAPI/Swagger specification generation from route definitions
+2. Interactive documentation interface with Swagger UI or similar
+3. Automatic schema documentation from Zod validation schemas
+4. Authentication documentation with JWT token examples
+5. Request/response examples for all endpoints with sample data
+6. Error code reference with detailed descriptions and solutions
+7. Rate limiting documentation with usage examples
+8. Postman collection generation for easy API testing
+9. Code examples in multiple languages (JavaScript, Python, cURL)
+10. API versioning documentation with migration guides
+Include automatic doc updates, testing interface, and developer onboarding guides.
+
+Step 24: Implement Caching Strategy
+Goal: Create comprehensive caching system for improved performance and reduced database load.
+Implementation Details:
+
+Redis-based caching with intelligent invalidation
+Query result caching with TTL management
+User session and permission caching
+API response caching with cache headers
+Database query optimization
+Cache warming and preloading
+
+Caching Features:
+
+Multi-layer caching strategy
+Intelligent cache invalidation
+Performance monitoring
+Cache hit/miss analytics
+Distributed caching support
+Cache warming strategies
+
+Cache Management:
+
+Query result caching
+User permission caching
+API response caching
+Session data caching
+File metadata caching
+Menu structure caching
+
+Cursor Prompt:
+Create comprehensive caching system:
+1. Redis-based caching layer with intelligent key management
+2. Query result caching with automatic invalidation on data changes
+3. User permission caching with TTL and manual refresh capabilities
+4. API response caching with proper HTTP cache headers
+5. Session data caching for improved authentication performance
+6. Menu and navigation caching with user-specific variations
+7. File metadata caching for faster file operations
+8. Database query optimization with prepared statements
+9. Cache analytics and performance monitoring
+10. Cache warming strategies for frequently accessed data
+Include cache invalidation patterns, performance metrics, and distributed caching support.
+
+Step 25: Testing, Security Hardening, and Deployment
+Goal: Implement comprehensive testing, security hardening, and deployment preparation.
+Implementation Details:
+
+Unit and integration testing
+Security vulnerability scanning
+Performance testing and optimization
+Docker containerization
+Environment configuration
+Production deployment scripts
+
+Testing and Deployment:
+
+Comprehensive test coverage
+Security auditing
+Performance benchmarking
+Container configuration
+CI/CD pipeline setup
+Production monitoring
+
+Cursor Prompt:
+Create comprehensive testing and deployment system:
+1. Unit tests for all service functions using Jest with high coverage
+2. Integration tests for API endpoints with supertest
+3. Database testing with test database setup and cleanup
+4. Security testing with vulnerability scanning and penetration testing
+5. Performance testing with load testing and benchmarking
+6. Docker configuration with multi-stage builds and optimization
+7. Environment-specific configuration management
+8. CI/CD pipeline with automated testing and deployment
+9. Production monitoring setup with logging and alerting
+10. Database migration and seed scripts for different environments
+Include security hardening checklist, performance optimization, and deployment automation.
+
+Environment Variables Configuration
+Create a comprehensive .env file:
+env# Server Configuration
+NODE_ENV=development
+PORT=3001
+API_VERSION=v1
+
+# Database Configuration
+DATABASE_URL=Mysql://username:password@localhost:5432/multi_tenant_admin
+DATABASE_POOL_SIZE=10
+DATABASE_TIMEOUT=30000
+
+# Redis Configuration
+REDIS_URL=redis://localhost:6379
+REDIS_PASSWORD=
+REDIS_DB=0
+
+# JWT Configuration
+JWT_SECRET=your-super-secret-jwt-key-min-32-chars
+JWT_EXPIRES_IN=24h
+JWT_REFRESH_SECRET=your-refresh-token-secret-key
+JWT_REFRESH_EXPIRES_IN=7d
+
+# Security Configuration
+BCRYPT_SALT_ROUNDS=12
+RATE_LIMIT_MAX=100
+RATE_LIMIT_WINDOW=15
+MAX_LOGIN_ATTEMPTS=5
+LOCKOUT_DURATION=30
+
+# CORS Configuration
+CORS_ORIGIN=http://localhost:3000,https://yourdomain.com
+CORS_CREDENTIALS=true
+
+# File Upload Configuration
+UPLOAD_PATH=./uploads
+MAX_FILE_SIZE=10485760
+ALLOWED_FILE_TYPES=jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx
+
+# Email Configuration (for notifications)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+EMAIL_FROM=noreply@yourdomain.com
+
+# Monitoring and Logging
+LOG_LEVEL=info
+LOG_FILE=./logs/app.log
+ENABLE_REQUEST_LOGGING=true
+
+# External Services (optional)
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_REGION=us-east-1
+S3_BUCKET_NAME=
+
+# Backup Configuration
+BACKUP_PATH=./backups
+BACKUP_RETENTION_DAYS=30
+AUTO_BACKUP_ENABLED=true
+BACKUP_SCHEDULE=0 2 * * *
+ 
+Project Structure
+multi-tenant-admin-api/
+├── src/
+│   ├── controllers/          # Route controllers
+│   │   ├── auth.controller.ts
+│   │   ├── users.controller.ts
+│   │   ├── roles.controller.ts
+│   │   ├── tenants.controller.ts
+│   │   ├── support.controller.ts
+│   │   ├── audit.controller.ts
+│   │   └── files.controller.ts
+│   ├── services/             # Business logic services
+│   │   ├── auth.service.ts
+│   │   ├── users.service.ts
+│   │   ├── permissions.service.ts
+│   │   ├── notifications.service.ts
+│   │   └── analytics.service.ts
+│   ├── middleware/           # Express middleware
+│   │   ├── auth.middleware.ts
+│   │   ├── validation.middleware.ts
+│   │   ├── rateLimit.middleware.ts
+│   │   ├── audit.middleware.ts
+│   │   └── error.middleware.ts
+│   ├── routes/               # API routes
+│   │   ├── auth.routes.ts
+│   │   ├── users.routes.ts
+│   │   ├── roles.routes.ts
+│   │   ├── api.routes.ts
+│   │   └── index.ts
+│   ├── schemas/              # Zod validation schemas
+│   │   ├── auth.schemas.ts
+│   │   ├── user.schemas.ts
+│   │   ├── common.schemas.ts
+│   │   └── index.ts
+│   ├── utils/                # Utility functions
+│   │   ├── jwt.utils.ts
+│   │   ├── password.utils.ts
+│   │   ├── cache.utils.ts
+│   │   ├── file.utils.ts
+│   │   └── response.utils.ts
+│   ├── config/               # Configuration files
+│   │   ├── database.ts
+│   │   ├── redis.ts
+│   │   ├── email.ts
+│   │   └── index.ts
+│   ├── types/                # TypeScript type definitions
+│   │   ├── auth.types.ts
+│   │   ├── user.types.ts
+│   │   ├── api.types.ts
+│   │   └── index.ts
+│  
+│   └── server.ts             # Main server file
+├── prisma/                   # Database schema and migrations
+│   ├── schema.prisma
+│   ├── migrations/
+│   └── seeds/
+├── tests/                    # Test files
+│   ├── unit/
+│   ├── integration/
+│   └── fixtures/
+├── uploads/                  # File uploads directory
+├── logs/                     # Application logs
+├── docs/                     # Documentation
+├── scripts/                  # Utility scripts
+│   ├── backup.js
+│   ├── migrate.js
+│   └── seed.js
+├── .env.example
+├── .gitignore
+├── package.json
+├── tsconfig.json
+├── jest.config.js
+├── Dockerfile
+└── docker-compose.yml
+
+Key Dependencies Summary
+json{
+  "dependencies": {
+    "express": "^4.18.2",
+    "@prisma/client": "^5.7.1",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3",
+    "redis": "^4.6.11",
+    "zod": "^3.22.4",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "express-rate-limit": "^7.1.5",
+    "multer": "^1.4.5-lts.1",
+    "winston": "^3.11.0",
+    "nodemailer": "^6.9.8",
+     "swagger-ui-express": "^5.0.0",
+    "compression": "^1.7.4",
+    "express-validator": "^7.0.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/multer": "^1.4.11",
+    "@types/cors": "^2.8.17",
+    "@types/compression": "^1.7.5",
+    "prisma": "^5.7.1",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2",
+    "nodemon": "^3.0.2",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.8",
+    "supertest": "^6.3.3",
+    "eslint": "^8.56.0",
+    "prettier": "^3.1.1"
+  }
+}
+
+Database Migration Commands
+bash# Generate initial migration
+npx prisma migrate dev --name init
+
+# Generate migration for changes
+npx prisma migrate dev --name add_new_feature
+
+# Apply migrations to production
+npx prisma migrate deploy
+
+# Generate Prisma client
+npx prisma generate
+
+# Seed database
+npx prisma db seed
+
+# Reset database (development only)
+npx prisma migrate reset
+
+Next Steps After Implementation
+
+Security Audit: Comprehensive security testing and vulnerability assessment
+Performance Testing: Load testing and optimization under realistic conditions
+Documentation Review: Complete API documentation and developer guides
+Integration Testing: End-to-end testing with frontend application
+Monitoring Setup: Production monitoring, logging, and alerting systems
+Backup Verification: Test backup and restore procedures
+Deployment Pipeline: Automated CI/CD pipeline with proper staging environments
+User Training: Documentation and training materials for administrators
+Maintenance Planning: Regular update schedules and monitoring procedures
+Compliance Review: Ensure GDPR, SOC2, and other compliance requirements
+
