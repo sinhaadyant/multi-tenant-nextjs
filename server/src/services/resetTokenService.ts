@@ -69,7 +69,7 @@ export class ResetTokenService {
     // Log audit
     await this.auditRepository.logUserAction(
       user.id,
-      user.id,
+      user.tenantId,
       'PASSWORD_RESET_REQUESTED',
       ipAddress,
       {
@@ -127,7 +127,7 @@ export class ResetTokenService {
     // Log audit
     await this.auditRepository.logUserAction(
       user.id,
-      user.id,
+      user.tenantId,
       'PASSWORD_RESET_COMPLETED',
       ipAddress,
       {
@@ -217,7 +217,7 @@ export class ResetTokenService {
     // Log audit
     await this.auditRepository.logUserAction(
       userId,
-      userId,
+      null, // We don't have user object here, so pass null for tenantId
       'RESET_TOKENS_REVOKED',
       '127.0.0.1',
       { userId }

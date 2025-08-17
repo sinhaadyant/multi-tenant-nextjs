@@ -1,0 +1,32 @@
+{
+  "name": "multi-tenant-admin-api-tests",
+  "version": "1.0.0",
+  "description": "Playwright API tests for Multi-Tenant Admin Panel",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report",
+    "test:install": "playwright install",
+    "test:codegen": "playwright codegen",
+    "test:api": "playwright test tests/api/",
+    "test:auth": "playwright test tests/api/auth.*.spec.ts",
+    "test:users": "playwright test tests/api/users.*.spec.ts",
+    "test:roles": "playwright test tests/api/roles.*.spec.ts",
+    "test:health": "playwright test tests/api/health.spec.ts",
+    "test:menu": "playwright test tests/api/menu.spec.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.7.1",
+    "axios": "^1.11.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

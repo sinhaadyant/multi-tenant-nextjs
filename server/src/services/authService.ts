@@ -85,7 +85,7 @@ export class AuthService {
     // Log audit
     await this.auditRepository.logUserAction(
       user.id,
-      user.id,
+      user.tenantId,
       'USER_LOGIN',
       deviceInfo.ipAddress,
       {
@@ -154,7 +154,7 @@ export class AuthService {
     // Log audit
     await this.auditRepository.logUserAction(
       user.id,
-      user.id,
+      user.tenantId,
       'TOKEN_REFRESHED',
       deviceInfo.ipAddress,
       {
@@ -186,7 +186,7 @@ export class AuthService {
       // Log audit
       await this.auditRepository.logUserAction(
         payload.userId,
-        payload.userId,
+        null, // We don't have user object here, so pass null for tenantId
         'USER_LOGOUT',
         deviceInfo.ipAddress,
         {
@@ -211,7 +211,7 @@ export class AuthService {
     // Log audit
     await this.auditRepository.logUserAction(
       userId,
-      userId,
+      null, // We don't have user object here, so pass null for tenantId
       'USER_LOGOUT_ALL_DEVICES',
       deviceInfo.ipAddress,
       {
@@ -274,7 +274,7 @@ export class AuthService {
     // Log audit
     await this.auditRepository.logUserAction(
       userId,
-      userId,
+      null, // We don't have user object here, so pass null for tenantId
       'DEVICE_REVOKED',
       deviceInfo.ipAddress,
       {
@@ -283,5 +283,69 @@ export class AuthService {
         ipAddress: deviceInfo.ipAddress,
       }
     );
+  }
+
+  /**
+   * Register a new user
+   */
+  async register(userData: {
+    name: string;
+    email: string;
+    password: string;
+    tenantId?: string;
+    isSuperadmin?: boolean;
+    isActive?: boolean;
+  }): Promise<any> {
+    // Create user using user service with default values
+    const user = await this.userService.createUser({
+      ...userData,
+      isSuperadmin: userData.isSuperadmin ?? false,
+      isActive: userData.isActive ?? true,
+    });
+
+    // Log audit
+    await this.auditRepository.logUserAction(
+      user.id,
+      user.tenantId,
+      'USER_REGISTERED',
+      '127.0.0.1',
+      { userId: user.id, email: user.email }
+    );
+
+    return user;
+  }
+
+  /**
+   * Change user password
+   */
+  async changePassword(
+    userId: string,
+    data: { currentPassword: string; newPassword: string }
+  ): Promise<void> {
+    // Change password using user service
+    await this.userService.changePassword(userId, data);
+
+    // Log audit
+    await this.auditRepository.logUserAction(
+      userId,
+      null, // We don't have user object here, so pass null for tenantId
+      'PASSWORD_CHANGED',
+      '127.0.0.1',
+      { userId }
+    );
+  }
+
+  /**
+   * Get user's active refresh tokens
+   */
+  async getUserRefreshTokens(userId: string): Promise<any[]> {
+    return this.tokenService.getUserRefreshTokens(userId);
+  }
+
+  /**
+   * Get user by ID
+   */
+  async getUserById(userId: string): Promise<any> {
+    return this.userService.getUserById(userId);
   }
 }

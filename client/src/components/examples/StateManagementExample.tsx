@@ -62,9 +62,8 @@ export function StateManagementExample() {
             <Button
               variant="outline"
               onClick={() => auth.logout()}
-              disabled={auth.isLogoutLoading}
             >
-              {auth.isLogoutLoading ? "Logging out..." : "Logout"}
+              Logout
             </Button>
           </div>
         </CardContent>

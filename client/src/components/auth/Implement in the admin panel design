@@ -1,0 +1,12 @@
+Implement in the admin panel design 
+
+Backend API's is in @server/
+
+separate CRUD pages (not modals) using the existing admin panel design and integrate with the server APIs.
+we have Reusable datatable as well 
+Notification Resusable 
+
+Use Reusable items like datatable and notification system and use tailwind admin panel design elements as needed 
+make all data dynamic from database
+don't create summary
+

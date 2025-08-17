@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { logger } from '@/config/logger';
 import { ZodError } from 'zod';
 import { Prisma } from '@prisma/client';
+import { AppError } from '@/utils/errors';
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -139,7 +140,10 @@ export const errorHandler = (
   });
 
   // Handle different types of errors
-  if (error instanceof ApiError) {
+  if (error instanceof AppError) {
+    statusCode = error.statusCode;
+    message = error.message;
+  } else if (error instanceof ApiError) {
     statusCode = error.statusCode;
     message = error.message;
 

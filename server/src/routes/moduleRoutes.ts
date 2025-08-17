@@ -1,173 +1,63 @@
 import { Router } from 'express';
-import { authMiddleware } from '@/middleware/auth';
-import { requireTenant } from '@/middleware/tenantResolver';
-import {
-  requireRead,
-  requireCreate,
-  requireUpdate,
-  requireDelete,
-} from '@/middleware/permissionGuard';
-import { asyncHandler } from '@/middleware/errorHandler';
-import {
-  getAllModules,
-  getModuleById,
-  createModule,
-  updateModule,
-  deleteModule,
-  reorderModules,
-  getModuleSubmodules,
-  createSubmodule,
-  updateSubmodule,
-  deleteSubmodule,
-  getUserMenu,
-} from '@/controllers/moduleController';
+import { moduleController } from '../controllers/moduleController';
+import { authMiddleware } from '../middleware/auth';
+import { permissionGuard } from '../middleware/permissionGuard';
 
 const router = Router();
 
-/**
- * @swagger
- * tags:
- *   name: Modules
- *   description: Module and menu management
- */
-
-// All module routes require authentication and tenant context
+// Apply auth middleware to all routes
 router.use(authMiddleware);
-router.use(requireTenant);
 
-/**
- * @swagger
- * /api/modules:
- *   get:
- *     summary: Get all modules
- *     tags: [Modules]
- */
-router.get('/', requireRead('module-management'), asyncHandler(getAllModules));
+// Get all modules (hierarchical structure)
+router.get(
+  '/',
+  permissionGuard({ moduleKey: 'modules', action: 'read' }),
+  moduleController.getAllModules
+);
 
-/**
- * @swagger
- * /api/modules:
- *   post:
- *     summary: Create a new module
- *     tags: [Modules]
- */
+// Get modules for menu (active modules only)
+router.get('/menu', moduleController.getMenuModules);
+
+// Get single module by ID
+router.get(
+  '/:id',
+  permissionGuard({ moduleKey: 'modules', action: 'read' }),
+  moduleController.getModuleById
+);
+
+// Create new module
 router.post(
   '/',
-  requireCreate('module-management'),
-  asyncHandler(createModule)
+  permissionGuard({ moduleKey: 'modules', action: 'create' }),
+  moduleController.createModule
 );
 
-/**
- * @swagger
- * /api/modules/{id}:
- *   get:
- *     summary: Get module by ID
- *     tags: [Modules]
- */
-router.get(
-  '/:id',
-  requireRead('module-management'),
-  asyncHandler(getModuleById)
-);
-
-/**
- * @swagger
- * /api/modules/{id}:
- *   put:
- *     summary: Update module
- *     tags: [Modules]
- */
+// Update module
 router.put(
   '/:id',
-  requireUpdate('module-management'),
-  asyncHandler(updateModule)
+  permissionGuard({ moduleKey: 'modules', action: 'update' }),
+  moduleController.updateModule
 );
 
-/**
- * @swagger
- * /api/modules/{id}:
- *   delete:
- *     summary: Delete module
- *     tags: [Modules]
- */
+// Delete module
 router.delete(
   '/:id',
-  requireDelete('module-management'),
-  asyncHandler(deleteModule)
+  permissionGuard({ moduleKey: 'modules', action: 'delete' }),
+  moduleController.deleteModule
 );
 
-/**
- * @swagger
- * /api/modules/reorder:
- *   post:
- *     summary: Reorder modules
- *     tags: [Modules]
- */
+// Toggle module status
+router.patch(
+  '/:id/toggle',
+  permissionGuard({ moduleKey: 'modules', action: 'update' }),
+  moduleController.toggleModuleStatus
+);
+
+// Reorder modules
 router.post(
   '/reorder',
-  requireUpdate('module-management'),
-  asyncHandler(reorderModules)
+  permissionGuard({ moduleKey: 'modules', action: 'update' }),
+  moduleController.reorderModules
 );
-
-/**
- * @swagger
- * /api/modules/{id}/submodules:
- *   get:
- *     summary: Get module submodules
- *     tags: [Modules]
- */
-router.get(
-  '/:id/submodules',
-  requireRead('module-management'),
-  asyncHandler(getModuleSubmodules)
-);
-
-/**
- * @swagger
- * /api/modules/{id}/submodules:
- *   post:
- *     summary: Create submodule
- *     tags: [Modules]
- */
-router.post(
-  '/:id/submodules',
-  requireCreate('module-management'),
-  asyncHandler(createSubmodule)
-);
-
-/**
- * @swagger
- * /api/modules/{moduleId}/submodules/{submoduleId}:
- *   put:
- *     summary: Update submodule
- *     tags: [Modules]
- */
-router.put(
-  '/:moduleId/submodules/:submoduleId',
-  requireUpdate('module-management'),
-  asyncHandler(updateSubmodule)
-);
-
-/**
- * @swagger
- * /api/modules/{moduleId}/submodules/{submoduleId}:
- *   delete:
- *     summary: Delete submodule
- *     tags: [Modules]
- */
-router.delete(
-  '/:moduleId/submodules/:submoduleId',
-  requireDelete('module-management'),
-  asyncHandler(deleteSubmodule)
-);
-
-/**
- * @swagger
- * /api/menu:
- *   get:
- *     summary: Get user menu tree
- *     tags: [Modules]
- */
-router.get('/menu', asyncHandler(getUserMenu));
 
 export default router;

@@ -1,0 +1,966 @@
+# Frontend Implementation Guide - Multi-Tenant Admin Panel
+
+## Prerequisites
+- Backend API is ready and running
+- Node.js 18+ installed
+- Understanding of React, Next.js, TypeScript, and Tailwind CSS
+
+---
+
+## Step 1: Initialize Next.js Project with TypeScript & Tailwind
+
+**Goal:** Create a new Next.js project with TypeScript and Tailwind CSS configured.
+
+**Implementation Details:**
+- Use Next.js 14+ with App Router
+- Configure TypeScript with strict mode
+- Set up Tailwind CSS with custom theme
+- Add essential ESLint and Prettier configurations
+
+**Acceptance Criteria:**
+- `npm run dev` starts the development server
+- TypeScript compilation works without errors
+- Tailwind classes apply correctly
+
+**Cursor Prompt:**
+```
+Create a new Next.js 14 project named "multi-tenant-admin" with:
+- TypeScript configuration with strict mode
+- Tailwind CSS with custom theme colors (primary, secondary, success, warning, error)
+- ESLint and Prettier setup
+- Basic folder structure: app/, components/, lib/, types/, hooks/
+ ```
+
+---
+
+## Step 2: Install and Configure Core Dependencies
+
+**Goal:** Install all necessary packages for state management, API calls, UI components, and forms.
+
+**Implementation Details:**
+- Redux Toolkit + Redux Persist for global state
+- TanStack Query (React Query) for server state
+- Axios for HTTP requests
+- React Hook Form + Zod for forms
+- Additional utility libraries
+
+**Dependencies to Install:**
+```json
+{
+  "@reduxjs/toolkit": "^2.0.1",
+  "redux-persist": "^6.0.0",
+  "@tanstack/react-query": "^5.17.0",
+  "axios": "^1.6.5",
+  "react-hook-form": "^7.48.2",
+  "@hookform/resolvers": "^3.3.2",
+  "zod": "^3.22.4",
+  "sonner": "^1.3.1",
+  "lucide-react": "^0.303.0",
+  "date-fns": "^3.2.0"
+}
+```
+
+**Cursor Prompt:**
+```
+Install and configure these packages for the multi-tenant admin panel:
+1. Redux Toolkit with Redux Persist for auth and global state
+2. TanStack Query for server state management
+3. Axios with interceptors setup
+4. React Hook Form with Zod resolver
+5. Sonner for notifications
+6. Lucide React for icons
+7. Date-fns for date utilities
+Create basic configuration files for each package.
+```
+
+---
+
+## Step 3: Set Up Shadcn/UI Components Library
+
+**Goal:** Initialize Shadcn/UI and install essential components for the admin panel.
+
+**Implementation Details:**
+- Initialize Shadcn/UI with custom theme
+- Install core components: Button, Input, Card, Dialog, Table, etc.
+- Configure component variants and styling
+- Set up proper file structure for components
+
+**Components to Install:**
+- Button, Input, Label, Card, Dialog, Table, Select, Checkbox, Switch, Tabs, Badge, Avatar, Dropdown Menu, Popover, Sheet, Skeleton
+
+**Cursor Prompt:**
+```
+Initialize Shadcn/UI in the project and install these essential components:
+- button, input, label, card, dialog, table, select, checkbox, switch
+- tabs, badge, avatar, dropdown-menu, popover, sheet, skeleton
+- form (for React Hook Form integration)
+Configure the components with a professional admin panel theme using CSS variables.
+Create a components/ui/index.ts file to export all components.
+```
+
+---
+
+## Step 4: Create Type Definitions and API Contracts
+
+**Goal:** Define TypeScript interfaces for all API responses and entities.
+
+**Implementation Details:**
+- Create types for User, Tenant, Role, Module, Permission entities
+- Define API response types with the standard response format
+- Create utility types for forms and tables
+- Set up proper type exports
+
+**Key Types Needed:**
+```typescript
+interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  data?: T;
+  errors?: any;
+  meta?: PaginationMeta;
+}
+
+```typescript
+interface Permission {
+  id: string;
+  role_id: string;
+  module_id: string;
+  submodule_id?: string;
+  canCreate: boolean;
+  canRead: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
+  canViewAll: boolean; // Key permission for data scope
+}
+
+interface UserPermissions {
+  [moduleKey: string]: {
+    canCreate: boolean;
+    canRead: boolean;
+    canUpdate: boolean;
+    canDelete: boolean;
+    canViewAll: boolean;
+  }
+}
+```
+```
+
+**Cursor Prompt:**
+```
+Create comprehensive TypeScript type definitions in types/ folder:
+1. API response types with standard response format from the PRD
+2. Entity types: User, Tenant, Role, Module, Permission, SupportTicket, AuditLog
+3. Form types for create/update operations
+4. Authentication types: LoginRequest, AuthUser, TokenResponse
+5. Pagination and filtering types
+6. Permission and role-related types
+Create proper exports in types/index.ts
+```
+
+---
+
+## Step 5: Configure Redux Store with Authentication Slice
+
+**Goal:** Set up Redux Toolkit store with authentication state management and persistence.
+
+**Implementation Details:**
+- Create auth slice with login/logout actions
+- Configure Redux Persist for auth state
+- Set up store provider and middleware
+- Create typed hooks for useSelector and useDispatch
+
+**Auth State Shape:**
+```typescript
+interface AuthState {
+  user: AuthUser | null;
+  token: string | null;
+  isAuthenticated: boolean;
+  tenant: Tenant | null;
+  permissions: Permission[];
+  loading: boolean;
+}
+```
+
+**Cursor Prompt:**
+```
+Create Redux Toolkit store with:
+1. Auth slice managing user, token, tenant, permissions, loading states
+2. Redux Persist configuration to persist auth state
+3. Store configuration with proper middleware
+4. Typed hooks (useAppSelector, useAppDispatch)
+5. Store provider component to wrap the app
+6. Actions: login, logout, setUser, setTenant, setPermissions, setLoading
+Integrate with _app.tsx or layout.tsx for Next.js 14 App Router.
+```
+
+---
+
+
+## Step 6: Set Up Axios Instance with Interceptors
+
+**Goal:** Create a configured Axios instance with request/response interceptors for authentication and error handling.
+
+**Implementation Details:**
+- Create Axios instance with base URL from environment
+- Add request interceptor to attach auth token
+- Add response interceptor for error handling and token refresh
+- Integrate with notification system for API errors
+- Handle 401 errors with automatic logout
+
+**Cursor Prompt:**
+```
+Create an Axios configuration in lib/axios.ts with:
+1. Base URL from environment variables
+2. Request interceptor to add Authorization header with JWT token
+3. Response interceptor to handle errors, show notifications, and handle 401 errors
+4. Token refresh logic when access token expires
+5. Integration with Redux store to get token and dispatch logout
+6. Proper TypeScript typing for API responses
+7. Export configured axios instance and API helper functions
+```
+
+---
+
+## Step 7: Configure TanStack Query with Axios Integration
+
+**Goal:** Set up TanStack Query for server state management with proper configuration and error handling.
+
+**Implementation Details:**
+- Configure QueryClient with sensible defaults
+- Create query provider component
+- Set up global error handling for queries
+- Create custom hooks for common query patterns
+- Configure caching strategies
+
+**Cursor Prompt:**
+```
+Set up TanStack Query (React Query) with:
+1. QueryClient configuration with proper defaults (staleTime, cacheTime, retry logic)
+2. QueryProvider component to wrap the application
+3. Global error handling that integrates with notification system
+4. Custom hooks: useApiQuery, useApiMutation for standardized API calls
+5. Query key factories for consistent cache management
+6. Integration with Axios instance from previous step
+7. Proper TypeScript typing for query responses
+```
+
+---
+
+
+## Step 8: Create Authentication System
+
+**Goal:** Implement login/logout functionality with form validation and error handling.
+
+**Implementation Details:**
+- Create login page with React Hook Form + Zod validation
+- Implement login mutation with proper error handling
+- Handle successful login (store token, redirect)
+- Create logout functionality
+- Add loading states and error messages
+
+**Login Form Features:**
+- Email and password validation
+- Tenant slug input (optional)
+- Remember me functionality
+- Forgot password link
+- Professional styling
+
+**Cursor Prompt:**
+```
+Create authentication system with:
+1. Login page (/login) with React Hook Form + Zod validation
+2. Login form with email, password, and optional tenant slug fields
+3. useAuth hook for login/logout/token management
+4. Login mutation with TanStack Query that updates Redux state
+5. Proper error handling and user feedback
+6. Logout functionality that clears state and redirects
+7. Loading states and form validation messages
+ ```
+
+---
+====>>>???
+
+## Step 9: Implement AuthGuard and Route Protection
+
+**Goal:** Create a higher-order component to protect routes based on authentication and permissions.
+
+**Implementation Details:**
+- Create AuthGuard component that checks authentication
+- Implement permission-based route protection
+- Handle loading states while checking auth
+- Redirect to login for unauthenticated users
+- Show unauthorized page for insufficient permissions
+
+**Permission Checking Logic:**
+- Check if user is authenticated
+- Verify user is active and tenant is active
+- Check specific permissions (canCreate, canRead, canUpdate, canDelete, canViewAll)
+- Handle data scope based on permissions:
+  - **Superadmin**: Can see ALL tenant data across the platform
+  - **canViewAll**: Can see all data within their tenant
+  - **canRead only**: Can see only their own data
+- Handle superadmin bypass logic
+
+**Cursor Prompt:**
+```
+Create route protection system with:
+1. AuthGuard component that wraps protected routes
+2. Permission checking logic that uses Redux auth state with granular permissions (canCreate, canRead, canUpdate, canDelete, canViewAll)
+3. Data scope resolver that determines if user can see all data vs own data only
+4. Loading spinner while authentication is being verified
+5. Automatic redirect to /login for unauthenticated users
+6. Unauthorized page component for insufficient permissions
+7. usePermissions hook to check specific permissions with scope handling
+8. Route-level permission checking with module and action parameters
+9. Integration with Next.js App Router middleware or page-level protection
+10. Superadmin bypass logic for all restrictions
+```
+
+---
+
+## Step 10: Create Main Layout with Navigation
+
+**Goal:** Build the main admin layout with sidebar navigation, header, and main content area.
+
+**Implementation Details:**
+- Responsive sidebar with collapsible functionality
+- Header with user dropdown, notifications, tenant switcher
+- Main content area with proper spacing and responsive design
+- Breadcrumb navigation
+- Mobile-friendly hamburger menu
+
+**Layout Components:**
+- Sidebar with navigation menu
+- Header with user actions
+- Main content wrapper
+- Breadcrumb component
+- Mobile navigation overlay
+
+**Cursor Prompt:**
+```
+Create main admin layout with:
+1. Responsive sidebar navigation with collapsible functionality
+2. Header with user dropdown, tenant info, and logout option
+3. Main content area with proper padding and responsive design
+4. Breadcrumb navigation component
+5. Mobile hamburger menu for smaller screens
+6. Dark/light theme toggle (optional)
+7. Proper styling with Tailwind CSS and Shadcn/UI
+8. Layout component that wraps all admin pages
+```
+
+
+## Step 17: Implement Tenant Management (SuperAdmin)
+
+**Goal:** Create tenant management interface for superadmin users with advanced configuration options.
+
+**Implementation Details:**
+- Tenant listing with status and usage statistics
+- Tenant creation and configuration
+- Tenant settings management
+- User management per tenant
+- Tenant activation/deactivation
+- Usage analytics and limits
+
+**Tenant Management Features:**
+- Tenant listing with search and filters
+- Create/edit tenant with domain and settings
+- Tenant user management
+- Settings override system
+- Usage statistics dashboard
+ 
+**Cursor Prompt:**
+```
+Create tenant management system for superadmins:
+1. Tenants list with DataTable showing name, domain, user count, status, created date
+2. Advanced filtering by status, subscription, usage metrics
+3. Create/Edit tenant seperate pages with domain validation and initial setup
+4. Tenant settings management with override capabilities
+5. Per-tenant user management interface
+6. Tenant activation/deactivation with confirmation
+7. Usage analytics dashboard showing key metrics
+8. Bulk operations for tenant management
+9. API integration with proper superadmin permission checks
+10. Tenant switching functionality for superadmins
+```
+
+
+
+---
+
+## Step 11: Implement Dynamic Menu System
+
+**Goal:** Create a dynamic navigation menu based on user permissions and modules from the API.
+
+**Implementation Details:**
+- Fetch menu data from /api/menu endpoint
+- Render nested menus with proper hierarchy
+- Filter menu items based on user permissions
+- Handle active states and route highlighting
+- Support icons and badges for menu items
+
+**Menu Features:**
+- Hierarchical menu structure (modules and submodules)
+- Permission-based filtering
+- Active route highlighting
+- Icons from Lucide React
+- Expandable/collapsible submenus
+
+**Cursor Prompt:**
+```
+Create dynamic navigation menu system:
+1. useMenu hook to fetch menu data from /api/menu endpoint
+2. NavigationMenu component that renders hierarchical menu structure
+3. Permission-based filtering to show only allowed menu items
+4. Active route highlighting with proper styling
+5. Support for icons (using Lucide React) and badges
+6. Expandable/collapsible submenus with smooth animations
+7. Integration with Next.js router for navigation
+8. Loading state while menu data is being fetched
+```
+
+---
+
+## Step 12: Build Notification System
+
+**Goal:** Implement a global notification system for user feedback and API responses.
+
+**Implementation Details:**
+- Integrate Sonner toast library
+- Create notification service with different types
+- Connect with Axios interceptors for automatic API error/success messages
+- Create custom notification components for complex messages
+- Configure proper positioning and styling
+
+**Notification Types:**
+- Success (green)
+- Error (red)
+- Warning (orange)
+- Info (blue)
+- Loading notifications
+
+**Cursor Prompt:**
+```
+Implement global notification system:
+1. Configure Sonner toast library with custom styling
+2. Create NotificationService with methods for success, error, warning, info notifications
+3. Integration with Axios interceptors to automatically show API errors/success messages
+4. Custom notification components for complex messages with actions
+5. Global toast provider component
+6. useNotification hook for easy access throughout the app
+7. Proper positioning, timing, and styling configuration
+8. Loading notifications for long-running operations
+```
+
+---
+
+## Step 13: Create Reusable Data Table Component
+
+**Goal:** Build a powerful, reusable data table with sorting, filtering, pagination, and search.
+
+**Implementation Details:**
+- Server-side pagination, sorting, and filtering
+- Search functionality with debounced input
+- Column configuration with custom renderers
+- Row selection and bulk actions
+- Loading and error states
+- Responsive design
+
+**Table Features:**
+- Sortable columns
+- Server-side pagination
+- Search and filtering
+- Row selection
+- Custom cell renderers
+- Export functionality
+- Loading skeletons
+
+**Cursor Prompt:**
+```
+Create reusable DataTable component:
+1. Server-side pagination, sorting, and filtering capabilities
+2. Search input with debounced API calls
+3. Column configuration system with custom cell renderers
+4. Row selection with bulk action support
+5. Loading states with skeleton rows
+6. Error handling and empty state displays
+7. Responsive design that works on mobile devices
+8. Integration with TanStack Query for data fetching
+9. Export functionality (CSV/Excel)
+10. Proper TypeScript generics for type safety
+```
+
+---
+
+
+
+## Step 14: Implement User Management Module
+
+**Goal:** Create comprehensive user management with CRUD operations, role assignment, and bulk actions.
+
+**Implementation Details:**
+- User list with advanced filtering and search
+- Create/edit user forms with validation
+- Role assignment interface
+- Bulk operations (activate/deactivate, delete)
+- User detail view with activity history
+- Password reset functionality
+
+**User Management Features:**
+- User listing with filters (role, status, tenant)
+- Create/edit user seperate pages forms
+- Role assignment 
+- Bulk operations with confirmation dialogs
+- User profile view
+- Activity logs integration
+
+**Cursor Prompt:**
+```
+Create comprehensive user management module:
+1. Users list page with DataTable showing name, email, roles, status, last login
+2. Advanced filtering by role, status, tenant, and date ranges
+3. Create/Edit user seperate pages with React Hook Form + Zod validation
+4. Role assignment interface 
+5. Bulk operations: activate/deactivate, delete users with confirmation
+6. User detail view with profile info and activity logs
+7. Password reset functionality for admins
+8. Proper permission checks for all operations
+9. API integration using TanStack Query mutations
+10. Success/error feedback for all operations
+```
+
+---
+
+## Step 15: Build Role and Permission Management
+
+**Goal:** Create an interface for managing roles and their permissions with an intuitive matrix view.
+
+**Implementation Details:**
+- Role listing and CRUD operations
+- Permission matrix interface for easy assignment
+- Module and action-based permission system
+- Global vs tenant-specific roles
+- Permission inheritance visualization
+
+**Permission Management Features:**
+- Role list with create/edit/delete
+- Permission matrix with modules and actions (CRUD)
+- Visual indicators for granted/denied permissions
+- Bulk permission assignment
+- Role cloning functionality
+- Permission preview for users
+
+**Cursor Prompt:**
+```
+Create role and permission management system:
+1. Roles list page with DataTable showing role name, type (global/tenant), user count
+2. Create/Edit role seperate pages with basic role information
+3. Permission matrix component showing modules vs actions (Create, Read, Update, Delete)
+4. Interactive checkbox grid for permission assignment
+5. Bulk permission operations (grant/deny by module or action)
+6. Role cloning functionality to copy permissions
+7. Permission preview showing effective permissions for selected users
+8. Global vs tenant-specific role management
+9. API integration for role CRUD and permission updates
+10. Visual feedback for permission changes
+```
+
+---
+
+## Step 16: Create Module and Menu Management
+
+**Goal:** Build an interface for managing application modules and menu structure with drag-and-drop reordering.
+
+**Implementation Details:**
+- Module listing with hierarchical display
+- Create/edit modules and submodules
+- Drag-and-drop reordering functionality
+ - Module activation/deactivation
+- Icon assignment for menu items
+
+**Module Management Features:**
+- Hierarchical module display
+- Drag-and-drop reordering
+- Module/submodule CRUD operations
+- Menu preview functionality
+- Icon picker for menu items
+- Bulk operations (activate/deactivate)
+
+**Cursor Prompt:**
+```
+Create module and menu management system:
+1. Modules list displaying hierarchical structure with drag-and-drop reordering
+2. Create/Edit module seperate pages with name, description, icon, and parent selection
+3. Submodule management within each module
+ 5. Icon picker component using Lucide React icons
+6. Bulk operations for module activation/deactivation
+7. Order index management with visual feedback
+8. API integration for module CRUD and reordering
+9. Permission-based access to module management
+10. Menu rebuild trigger after changes
+```
+
+---
+
+---
+
+## Step 18: Build Support Ticket System
+
+**Goal:** Create a comprehensive support ticket system with replies, attachments, and status management.
+
+**Implementation Details:**
+- Ticket listing with filters and priority indicators
+- Ticket creation with file attachments
+- Threaded replies with rich text editor
+- Status workflow management
+- File upload and download functionality
+- Email notifications integration
+
+**Support System Features:**
+- Ticket list with priority and status indicators
+- Create ticket form with attachment support
+- Ticket detail view with reply thread
+- File upload with drag-and-drop
+- Status change workflow
+- Internal notes system
+- Search and filtering
+
+**Cursor Prompt:**
+```
+Create comprehensive support ticket system:
+1. Support tickets list with priority indicators, status badges, and advanced filtering
+2. Create ticket seperate pages with title, description, priority, and file attachment support
+3. Ticket detail view with threaded replies and status timeline
+4. Reply composer with rich text editing and attachment upload
+5. File upload component with drag-and-drop and progress indicators
+6. Status management workflow (Open, In Progress, Resolved, Closed)
+7. Internal notes system for admin-only comments
+8. Search functionality across ticket content and replies
+9. API integration for tickets, replies, and file uploads
+ ```
+
+---
+
+## Step 19: Implement Audit Log Viewer
+
+**Goal:** Create an audit log viewer with advanced filtering and export capabilities.
+
+**Implementation Details:**
+- Audit log listing with detailed information
+- Advanced filtering by user, action, date, module
+- Export functionality (CSV, Excel)
+- Log detail view with before/after comparison
+- Search across log content
+ 
+**Audit Log Features:**
+- Comprehensive log listing
+- Multi-criteria filtering
+- Export with custom date ranges
+- JSON diff viewer for changes
+- User and IP tracking
+- Performance optimized pagination
+
+**Cursor Prompt:**
+```
+Create audit log viewer system:
+1. Audit logs list with DataTable showing timestamp, user, action, module, IP address
+2. Advanced filtering by user, action type, date range, module, and IP address
+3. Log detail seperate pages with before/after JSON comparison
+4. Export functionality with date range selection (CSV/Excel)
+5. Search functionality across log descriptions and details
+6. Visual diff component for showing data changes
+7. User profile links from audit entries
+8. Pagination optimized for large datasets
+9. API integration with proper permission checks
+ ```
+
+---
+
+## Step 20: Create Device and Session Management
+
+**Goal:** Build user device and session management with security features and analytics.
+
+**Implementation Details:**
+- Device listing with browser, OS, and location info
+- Session management with revoke capabilities
+- Security alerts for suspicious activity
+- Device fingerprinting and tracking
+- Multi-device support with limits
+- Session analytics and insights
+
+**Device Management Features:**
+- Active device listing
+- Device revocation with confirmation
+- Session timeline and activity
+- Security alerts and notifications
+- Device limits enforcement
+- Login history tracking
+
+**Cursor Prompt:**
+```
+Create device and session management system:
+1. Devices list showing browser, OS, location, and last activity
+2. Active sessions management with individual device revocation
+3. Session history with login/logout timestamps and IP tracking
+4. Security alerts for unusual login patterns or locations
+5. Bulk device revocation with "Revoke all other sessions" option
+6. Device information parsing and display with proper icons
+7. Session analytics with charts showing usage patterns
+8. API integration for device management endpoints
+9. Real-time session updates and automatic logout on revocation
+10. Mobile-responsive design for device management
+```
+
+---
+
+## Step 21: Implement Error Boundaries and Loading States
+
+**Goal:** Create comprehensive error handling and loading state management throughout the application.
+
+**Implementation Details:**
+- Global error boundary with fallback UI
+- Route-level error boundaries
+- Loading skeletons for all major components
+- Error retry mechanisms
+- Offline state handling
+- Performance monitoring integration
+
+**Error Handling Features:**
+- Global error boundary
+- Component-level error boundaries
+- Loading skeletons
+- Retry mechanisms
+- Offline detection
+- Error logging and reporting
+
+**Cursor Prompt:**
+```
+Implement comprehensive error handling and loading states:
+1. Global ErrorBoundary component with fallback UI and error reporting
+2. Route-level error boundaries for page-specific error handling
+3. Loading skeleton components for tables, forms, and content areas
+4. Error retry mechanisms with exponential backoff
+5. Offline state detection and user notification
+6. Suspense boundaries for lazy-loaded components
+7. Loading states for all API operations with proper UX
+8. Error logging service integration (optional)
+9. Custom 404 and 500 error pages
+10. Performance monitoring with error tracking
+```
+
+---
+
+## Step 22: Build Dashboard and Analytics
+
+**Goal:** Create an informative dashboard with key metrics, charts, and quick actions.
+
+**Implementation Details:**
+- Key performance indicators (KPIs)
+- Interactive charts and graphs
+- Recent activity feeds
+- Quick action buttons
+- Responsive dashboard layout
+ 
+**Dashboard Features:**
+- KPI cards (users, tenants, tickets, etc.)
+- Interactive charts with drill-down
+- Recent activity timeline
+- Quick actions panel
+- Responsive grid layout
+- Data refresh capabilities
+
+**Cursor Prompt:**
+```
+Create comprehensive admin dashboard:
+1. KPI cards showing key metrics (total users, active tenants, open tickets, etc.)
+2. Interactive charts using a charting library (Chart.js or Recharts)
+3. Recent activity feed with user actions and system events
+4. Quick actions panel for common administrative tasks
+5. Responsive dashboard layout with grid system
+ 7. Customizable dashboard widgets (drag-and-drop optional)
+8. Date range filters for analytics
+9. Export capabilities for dashboard data
+10. Mobile-optimized dashboard view
+```
+
+---
+
+## Step 23: Add Advanced Search and Filtering
+
+**Goal:** Implement global search functionality and advanced filtering across all modules.
+
+**Implementation Details:**
+- Global search with autocomplete
+- Saved search filters
+- Advanced filter builder
+- Search result highlighting
+- Cross-module search capabilities
+- Search history and suggestions
+
+**Search Features:**
+- Global search bar in header
+- Module-specific advanced filters
+- Filter saving and management
+- Search result aggregation
+ - Search analytics
+
+**Cursor Prompt:**
+```
+Implement advanced search and filtering system:
+1. Global search component in header with autocomplete and recent searches
+2. Advanced filter builder with dynamic filter criteria
+3. Saved search functionality with user-specific filter storage
+4. Search result highlighting and relevance scoring
+5. Cross-module search with categorized results
+6. Filter presets for common searches
+7. Search history with quick access to recent queries
+8. search suggestions with debounced API calls
+9. Export filtered results functionality
+10. Search analytics and popular queries tracking
+```
+
+---
+
+## Step 24: Implement Settings and Configuration
+
+**Goal:** Create a comprehensive settings interface for system and user preferences.
+
+**Implementation Details:**
+- User profile settings
+- System configuration management
+- Theme and appearance settings
+ - Security settings
+- Integration configurations
+
+**Settings Features:**
+- Tabbed settings interface
+- User profile management
+- System-wide configurations
+ - Security preferences
+
+**Cursor Prompt:**
+```
+Create comprehensive settings and configuration system:
+1. User settings page with profile, preferences, and security tabs
+2. System settings interface for superadmins (email config, security policies)
+3. Theme customization with light/dark mode and color scheme options
+4. Notification preferences with granular control
+5. Security settings (2FA setup, password policies, session management)
+6. Integration settings for third-party services
+7. Backup and restore functionality for configurations
+8. Settings validation 
+9. API integration for settings persistence
+10. Settings export/import functionality
+```
+
+---
+
+## Step 25: Testing, Optimization, and Deployment Preparation
+
+**Goal:** Implement comprehensive testing, performance optimization, and prepare for deployment.
+
+**Implementation Details:**
+- Unit tests for components and hooks
+- Integration tests for user flows
+- Performance optimization and bundle analysis
+- Accessibility improvements
+- SEO optimization
+- Deployment configuration
+
+**Testing and Optimization:**
+- Component testing with Jest and Testing Library
+- E2E testing with Playwright
+- Performance audits with Lighthouse
+- Bundle size optimization
+- Accessibility compliance
+- Production build optimization
+
+**Cursor Prompt:**
+```
+Implement testing, optimization, and deployment preparation:
+1. Unit tests for critical components using Jest and React Testing Library
+2. Integration tests for key user flows (login, user management, etc.)
+3. E2E tests with Playwright for complete user journeys
+4. Performance optimization with code splitting and lazy loading
+5. Bundle analysis and optimization with webpack-bundle-analyzer
+6. Accessibility improvements with aria labels and keyboard navigation
+7. SEO optimization with proper meta tags and structured data
+8. Production build configuration with environment variables
+9. Docker configuration for containerized deployment
+10. CI/CD pipeline setup for automated testing and deployment
+```
+
+---
+
+## Environment Variables Setup
+
+Create a `.env.local` file with these variables:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3001/api
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_UPLOAD_URL=http://localhost:3001/uploads
+```
+
+## Folder Structure
+
+```
+multi-tenant-admin/
+├── app/                          # Next.js App Router pages
+│   ├── (auth)/                   # Auth routes group
+│   │   └── login/                # Login page
+│   ├── (dashboard)/              # Dashboard routes group
+│   │   ├── users/                # User management
+│   │   ├── roles/                # Role management
+│   │   ├── tenants/              # Tenant management
+│   │   ├── support/              # Support system
+│   │   ├── audit/                # Audit logs
+│   │   └── settings/             # Settings
+│   └── layout.tsx                # Root layout
+├── components/                   # React components
+│   ├── ui/                       # Shadcn/UI components
+│   ├── forms/                    # Form components
+│   ├── tables/                   # Table components
+│   └── layout/                   # Layout components
+├── lib/                          # Utility libraries
+│   ├── axios.ts                  # Axios configuration
+│   ├── auth.ts                   # Auth utilities
+│   └── utils.ts                  # General utilities
+├── hooks/                        # Custom React hooks
+├── store/                        # Redux store
+├── types/                        # TypeScript definitions
+└── styles/                       # Global styles
+```
+
+## Key Dependencies Summary
+
+```json
+{
+  "dependencies": {
+    "next": "^14.0.0",
+    "@reduxjs/toolkit": "^2.0.1",
+    "redux-persist": "^6.0.0",
+    "@tanstack/react-query": "^5.17.0",
+    "axios": "^1.6.5",
+    "react-hook-form": "^7.48.2",
+    "@hookform/resolvers": "^3.3.2",
+    "zod": "^3.22.4",
+    "sonner": "^1.3.1",
+    "lucide-react": "^0.303.0",
+    "tailwindcss": "^3.4.0",
+    "@radix-ui/react-dialog": "^1.0.5",
+    "@radix-ui/react-dropdown-menu": "^2.0.6"
+  }
+}
+```
+
+## Next Steps After Implementation
+
+1. **Security Review**: Conduct thorough security testing
+2. **Performance Testing**: Load testing and optimization
+3. **User Acceptance Testing**: Get feedback from end users
+4. **Documentation**: Create user guides and API documentation
+5. **Deployment**: Set up production environment
+6. **Monitoring**: Implement error tracking and analytics
+7. **Maintenance**: Plan for ongoing updates and improvements
+

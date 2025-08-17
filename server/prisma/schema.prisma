@@ -94,18 +94,23 @@ model Module {
   id          String    @id @default(cuid())
   name        String
   description String?
+  icon        String?   @default("FileText")
+  parentId    String?   @map("parent_id")
   isActive    Boolean   @default(true) @map("is_active")
   orderIndex  Int       @default(0) @map("order_index")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   // Relations
+  parent            Module?           @relation("ModuleHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children          Module[]          @relation("ModuleHierarchy")
   submodules        Submodule[]
   rolePermissions   RolePermission[]
 
   @@map("modules")
   @@index([isActive])
   @@index([orderIndex])
+  @@index([parentId])
 }
 
 model Submodule {
@@ -251,7 +256,7 @@ model RefreshToken {
   id        String   @id @default(cuid())
   userId    String   @map("user_id")
   deviceId  String?  @map("device_id")
-  token     String   @unique
+  token     String   @unique @db.VarChar(1000)
   isActive  Boolean  @default(true) @map("is_active")
   expiresAt DateTime @map("expires_at")
   createdAt DateTime @default(now()) @map("created_at")
@@ -271,7 +276,7 @@ model RefreshToken {
 model ResetToken {
   id        String   @id @default(cuid())
   userId    String   @map("user_id")
-  token     String   @unique
+  token     String   @unique @db.VarChar(1000)
   expiresAt DateTime @map("expires_at")
   isUsed    Boolean  @default(false) @map("is_used")
   createdAt DateTime @default(now()) @map("created_at")

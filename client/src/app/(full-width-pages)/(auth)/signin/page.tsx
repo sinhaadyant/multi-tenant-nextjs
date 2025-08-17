@@ -1,11 +1,24 @@
-import SignInForm from "@/components/auth/SignInForm";
-import { Metadata } from "next";
+"use client";
 
-export const metadata: Metadata = {
-  title: "Next.js SignIn Page | TailAdmin - Next.js Dashboard Template",
-  description: "This is Next.js Signin Page TailAdmin Dashboard Template",
-};
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function SignIn() {
-  return <SignInForm />;
+  const router = useRouter();
+
+  useEffect(() => {
+    // Redirect to the new login page
+    router.replace("/login");
+  }, [router]);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+        <p className="mt-4 text-gray-600 dark:text-gray-400">
+          Redirecting to login...
+        </p>
+      </div>
+    </div>
+  );
 }

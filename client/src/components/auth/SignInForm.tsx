@@ -1,15 +1,50 @@
 "use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import Checkbox from "@/components/form/input/Checkbox";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons";
-import Link from "next/link";
-import React, { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { loginSchema, type LoginFormData } from "@/lib/authSchemas";
+import { Alert } from "@/components/ui";
 
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
+  const { login, loginAsync, isLoginLoading, loginError, clearError } =
+    useAuth();
+  const router = useRouter();
+
+  const form = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+      tenant_slug: "",
+      remember_me: false,
+    },
+  });
+
+  const onSubmit = async (data: LoginFormData) => {
+    clearError();
+    try {
+      const result = await loginAsync(data);
+      if (result.success) {
+        // Redirect to dashboard after successful login
+        router.push("/");
+      }
+    } catch (error) {
+      // Error is already handled by the login function
+      console.error("Login failed:", error);
+    }
+  };
+
   return (
     <div className="flex flex-col flex-1 lg:w-1/2 w-full">
       <div className="w-full max-w-md sm:pt-10 mx-auto mb-5">
@@ -84,13 +119,34 @@ export default function SignInForm() {
                 </span>
               </div>
             </div>
-            <form>
+            <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
               <div className="space-y-6">
+                {/* Error Alert */}
+                {loginError && (
+                  <Alert
+                    variant="error"
+                    title="Login Error"
+                    message={loginError?.message || "Login failed"}
+                  />
+                )}
+
                 <div>
                   <Label>
                     Email <span className="text-error-500">*</span>{" "}
                   </Label>
-                  <Input placeholder="info@gmail.com" type="email" />
+                  <Input
+                    placeholder="info@gmail.com"
+                    type="email"
+                    name="email"
+                    defaultValue={form.watch("email")}
+                    onChange={e => form.setValue("email", e.target.value)}
+                    disabled={isLoginLoading}
+                  />
+                  {form.formState.errors.email && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {form.formState.errors.email.message}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label>
@@ -100,6 +156,10 @@ export default function SignInForm() {
                     <Input
                       type={showPassword ? "text" : "password"}
                       placeholder="Enter your password"
+                      name="password"
+                      defaultValue={form.watch("password")}
+                      onChange={e => form.setValue("password", e.target.value)}
+                      disabled={isLoginLoading}
                     />
                     <span
                       onClick={() => setShowPassword(!showPassword)}
@@ -112,24 +172,58 @@ export default function SignInForm() {
                       )}
                     </span>
                   </div>
+                  {form.formState.errors.password && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {form.formState.errors.password.message}
+                    </p>
+                  )}
                 </div>
+
+                {/* Tenant Slug Field */}
+                <div>
+                  <Label>Tenant (Optional)</Label>
+                  <Input
+                    placeholder="Enter tenant slug"
+                    name="tenant_slug"
+                    defaultValue={form.watch("tenant_slug")}
+                    onChange={e => form.setValue("tenant_slug", e.target.value)}
+                    disabled={isLoginLoading}
+                  />
+                  {form.formState.errors.tenant_slug && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {form.formState.errors.tenant_slug.message}
+                    </p>
+                  )}
+                </div>
+
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Checkbox checked={isChecked} onChange={setIsChecked} />
+                    <Checkbox
+                      checked={form.watch("remember_me") || false}
+                      onChange={checked =>
+                        form.setValue("remember_me", checked)
+                      }
+                      disabled={isLoginLoading}
+                    />
                     <span className="block font-normal text-gray-700 text-theme-sm dark:text-gray-400">
                       Keep me logged in
                     </span>
                   </div>
                   <Link
-                    href="/reset-password"
+                    href="/forgot-password"
                     className="text-sm text-brand-500 hover:text-brand-600 dark:text-brand-400"
                   >
                     Forgot password?
                   </Link>
                 </div>
                 <div>
-                  <Button className="w-full" size="sm">
-                    Sign in
+                  <Button
+                    className="w-full"
+                    size="sm"
+                    disabled={isLoginLoading}
+                    onClick={form.handleSubmit(onSubmit)}
+                  >
+                    {isLoginLoading ? "Signing in..." : "Sign in"}
                   </Button>
                 </div>
               </div>

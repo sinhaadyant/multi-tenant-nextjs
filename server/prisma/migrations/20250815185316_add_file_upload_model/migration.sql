@@ -176,8 +176,6 @@ ALTER TABLE `file_uploads` ADD CONSTRAINT `file_uploads_tenant_id_fkey` FOREIGN 
 
 -- RedefineIndex
 CREATE INDEX `role_permissions_module_id_idx` ON `role_permissions`(`module_id`);
-DROP INDEX `role_permissions_module_id_fkey` ON `role_permissions`;
 
 -- RedefineIndex
 CREATE INDEX `role_permissions_submodule_id_idx` ON `role_permissions`(`submodule_id`);
-DROP INDEX `role_permissions_submodule_id_fkey` ON `role_permissions`;

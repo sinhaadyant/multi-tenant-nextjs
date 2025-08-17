@@ -81,7 +81,7 @@ export class TokenService {
     // Log audit
     await this.auditRepository.logUserAction(
       oldTokenRecord.userId,
-      oldTokenRecord.userId,
+      null, // We don't have user object here, so pass null for tenantId
       'REFRESH_TOKEN_ROTATED',
       '127.0.0.1',
       {
@@ -102,7 +102,7 @@ export class TokenService {
       // Log audit
       await this.auditRepository.logUserAction(
         tokenRecord.userId,
-        tokenRecord.userId,
+        null, // We don't have user object here, so pass null for tenantId
         'REFRESH_TOKEN_INVALIDATED',
         '127.0.0.1',
         {
@@ -122,7 +122,7 @@ export class TokenService {
     // Log audit
     await this.auditRepository.logUserAction(
       userId,
-      userId,
+      null, // We don't have user object here, so pass null for tenantId
       'ALL_REFRESH_TOKENS_INVALIDATED',
       '127.0.0.1',
       { userId }

@@ -3,11 +3,33 @@ import { z } from 'zod';
 // Create user validation schema
 export const createUserSchema = z.object({
   name: z
-    .string()
-    .min(1, 'Name is required')
-    .max(100, 'Name must be less than 100 characters'),
-  email: z.string().email('Invalid email format'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+    .string({
+      required_error: 'Name is required',
+      invalid_type_error: 'Name is required',
+    })
+    .refine(val => val && val.trim().length > 0, {
+      message: 'Name is required',
+    })
+    .refine(val => val.length <= 100, {
+      message: 'Name must be less than 100 characters',
+    }),
+  email: z
+    .string({
+      required_error: 'Email is required',
+      invalid_type_error: 'Email is required',
+    })
+    .refine(val => val && val.trim().length > 0, {
+      message: 'Email is required',
+    })
+    .refine(val => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), {
+      message: 'Invalid email format',
+    }),
+  password: z
+    .string({
+      required_error: 'Password is required',
+      invalid_type_error: 'Password is required',
+    })
+    .min(8, 'Password must be at least 8 characters'),
   tenantId: z.string().optional(),
   isSuperadmin: z.boolean().default(false),
   isActive: z.boolean().default(true),
@@ -68,15 +90,44 @@ export const removeRoleSchema = z.object({
 
 // Login validation schema
 export const loginSchema = z.object({
-  email: z.string().email('Invalid email format'),
-  password: z.string().min(1, 'Password is required'),
+  email: z
+    .string({
+      required_error: 'Email is required',
+      invalid_type_error: 'Email is required',
+    })
+    .refine(val => val && val.trim().length > 0, {
+      message: 'Email is required',
+    })
+    .refine(val => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), {
+      message: 'Invalid email format',
+    }),
+  password: z
+    .string({
+      required_error: 'Password is required',
+      invalid_type_error: 'Password is required',
+    })
+    .refine(val => val && val.trim().length > 0, {
+      message: 'Password is required',
+    }),
   tenantSlug: z.string().optional(),
 });
 
 // Change password validation schema
 export const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, 'Current password is required'),
-  newPassword: z.string().min(8, 'New password must be at least 8 characters'),
+  currentPassword: z
+    .string({
+      required_error: 'Current password is required',
+      invalid_type_error: 'Current password is required',
+    })
+    .refine(val => val && val.trim().length > 0, {
+      message: 'Current password is required',
+    }),
+  newPassword: z
+    .string({
+      required_error: 'New password is required',
+      invalid_type_error: 'New password is required',
+    })
+    .min(8, 'New password must be at least 8 characters long'),
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;

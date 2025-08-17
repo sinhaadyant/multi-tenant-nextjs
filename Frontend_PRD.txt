@@ -361,6 +361,9 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
       Create Supertest integration tests for /api/auth and /api/users endpoints covering login, refresh, list users with filtering and permission behaviors.
       ```
 
+Integration Testing - All utilities and schemas are tested and working
+Route Implementation - Controllers can now use the validation middleware
+Frontend Integration - Consistent API contracts for frontend development
 ===================
 
 **Frontend – Setup & Core Features**
@@ -374,7 +377,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
       ```text
       Create a Next.js + TypeScript project named multi-tenant-frontend with TailwindCSS and shadcn UI preconfigured. Add eslint, prettier, and basic layout pages.
       ```
-??==>
+
 32. Add global state: Redux Toolkit + Redux Persist; TanStack Query + Axios
 
     * Goal: central store for auth and UI, queryClient for server state
@@ -384,7 +387,7 @@ Each step includes: *goal*, *acceptance criteria*, and a **Cursor prompt** to sc
       ```text
       Implement Redux Toolkit store with authSlice, tenantSlice, UI slice. Add redux-persist to persist auth. Setup Axios instance with interceptors and TanStack Query Provider.
       ```
-
+??==>
 33. Implement AuthGuard and route protection
 
     * Goal: HOC/component `AuthGuard` that checks Redux auth & permissions and redirects to login

@@ -5,6 +5,7 @@ import { SidebarProvider } from "@/context/SidebarContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { Providers } from "@/providers/Providers";
 import { Toaster } from "@/components/ui/sonner";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -18,12 +19,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${outfit.className} dark:bg-gray-900`}>
-        <Providers>
-          <ThemeProvider>
-            <SidebarProvider>{children}</SidebarProvider>
-          </ThemeProvider>
-        </Providers>
-        <Toaster />
+        <ErrorBoundary>
+          <Providers>
+            <ThemeProvider>
+              <SidebarProvider>{children}</SidebarProvider>
+            </ThemeProvider>
+          </Providers>
+          <Toaster />
+        </ErrorBoundary>
       </body>
     </html>
   );

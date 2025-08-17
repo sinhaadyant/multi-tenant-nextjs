@@ -13,35 +13,48 @@ async function main() {
       data: {
         name: 'Dashboard',
         description: 'Main dashboard and analytics',
+        icon: 'BarChart',
         orderIndex: 1,
       },
     }),
     prisma.module.create({
       data: {
-        name: 'Users',
+        name: 'User Management',
         description: 'User management and profiles',
+        icon: 'Users',
         orderIndex: 2,
       },
     }),
     prisma.module.create({
       data: {
-        name: 'Roles',
+        name: 'Role Management',
         description: 'Role and permission management',
+        icon: 'Shield',
         orderIndex: 3,
+      },
+    }),
+    prisma.module.create({
+      data: {
+        name: 'Tenant Management',
+        description: 'Manage tenants and their settings',
+        icon: 'Building',
+        orderIndex: 4,
       },
     }),
     prisma.module.create({
       data: {
         name: 'Support',
         description: 'Support ticket system',
-        orderIndex: 4,
+        icon: 'HelpCircle',
+        orderIndex: 5,
       },
     }),
     prisma.module.create({
       data: {
         name: 'Notifications',
         description: 'System notifications and alerts',
-        orderIndex: 5,
+        icon: 'Bell',
+        orderIndex: 6,
       },
     }),
   ]);
@@ -347,7 +360,9 @@ async function main() {
     )
   );
 
-  console.log(`✅ Created ${superadminPermissions.length} superadmin permissions`);
+  console.log(
+    `✅ Created ${superadminPermissions.length} superadmin permissions`
+  );
 
   // Create sample support tickets
   console.log('Creating sample support tickets...');
@@ -381,14 +396,16 @@ async function main() {
       data: {
         ticketId: supportTickets[0].id,
         userId: tenantAdmins[0].id,
-        replyText: 'We are investigating the login issue. Please try clearing your browser cache.',
+        replyText:
+          'We are investigating the login issue. Please try clearing your browser cache.',
       },
     }),
     prisma.supportReply.create({
       data: {
         ticketId: supportTickets[1].id,
         userId: superadmin.id,
-        replyText: 'Thank you for the feature request. We will review this and get back to you.',
+        replyText:
+          'Thank you for the feature request. We will review this and get back to you.',
       },
     }),
   ]);
@@ -417,7 +434,7 @@ async function main() {
 }
 
 main()
-  .catch((e) => {
+  .catch(e => {
     console.error('❌ Error during seeding:', e);
     process.exit(1);
   })

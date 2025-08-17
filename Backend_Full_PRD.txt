@@ -1,29 +1,95 @@
-Backend Implementation Guide - Multi-Tenant Admin Panel API
-Prerequisites
+# Backend Implementation Guide - Multi-Tenant Admin Panel API (Updated)
 
-Node.js 18+ installed
-Mysql database
-Understanding of Express.js, TypeScript, Prisma, and JWT authentication
-Redis for session management and caching
+## Prerequisites
+- Node.js 18+ installed
+- MySQL database
+- Understanding of Express.js, TypeScript, Prisma, and JWT authentication
+- Redis for session management and caching
+
+---
+
+## **Permission-Based Data Scope Implementation**
+
+### **Core Data Scope Rules:**
+```typescript
+// API Behavior Examples:
+
+// GET /api/users
+// Superadmin: Returns all users across all tenants
+// canViewAll: Returns users within same tenant  
+// canRead: Returns only the user's own profile
+
+// POST /api/users
+// Requires canCreate permission
+// Tenant scope: Can only create users in same tenant
+// Field validation based on permissions
+
+// PUT /api/users/:id
+// canUpdate + canViewAll: Can update any user in tenant
+// canUpdate only: Can update only own profile
+// Superadmin: Can update any user across tenants
+
+// DELETE /api/users/:id
+// canDelete + canViewAll: Can delete any user in tenant
+// canDelete only: Cannot delete (no access to others)
+// Superadmin: Can delete any user across tenants
+```
+
+### **Data Scope Middleware:**
+```typescript
+interface DataScopeContext {
+  userTenantId: string;
+  isSuperadmin: boolean;
+  canViewAll: boolean;
+  canCreate: boolean;
+  canRead: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
+  userId: string;
+}
+
+const applyDataScope = (query: any, context: DataScopeContext) => {
+  if (context.isSuperadmin) {
+    return query; // No filtering for superadmin
+  }
+  
+  if (context.canViewAll) {
+    return query.where({ tenantId: context.userTenantId });
+  }
+  
+  if (context.canRead) {
+    return query.where({ 
+      OR: [
+        { userId: context.userId },
+        { createdBy: context.userId }
+      ]
+    });
+  }
+  
+  throw new Error('Insufficient permissions');
+};
+```
 
 
-Step 1: Initialize Node.js Project with TypeScript
-Goal: Create a new Node.js project with TypeScript configuration and essential development tools.
-Implementation Details:
+---
 
-Initialize npm project with TypeScript setup
-Configure TypeScript with strict mode and modern settings
-Set up ESLint and Prettier for code quality
-Configure nodemon for development hot reload
-Create basic folder structure
+## Step 1: Initialize Node.js Project with TypeScript
+**Goal:** Create a new Node.js project with TypeScript configuration and essential development tools.
 
-Acceptance Criteria:
+**Implementation Details:**
+- Initialize npm project with TypeScript setup
+- Configure TypeScript with strict mode and modern settings
+- Set up ESLint and Prettier for code quality
+- Configure nodemon for development hot reload
+- Create basic folder structure
 
-npm run dev starts the development server with hot reload
-TypeScript compilation works without errors
-ESLint and Prettier are properly configured
+**Acceptance Criteria:**
+- `npm run dev` starts the development server with hot reload
+- TypeScript compilation works without errors
+- ESLint and Prettier are properly configured
 
-Cursor Prompt:
+**Cursor Prompt:**
+```
 Create a new Node.js backend project named "multi-tenant-admin-api" with:
 - TypeScript configuration with strict mode enabled
 - ESLint and Prettier setup with recommended rules
@@ -32,39 +98,43 @@ Create a new Node.js backend project named "multi-tenant-admin-api" with:
 - Package.json scripts for dev, build, start, lint, and test
 - .gitignore file with Node.js and environment variables
 - Environment variables setup with .env.example
-====???
-Step 2: Install and Configure Core Dependencies
-Goal: Install all necessary packages for Express server, database, authentication, and utilities.
-Implementation Details:
+```
+---
 
-Express.js with TypeScript support
-Prisma ORM for database management
-JWT for authentication
-Bcrypt for password hashing
-Express middleware for CORS, helmet, rate limiting
-File upload handling with Multer
+## Step 2: Install and Configure Core Dependencies
+**Goal:** Install all necessary packages for Express server, database, authentication, and utilities.
 
-Dependencies to Install:
-json{
-  "express":  
-  "@types/express": 
-  "prisma":  
-  "@prisma/client": 
-  "jsonwebtoken":  
-  "@types/jsonwebtoken":  
-  "bcryptjs": 
-  "@types/bcryptjs":  
-  "cors":  
-  "@types/cors": 
-  "helmet":  
-  "express-rate-limit":  
-  "multer": " 
-  "@types/multer": 
-  "redis": ,
-  "dotenv": 
-  "zod":  
-  "winston":  
+**Implementation Details:**
+- Express.js with TypeScript support
+- Prisma ORM for database management
+- JWT for authentication
+- Bcrypt for password hashing
+- Express middleware for CORS, helmet, rate limiting
+- File upload handling with Multer
+
+**Dependencies to Install:**
+```json
+{
+  "express": "^4.18.2",
+  "@types/express": "^4.17.21",
+  "prisma": "^5.7.1",
+  "@prisma/client": "^5.7.1",
+  "jsonwebtoken": "^9.0.2",
+  "@types/jsonwebtoken": "^9.0.5",
+  "bcryptjs": "^2.4.3",
+  "@types/bcryptjs": "^2.4.6",
+  "cors": "^2.8.5",
+  "@types/cors": "^2.8.17",
+  "helmet": "^7.1.0",
+  "express-rate-limit": "^7.1.5",
+  "multer": "^1.4.5-lts.1",
+  "@types/multer": "^1.4.11",
+  "redis": "^4.6.11",
+  "dotenv": "^0.16.3",
+  "zod": "^3.22.4",
+  "winston": "^3.11.0"
 }
+```
 Cursor Prompt:
 Install and configure these packages for the multi-tenant admin API:
 1. Express.js with TypeScript support and essential middleware
@@ -347,66 +417,106 @@ Create comprehensive role management API endpoints:
 10. GET /api/roles/hierarchy for role inheritance and permission visualization
 Include permission validation, conflict resolution, and audit logging.
 
-Step 10: Create Permission System API
-Goal: Build granular permission management with module-based access control.
-Implementation Details:
+---
 
-Module and submodule management
-Permission matrix (CRUD + ViewAll) per module
-Permission inheritance and calculation
-User effective permissions API
-Permission checking utilities
-Data scope management
+## Step 10: Create Permission System API
+**Goal:** Build granular permission management with module-based access control and data scope enforcement.
 
-Permission Features:
+**Implementation Details:**
+- Module and submodule management
+- Permission matrix (CRUD + ViewAll) per module
+- Permission inheritance and calculation
+- User effective permissions API
+- Permission checking utilities
+- Data scope management with tenant isolation
 
-Module-based permissions
-CRUD + ViewAll granular control
-Data scope (own data vs all data)
-Permission inheritance
-Effective permission calculation
-permission checking
+**API Behavior Examples:**
+```typescript
+// GET /api/permissions/matrix
+// Superadmin: Full permission matrix across all tenants
+// canViewAll: Tenant-specific permission matrix
+// canRead: Only own permission summary
 
-Permission Endpoints:
+// POST /api/permissions/check
+// Validates specific permission for current user
+// Considers data scope (own vs tenant vs global)
+// Returns permission result with scope information
 
-GET /api/modules - List all modules and submodules
-POST /api/modules - Create new module
-GET /api/permissions/matrix - Permission matrix view
-PUT /api/permissions/matrix - Update permission matrix
-GET /api/users/:id/permissions - User effective permissions
-POST /api/permissions/check - Check specific permission
+// GET /api/menu
+// Returns user-specific navigation menu
+// Filtered by user permissions and tenant access
+// Hierarchical structure with modules/submodules
+```
 
-Cursor Prompt:
-Create comprehensive permission management system:
-1. GET /api/modules with hierarchical module/submodule structure
-2. POST /api/modules for creating new modules with permission definitions
-3. GET /api/permissions/matrix showing role vs module permission grid
-4. PUT /api/permissions/matrix for bulk permission updates
-5. GET /api/users/:id/permissions calculating effective user permissions
-6. POST /api/permissions/check for permission validation
-7. GET /api/permissions/data-scope for determining user data access scope
-8. PUT /api/modules/:id/order for module ordering and menu structure
-9. GET /api/menu generating user-specific navigation menu
-10. Permission inheritance calculation for role hierarchies and conflicts
-Include efficient permission caching and updates.
+**Permission Features:**
+- Module-based permissions with hierarchical structure
+- CRUD + ViewAll granular control per module
+- Data scope enforcement (own data vs tenant data vs global)
+- Permission inheritance and role hierarchy
+- Effective permission calculation with caching
+- Real-time permission checking with data scope
 
-Step 11: Build Tenant Management API (Multi-Tenancy)
-Goal: Create comprehensive tenant management with isolation and configuration options.
-Implementation Details:
+**Permission Endpoints:**
+- `GET /api/modules` - List all modules and submodules
+- `POST /api/modules` - Create new module
+- `GET /api/permissions/matrix` - Permission matrix view
+- `PUT /api/permissions/matrix` - Update permission matrix
+- `GET /api/users/:id/permissions` - User effective permissions
+- `POST /api/permissions/check` - Check specific permission
+- `GET /api/menu` - Generate user-specific navigation menu
+- `GET /api/permissions/data-scope` - Get user data access scope
 
-Tenant CRUD operations
-Tenant-specific settings and configurations
-User-tenant associations
-Data isolation enforcement
-Tenant analytics and usage metrics
-Subdomain/domain management
+**Cursor Prompt:**
+```
+Create comprehensive permission management system with data scope behaviors:
+1. GET /api/modules with hierarchical module/submodule structure and permission-based filtering
+2. POST /api/modules for creating new modules with permission definitions and tenant scope
+3. GET /api/permissions/matrix showing role vs module permission grid with data scope indicators
+4. PUT /api/permissions/matrix for bulk permission updates with validation and inheritance
+5. GET /api/users/:id/permissions calculating effective user permissions with data scope
+6. POST /api/permissions/check for permission validation with scope-aware results
+7. GET /api/permissions/data-scope for determining user data access scope (own/tenant/global)
+8. PUT /api/modules/:id/order for module ordering and menu structure with permission checks
+9. GET /api/menu generating user-specific navigation menu filtered by permissions
+10. Permission inheritance calculation for role hierarchies and conflict resolution
+Include efficient permission caching, data scope middleware, and tenant isolation enforcement.
+```
 
-Tenant Features:
+---
 
-Tenant creation and configuration
-Domain and subdomain management
-Tenant-specific settings override
-User management per tenant
+## Step 11: Build Tenant Management API (Multi-Tenancy)
+**Goal:** Create comprehensive tenant management with isolation and configuration options.
+
+**Implementation Details:**
+- Tenant CRUD operations with superadmin-only access
+- Tenant-specific settings and configurations
+- User-tenant associations with proper isolation
+- Data isolation enforcement across all operations
+- Tenant analytics and usage metrics
+- Subdomain/domain management
+
+**API Behavior Examples:**
+```typescript
+// GET /api/tenants
+// Superadmin: Returns all tenants with full details
+// Regular users: Access denied (403)
+
+// POST /api/tenants
+// Superadmin only: Can create new tenants
+// Validates domain uniqueness and configuration
+
+// GET /api/tenants/:id/users
+// Superadmin: Can view any tenant's users
+// Tenant admin with canViewAll: Can view own tenant users only
+```
+
+**Tenant Features:**
+- Tenant creation and configuration with domain validation
+- Domain and subdomain management with DNS integration
+- Tenant-specific settings override with inheritance
+- User management per tenant with proper isolation
+- Usage analytics and billing integration hooks
+- Tenant activation/deactivation with data preservation
 Usage analytics and limits
 Billing integration hooks
 
@@ -435,93 +545,133 @@ Create comprehensive tenant management system:
 10. Tenant isolation middleware ensuring data access boundaries
 Include domain validation, usage tracking, and tenant-scoped queries.
 
-Step 12: Implement Support Ticket System API
-Goal: Create a comprehensive support ticket system with threaded conversations and file attachments.
-Implementation Details:
+---
 
-Ticket CRUD operations with status workflow
-Threaded reply system
-File attachment support
-Priority and category management
-Assignment and escalation
-Email notification hooks
+## Step 12: Implement Support Ticket System API
+**Goal:** Create a comprehensive support ticket system with threaded conversations and file attachments.
 
-Support System Features:
+**Implementation Details:**
+- Ticket CRUD operations with status workflow and data scope
+- Threaded reply system with permission-based access
+- File attachment support with tenant isolation
+- Priority and category management
+- Assignment and escalation with data scope
+- Email notification hooks
 
-Ticket creation and management
-Threaded conversation system
-File upload and download
-Status workflow automation
-Priority and SLA management
-Internal notes system
+**API Behavior Examples:**
+```typescript
+// GET /api/support/tickets
+// Superadmin: All tickets across all tenants
+// canViewAll: All tickets within tenant
+// canRead: Only own created tickets
 
-Support Endpoints:
+// POST /api/support/tickets/:id/replies
+// canCreate permission required
+// Tenant scope: Can only reply to accessible tickets
+// Auto-assigns tenant context from authenticated user
 
-GET /api/support/tickets - List tickets with filtering
-POST /api/support/tickets - Create new ticket
-GET /api/support/tickets/:id - Get ticket details
-PUT /api/support/tickets/:id - Update ticket
-POST /api/support/tickets/:id/replies - Add reply
-POST /api/support/tickets/:id/files - Upload attachments
-GET /api/support/tickets/:id/files/:fileId - Download file
-PUT /api/support/tickets/:id/status - Update status
+// GET /api/support/tickets/:id
+// Superadmin: Can view any ticket
+// canViewAll: Can view tickets in same tenant
+// canRead: Can only view own created tickets
+```
 
-Cursor Prompt:
-Create comprehensive support ticket system API:
-1. GET /api/support/tickets with advanced filtering (status, priority, assignee)
-2. POST /api/support/tickets for creating tickets with file attachments
-3. GET /api/support/tickets/:id with full thread and attachment history
-4. PUT /api/support/tickets/:id for updating ticket details and assignment
-5. POST /api/support/tickets/:id/replies for threaded conversation system
-6. POST /api/support/tickets/:id/files for secure file upload handling
-7. GET /api/support/files/:id for secure file download with permissions
-8. PUT /api/support/tickets/:id/status for workflow state management
-9. POST /api/support/tickets/:id/notes for internal admin notes
-10. GET /api/support/analytics for ticket metrics and SLA reporting
-Include file security, email notifications, and workflow automation.
+**Support System Features:**
+- Ticket creation and management with data scope enforcement
+- Threaded conversation system with permission-based access
+- File upload and download with tenant isolation
+- Status workflow automation with role-based transitions
+- Priority and SLA management with tenant-specific rules
+- Internal notes system for admin-only comments
 
-Step 13: Create Audit Logging System
-Goal: Implement comprehensive audit logging for all system activities with advanced querying capabilities.
-Implementation Details:
+**Support Endpoints:**
+- `GET /api/support/tickets` - List tickets with filtering and data scope
+- `POST /api/support/tickets` - Create new ticket with tenant context
+- `GET /api/support/tickets/:id` - Get ticket details with permission checks
+- `PUT /api/support/tickets/:id` - Update ticket with data scope validation
+- `POST /api/support/tickets/:id/replies` - Add reply with permission checks
+- `POST /api/support/tickets/:id/files` - Upload attachments with tenant scope
+- `GET /api/support/tickets/:id/files/:fileId` - Download file with permissions
+- `PUT /api/support/tickets/:id/status` - Update status with workflow validation
 
-Automatic audit logging middleware
-User action tracking
-Data change logging (before/after)
-System event logging
-Advanced filtering and search
-Export functionality
+**Cursor Prompt:**
+```
+Create comprehensive support ticket system API with data scope behaviors:
+1. GET /api/support/tickets with permission-based filtering (superadmin/canViewAll/canRead)
+2. POST /api/support/tickets for creating tickets with automatic tenant context assignment
+3. GET /api/support/tickets/:id with full thread and permission-based access control
+4. PUT /api/support/tickets/:id for updating ticket details with data scope validation
+5. POST /api/support/tickets/:id/replies for threaded conversation with permission checks
+6. POST /api/support/tickets/:id/files for secure file upload with tenant isolation
+7. GET /api/support/files/:id for secure file download with permission-based access
+8. PUT /api/support/tickets/:id/status for workflow state management with role validation
+9. POST /api/support/tickets/:id/notes for internal admin notes with permission checks
+10. GET /api/support/analytics for ticket metrics with tenant-scoped data
+Include data scope middleware, tenant isolation, permission validation, and audit logging.
+```
 
-Audit Features:
+---
 
-Automatic action logging
-Before/after data comparison
-User and IP tracking
-Advanced search and filtering
-Export capabilities
-Data retention policies
+## Step 13: Create Audit Logging System
+**Goal:** Implement comprehensive audit logging for all system activities with advanced querying capabilities and data scope enforcement.
 
-Audit Endpoints:
+**Implementation Details:**
+- Automatic audit logging middleware with data scope filtering
+- User action tracking with tenant isolation
+- Data change logging (before/after) with permission-based access
+- System event logging with scope-aware filtering
+- Advanced filtering and search with data scope
+- Export functionality with permission-based data access
 
-GET /api/audit/logs - List audit logs with filtering
-GET /api/audit/logs/:id - Get detailed log entry
-GET /api/audit/export - Export audit data
-GET /api/audit/stats - Audit statistics
-POST /api/audit/search - Advanced search
-GET /api/audit/users/:id - User activity history
+**API Behavior Examples:**
+```typescript
+// GET /api/audit/logs
+// Superadmin: All audit logs across all tenants
+// canViewAll: Audit logs within tenant scope
+// canRead: Only own activity logs
 
-Cursor Prompt:
-Create comprehensive audit logging system:
-1. Audit middleware that automatically logs all API requests and responses
-2. GET /api/audit/logs with advanced filtering (user, action, date, module)
-3. GET /api/audit/logs/:id with detailed log entry and data changes
-4. POST /api/audit/search for complex audit queries with multiple criteria
-5. GET /api/audit/export for CSV/Excel export with date range filtering
-6. GET /api/audit/stats for audit analytics and activity dashboards
-7. GET /api/users/:id/audit for user-specific activity history
-8. Data change tracking with before/after JSON comparison
-9. System event logging for auth, permissions, and configuration changes
-10. Audit data retention and archival system with configurable policies
-Include IP tracking, user agent logging, and performance optimization for large datasets.
+// GET /api/audit/export
+// Permission-based data export
+// Tenant scope filtering applied automatically
+// Includes only accessible audit entries
+
+// GET /api/audit/users/:id
+// Superadmin: Can view any user's audit history
+// canViewAll: Can view audit history of users in same tenant
+// canRead: Can only view own audit history
+```
+
+**Audit Features:**
+- Automatic action logging with data scope enforcement
+- Before/after data comparison with permission-based access
+- User and IP tracking with tenant isolation
+- Advanced search and filtering with data scope
+- Export capabilities with permission-based data access
+- Data retention policies with tenant-specific rules
+
+**Audit Endpoints:**
+- `GET /api/audit/logs` - List audit logs with filtering and data scope
+- `GET /api/audit/logs/:id` - Get detailed log entry with permission checks
+- `GET /api/audit/export` - Export audit data with scope filtering
+- `GET /api/audit/stats` - Audit statistics with tenant scope
+- `POST /api/audit/search` - Advanced search with data scope
+- `GET /api/audit/users/:id` - User activity history with permission checks
+
+**Cursor Prompt:**
+```
+Create comprehensive audit logging system with data scope behaviors:
+1. Audit middleware that automatically logs all API requests with data scope context
+2. GET /api/audit/logs with permission-based filtering (superadmin/canViewAll/canRead)
+3. GET /api/audit/logs/:id with detailed log entry and permission-based access control
+4. POST /api/audit/search for complex audit queries with data scope enforcement
+5. GET /api/audit/export for CSV/Excel export with permission-based data filtering
+6. GET /api/audit/stats for audit analytics with tenant-scoped data
+7. GET /api/users/:id/audit for user-specific activity history with permission checks
+8. Data change tracking with before/after JSON comparison and scope filtering
+9. System event logging for auth, permissions, and configuration changes with tenant isolation
+10. Audit data retention and archival system with tenant-specific policies
+Include data scope middleware, tenant isolation, permission validation, and performance optimization.
+```
 
 Step 14: Implement File Upload and Management System
 Goal: Create secure file upload system with proper validation, storage, and access control.
@@ -566,7 +716,65 @@ Create comprehensive file management system:
 10. File cleanup routines for orphaned and expired files
 Include comprehensive security, access control, and storage optimization.
 
-Step 15: Build Session Management System
+---
+
+## Step 14.5: Create Menu and Navigation API
+**Goal:** Implement dynamic menu generation based on user permissions and tenant access.
+
+**Implementation Details:**
+- Dynamic menu generation based on user permissions
+- Hierarchical menu structure with modules/submodules
+- Tenant-specific menu customization
+- Permission-based menu item filtering
+- Real-time menu updates with permission changes
+
+**API Behavior Examples:**
+```typescript
+// GET /api/menu
+// Returns user-specific navigation menu
+// Filtered by user permissions and tenant access
+// Hierarchical structure with modules/submodules
+// Includes menu item permissions and data scope indicators
+
+// GET /api/menu/preview
+// Superadmin: Preview menu for any user/tenant
+// canViewAll: Preview menu for users in same tenant
+// canRead: Preview only own menu structure
+```
+
+**Menu Features:**
+- Dynamic menu generation with permission filtering
+- Hierarchical structure with modules and submodules
+- Tenant-specific menu customization
+- Permission-based menu item visibility
+- Menu caching with permission-based invalidation
+- Menu preview functionality for administrators
+
+**Menu Endpoints:**
+- `GET /api/menu` - Get user-specific navigation menu
+- `GET /api/menu/preview` - Preview menu for specific user/tenant
+- `POST /api/menu/customize` - Customize menu structure (admin only)
+- `GET /api/menu/modules` - Get available modules for menu building
+
+**Cursor Prompt:**
+```
+Create dynamic menu and navigation API with permission-based behaviors:
+1. GET /api/menu with user-specific menu generation based on permissions
+2. GET /api/menu/preview for administrators to preview user menus
+3. POST /api/menu/customize for menu structure customization with permission checks
+4. GET /api/menu/modules for available modules with permission indicators
+5. Menu caching system with permission-based cache invalidation
+6. Hierarchical menu structure with modules/submodules and icons
+7. Tenant-specific menu customization and branding
+8. Menu item permission validation and data scope indicators
+9. Real-time menu updates when permissions change
+10. Menu analytics and usage tracking with tenant scope
+Include permission validation, tenant isolation, and menu caching optimization.
+```
+
+---
+
+## Step 15: Build Session Management System
 Goal: Implement comprehensive session management with device tracking and security features.
 Implementation Details:
 
@@ -694,48 +902,68 @@ Create comprehensive API security system:
 10. DDoS protection with adaptive rate limiting
 Include comprehensive security monitoring, threat intelligence, and automated responses.
 
-Step 18: Build Analytics and Reporting System
-Goal: Create comprehensive analytics system for usage metrics, performance monitoring, and business intelligence.
-Implementation Details:
+---
 
-Usage analytics and metrics collection
-Performance monitoring
-Custom report generation
-Data aggregation and visualization APIs
-Export capabilities
-Scheduled reporting
+## Step 18: Build Analytics and Reporting System
+**Goal:** Create comprehensive analytics system for usage metrics, performance monitoring, and business intelligence with data scope enforcement.
 
-Analytics Features:
+**Implementation Details:**
+- Usage analytics and metrics collection with tenant isolation
+- Performance monitoring with scope-aware data
+- Custom report generation with permission-based access
+- Data aggregation and visualization APIs with data scope
+- Export capabilities with permission-based data access
+- Scheduled reporting with tenant-specific delivery
 
-User activity analytics
-System performance metrics
-Custom dashboard data
-Report generation
-Data export capabilities
-Trend analysis
+**API Behavior Examples:**
+```typescript
+// GET /api/analytics/dashboard
+// Superadmin: Cross-tenant analytics and system-wide metrics
+// canViewAll: Tenant-specific analytics and user metrics
+// canRead: Personal analytics and own activity metrics
 
-Analytics Endpoints:
+// GET /api/analytics/users
+// Superadmin: User analytics across all tenants
+// canViewAll: User analytics within tenant scope
+// canRead: Only own user analytics and activity
 
-GET /api/analytics/dashboard - Main dashboard metrics
-GET /api/analytics/users - User analytics
-GET /api/analytics/performance - System performance
-POST /api/analytics/custom - Custom report generation
-GET /api/analytics/export - Data export
-GET /api/analytics/trends - Trend analysis
+// POST /api/analytics/custom
+// Permission-based report generation
+// Data scope filtering applied automatically
+// Tenant isolation for report data
+```
 
-Cursor Prompt:
-Create comprehensive analytics and reporting system:
-1. GET /api/analytics/dashboard with key metrics (users, tenants, tickets, etc.)
-2. GET /api/analytics/users for user activity and engagement metrics
-3. GET /api/analytics/performance for system performance monitoring
-4. POST /api/analytics/reports for custom report generation with parameters
-5. GET /api/analytics/export for data export in multiple formats
-6. GET /api/analytics/trends for historical data and trend analysis
-7. metrics collection and aggregation
-8. Performance monitoring with response times and error rates
-9. Business intelligence queries with complex aggregations
-10. Scheduled reporting system with email delivery
-Include data visualization helpers, caching for expensive queries, and export optimization.
+**Analytics Features:**
+- User activity analytics with data scope enforcement
+- System performance metrics with tenant isolation
+- Custom dashboard data with permission-based access
+- Report generation with data scope filtering
+- Data export capabilities with permission-based access
+- Trend analysis with tenant-specific data
+
+**Analytics Endpoints:**
+- `GET /api/analytics/dashboard` - Main dashboard metrics with data scope
+- `GET /api/analytics/users` - User analytics with tenant isolation
+- `GET /api/analytics/performance` - System performance with scope filtering
+- `POST /api/analytics/custom` - Custom report generation with permissions
+- `GET /api/analytics/export` - Data export with scope filtering
+- `GET /api/analytics/trends` - Trend analysis with tenant scope
+
+**Cursor Prompt:**
+```
+Create comprehensive analytics and reporting system with data scope behaviors:
+1. GET /api/analytics/dashboard with permission-based metrics (superadmin/canViewAll/canRead)
+2. GET /api/analytics/users for user activity with tenant-scoped data access
+3. GET /api/analytics/performance for system monitoring with scope-aware metrics
+4. POST /api/analytics/custom for permission-based report generation
+5. GET /api/analytics/export for data export with scope filtering
+6. GET /api/analytics/trends for historical analysis with tenant isolation
+7. Metrics collection and aggregation with data scope enforcement
+8. Performance monitoring with tenant-specific response times
+9. Business intelligence queries with permission-based data access
+10. Scheduled reporting system with tenant-scoped delivery
+Include data scope middleware, tenant isolation, permission validation, and caching optimization.
+```
 
 Step 19: Create Notification System API
 Goal: Implement comprehensive notification system for in-app, email, and system notifications.
@@ -783,14 +1011,12 @@ Implementation Details:
 
 Automated database backups
 Selective data export
-Backup scheduling and retention
 Data restoration capabilities
 Export format options (JSON, CSV, SQL)
 Incremental backup support
 
 Backup Features:
-
-Automated backup scheduling
+ 
 Selective data export
 Multiple export formats
 Backup verification
@@ -977,15 +1203,20 @@ Production monitoring
 Cursor Prompt:
 Create comprehensive testing and deployment system:
 1. Unit tests for all service functions using Jest with high coverage
-2. Integration tests for API endpoints with supertest
+2. Integration end 2 end tests for API endpoints with supertest
 3. Database testing with test database setup and cleanup
 4. Security testing with vulnerability scanning and penetration testing
 5. Performance testing with load testing and benchmarking
+
 6. Docker configuration with multi-stage builds and optimization
+
 7. Environment-specific configuration management
+10. Database migration and seed scripts for different environments
+
+
 8. CI/CD pipeline with automated testing and deployment
 9. Production monitoring setup with logging and alerting
-10. Database migration and seed scripts for different environments
+
 Include security hardening checklist, performance optimization, and deployment automation.
 
 Environment Variables Configuration
@@ -1183,16 +1414,161 @@ npx prisma db seed
 # Reset database (development only)
 npx prisma migrate reset
 
-Next Steps After Implementation
+---
 
-Security Audit: Comprehensive security testing and vulnerability assessment
-Performance Testing: Load testing and optimization under realistic conditions
-Documentation Review: Complete API documentation and developer guides
-Integration Testing: End-to-end testing with frontend application
-Monitoring Setup: Production monitoring, logging, and alerting systems
-Backup Verification: Test backup and restore procedures
-Deployment Pipeline: Automated CI/CD pipeline with proper staging environments
-User Training: Documentation and training materials for administrators
-Maintenance Planning: Regular update schedules and monitoring procedures
-Compliance Review: Ensure GDPR, SOC2, and other compliance requirements
+## **Implementation Summary and Key Requirements**
+
+### **Permission-Based Data Scope Implementation**
+
+All APIs must implement the following data scope behaviors:
+
+#### **Data Scope Levels:**
+1. **Superadmin**: Can access ALL data across ALL tenants
+2. **canViewAll**: Can access all data within their own tenant
+3. **canRead**: Can only access their own data
+
+#### **Required Data Scope Middleware:**
+```typescript
+interface DataScopeContext {
+  userTenantId: string;
+  isSuperadmin: boolean;
+  canViewAll: boolean;
+  canCreate: boolean;
+  canRead: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
+  userId: string;
+}
+
+const applyDataScope = (query: any, context: DataScopeContext) => {
+  if (context.isSuperadmin) {
+    return query; // No filtering for superadmin
+  }
+  
+  if (context.canViewAll) {
+    return query.where({ tenantId: context.userTenantId });
+  }
+  
+  if (context.canRead) {
+    return query.where({ 
+      OR: [
+        { userId: context.userId },
+        { createdBy: context.userId }
+      ]
+    });
+  }
+  
+  throw new Error('Insufficient permissions');
+};
+```
+
+### **All APIs Must Include:**
+
+1. **Data Scope Filtering** - Based on user permissions (superadmin/canViewAll/canRead)
+2. **Tenant Isolation** - Automatic tenant boundary enforcement
+3. **Permission Validation** - Check specific permissions before operations
+4. **Audit Logging** - Automatic activity tracking with data scope
+5. **Rate Limiting** - Endpoint-specific limits
+6. **Input Validation** - Comprehensive Zod schema validation
+7. **Error Handling** - Standardized error responses
+8. **Security Headers** - CORS, helmet, and security middleware
+
+### **Response Format Consistency:**
+All endpoints must use the standardized response format:
+```typescript
+{
+  success: boolean;
+  message: string;
+  data?: any;
+  errors?: any;
+  meta?: {
+    page?: number;
+    limit?: number;
+    total?: number;
+    totalPages?: number;
+  };
+}
+```
+
+### **Key API Endpoints with Data Scope:**
+
+#### **Authentication & Authorization:**
+- `POST /api/auth/login` - Tenant-aware authentication
+- `GET /api/auth/me` - User context with permissions
+- `GET /api/menu` - Dynamic menu with permission filtering
+
+#### **User Management:**
+- `GET /api/users` - Permission-based user listing
+- `POST /api/users` - Tenant-scoped user creation
+- `PUT /api/users/:id` - Permission-based user updates
+
+#### **Role & Permission Management:**
+- `GET /api/roles` - Data scope filtered role listing
+- `GET /api/permissions/matrix` - Permission matrix with scope
+- `POST /api/permissions/check` - Permission validation with scope
+
+#### **Tenant Management:**
+- `GET /api/tenants` - Superadmin only access
+- `GET /api/tenants/:id/users` - Tenant-scoped user management
+
+#### **Support System:**
+- `GET /api/support/tickets` - Permission-based ticket access
+- `POST /api/support/tickets` - Tenant-scoped ticket creation
+
+#### **Audit & Analytics:**
+- `GET /api/audit/logs` - Permission-based audit access
+- `GET /api/analytics/dashboard` - Scope-aware analytics
+
+### **Security Requirements:**
+
+1. **JWT Token Management** - Access and refresh tokens with tenant context
+2. **Password Security** - Bcrypt hashing with configurable salt rounds
+3. **Rate Limiting** - Multi-tier rate limiting (global, user, endpoint)
+4. **Input Sanitization** - Prevent injection attacks
+5. **CORS Configuration** - Environment-based origins
+6. **Security Headers** - HSTS, CSP, X-Frame-Options
+7. **Session Management** - Device tracking and revocation
+8. **Audit Logging** - Comprehensive activity tracking
+
+### **Performance Requirements:**
+
+1. **Database Optimization** - Proper indexing and query optimization
+2. **Caching Strategy** - Redis-based caching with invalidation
+3. **Connection Pooling** - Database connection management
+4. **Query Optimization** - Efficient data scope filtering
+5. **Response Caching** - API response caching with headers
+
+### **Monitoring & Observability:**
+
+1. **Health Checks** - System and dependency health monitoring
+2. **Performance Metrics** - Response times and error rates
+3. **Audit Logging** - Comprehensive activity tracking
+4. **Error Tracking** - Centralized error monitoring
+5. **Security Monitoring** - Threat detection and alerting
+
+---
+
+## **Next Steps After Implementation**
+
+1. **Security Audit** - Comprehensive security testing and vulnerability assessment
+2. **Performance Testing** - Load testing and optimization under realistic conditions
+3. **Documentation Review** - Complete API documentation and developer guides
+4. **Integration Testing** - End-to-end testing with frontend application
+5. **Monitoring Setup** - Production monitoring, logging, and alerting systems
+6. **Backup Verification** - Test backup and restore procedures
+7. **Deployment Pipeline** - Automated CI/CD pipeline with proper staging environments
+8. **User Training** - Documentation and training materials for administrators
+9. **Maintenance Planning** - Regular update schedules and monitoring procedures
+10. **Compliance Review** - Ensure GDPR, SOC2, and other compliance requirements
+
+### **Critical Success Factors:**
+
+1. **Data Scope Enforcement** - All APIs must properly implement permission-based data filtering
+2. **Tenant Isolation** - Complete data isolation between tenants
+3. **Permission Validation** - Granular permission checking for all operations
+4. **Audit Trail** - Comprehensive logging of all system activities
+5. **Security Hardening** - Multi-layered security implementation
+6. **Performance Optimization** - Efficient data access and caching
+7. **Scalability** - Horizontal scaling capabilities
+8. **Monitoring** - Real-time system monitoring and alerting
 

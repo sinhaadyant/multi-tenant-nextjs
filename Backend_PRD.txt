@@ -1,0 +1,837 @@
+# Backend Permission System Implementation Guide
+
+## Overview
+
+This guide provides step-by-step implementation to enhance your existing backend with the proper permission system that matches the frontend requirements. It focuses on implementing scope-based data filtering and permission-driven API responses.
+
+---
+
+## Step 1: Update Database Schema for Permissions
+
+**Goal:** Ensure your database schema supports the granular permission system.
+
+**Implementation Details:**
+- Verify role_permissions table has all required boolean fields
+- Add indexes for performance on permission queries
+- Ensure proper foreign key constraints
+
+**Expected Schema:**
+```sql
+-- role_permissions table should have:
+CREATE TABLE role_permissions (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  role_id INT NOT NULL,
+  module_id INT NOT NULL,
+  submodule_id INT NULL,
+  can_create BOOLEAN DEFAULT FALSE,
+  can_read BOOLEAN DEFAULT FALSE,
+  can_update BOOLEAN DEFAULT FALSE,
+  can_delete BOOLEAN DEFAULT FALSE,
+  can_view_all BOOLEAN DEFAULT FALSE, -- Key field for scope
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  
+  FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
+  FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE CASCADE,
+  FOREIGN KEY (submodule_id) REFERENCES submodules(id) ON DELETE CASCADE,
+  
+  -- Indexes for performance
+  INDEX idx_role_module (role_id, module_id),
+  INDEX idx_module_permissions (module_id, can_read, can_view_all),
+  UNIQUE KEY unique_role_module_submodule (role_id, module_id, submodule_id)
+);
+```
+
+**Cursor Prompt:**
+```
+Review and update the database schema to ensure proper permission system:
+
+1. Verify role_permissions table has all required fields: can_create, can_read, can_update, can_delete, can_view_all (all BOOLEAN)
+2. Add proper indexes on role_id, module_id, and permission fields for performance
+3. Ensure foreign key constraints are properly set up
+4. Add migration script if changes are needed
+5. Update Prisma schema if using Prisma to reflect these changes
+6. Verify users table has is_superadmin BOOLEAN field
+7. Ensure tenant_id is properly indexed in all relevant tables
+8. Add any missing indexes on frequently queried fields (user_id, tenant_id, created_at)
+```
+
+---
+
+## Step 2: Create Permission Resolution Service
+
+**Goal:** Build a centralized service to resolve user permissions and determine data scope.
+
+**Implementation Details:**
+- Service to resolve effective permissions from multiple roles
+- Data scope determination based on permissions
+- Caching for performance optimization
+- Support for superadmin bypass logic
+
+**Cursor Prompt:**
+```
+Create a comprehensive PermissionService in src/services/PermissionService.ts:
+
+1. Method getUserPermissions(userId) that returns aggregated permissions from all user roles
+2. Method hasPermission(userId, moduleKey, action) for checking specific permissions
+3. Method getDataScope(userId, moduleKey) that returns scope object: { scope: 'all'|'tenant'|'own', tenantId?, userId? }
+4. Method resolveEffectivePermissions(roles) that merges permissions from multiple roles (union of permissions)
+5. Caching mechanism using Redis or in-memory cache for frequent permission lookups
+6. Superadmin bypass logic that returns full permissions for is_superadmin users
+7. Support for global roles vs tenant-specific roles
+8. Method getAccessibleTenants(userId) for superadmin tenant switching
+9. Permission validation with proper error handling
+10. TypeScript interfaces for permission objects and scope definitions
+```
+
+
+---
+
+## Step 3: Enhance Authentication Middleware
+
+**Goal:** Update auth middleware to attach resolved permissions to request object.
+
+**Implementation Details:**
+- Extend authMiddleware to include permission resolution
+- Attach user permissions to req.user object
+- Handle permission caching for performance
+- Support for permission refresh on role changes
+
+**Enhanced Request Object:**
+```typescript
+interface AuthenticatedRequest extends Request {
+  user: {
+    id: string;
+    email: string;
+    tenant_id?: string;
+    is_superadmin: boolean;
+    is_active: boolean;
+    permissions: {
+      [moduleKey: string]: {
+        canCreate: boolean;
+        canRead: boolean;
+        canUpdate: boolean;
+        canDelete: boolean;
+        canViewAll: boolean;
+      }
+    };
+    dataScopes: {
+      [moduleKey: string]: {
+        scope: 'all' | 'tenant' | 'own';
+        tenantId?: string;
+        userId?: string;
+      }
+    };
+  };
+}
+```
+
+**Cursor Prompt:**
+```
+Enhance the existing authMiddleware in src/middleware/authMiddleware.ts:
+
+1. After JWT verification and user loading, resolve user permissions using PermissionService
+2. Attach permissions object to req.user with module-based permission mapping
+3. Pre-calculate dataScopes for common modules and attach to req.user
+4. Implement permission caching with 15-minute TTL to avoid repeated DB queries
+5. Add permission refresh mechanism when user roles change
+6. Handle superadmin users by bypassing permission resolution
+7. Add proper error handling for permission resolution failures
+8. Create TypeScript interface for enhanced req.user object
+9. Add logging for permission resolution debugging
+10. Optimize queries to fetch user, roles, and permissions in minimal DB calls
+```
+
+---
+
+## Step 4: Create Data Scope Filtering Utility
+
+**Goal:** Build utility functions to apply data scope filters to database queries.
+
+**Implementation Details:**
+- Query builder that applies scope-based filters
+- Support for different ORM/query patterns
+- Consistent filter application across all endpoints
+- Performance optimized filtering
+
+**Cursor Prompt:**
+```
+Create DataScopeService in src/services/DataScopeService.ts:
+
+1. Method applyDataScopeFilter(query, user, moduleKey) that modifies queries based on user's data scope
+2. Support for Prisma where clauses, raw SQL, and query builder patterns
+3. Scope application logic:
+   - 'all' scope: no filters (superadmin)
+   - 'tenant' scope: add tenant_id filter
+   - 'own' scope: add user_id filter (and tenant_id if applicable)
+4. Method getScopeWhereClause(user, moduleKey) returning appropriate where conditions
+5. Support for complex queries with joins and relations
+6. Method validateDataAccess(user, record, moduleKey) to check if user can access specific records
+7. Utility for bulk operations with scope validation
+8. Query optimization to use proper indexes
+9. Support for different table structures (some may not have user_id, some may not have tenant_id)
+10. Comprehensive TypeScript typing for scope filters
+```
+
+---
+
+## Step 5: Update Permission Guard Middleware
+
+**Goal:** Enhance permissionGuard middleware to support the new permission system.
+
+**Implementation Details:**
+- Check specific permissions (canCreate, canRead, etc.)
+- Validate data scope for record-specific operations
+- Support for bulk operation permissions
+- Proper error responses with permission context
+
+**Cursor Prompt:**
+```
+Update the permissionGuard middleware in src/middleware/permissionGuard.ts:
+
+1. Modify permissionGuard(moduleKey, action) to use new permission system
+2. Support for actions: 'create', 'read', 'update', 'delete', 'view_all'
+3. Add recordLevelGuard(moduleKey, action, recordId) for checking access to specific records
+4. Implement bulkPermissionGuard for bulk operations
+5. Return detailed error responses indicating which permission is missing
+6. Add scope validation - ensure user can access the requested data scope
+7. Support for conditional permissions based on record ownership
+8. Method to check permissions without throwing (for conditional UI logic)
+9. Integration with DataScopeService for record access validation
+10. Comprehensive error handling with appropriate HTTP status codes (403 vs 404)
+```
+
+---
+
+??==>>
+
+## Step 6: Update User Management API
+
+**Goal:** Modify user endpoints to respect permission scopes and return appropriate data.
+
+**Implementation Details:**
+- Apply data scope filtering to user queries
+- Permission-based field visibility
+- Scope-aware CRUD operations
+- Proper error handling for unauthorized access
+
+**API Behavior Examples:**
+```typescript
+// GET /api/users
+// Superadmin: Returns all users across all tenants
+// canViewAll: Returns users within same tenant
+// canRead: Returns only the user's own profile
+
+// POST /api/users  
+// Requires canCreate permission
+// Tenant scope: Can only create users in same tenant
+// Field validation based on permissions
+```
+
+**Cursor Prompt:**
+```
+Update user management endpoints in src/controllers/userController.ts:
+
+1. Modify listUsers endpoint to apply data scope filtering using DataScopeService
+2. Add permission checks: require canRead for listing, canCreate for creation, etc.
+3. Implement scope-aware user creation (can only create users in accessible scope)
+4. Update getUserById to validate user can access the requested user
+5. Modify updateUser to check both canUpdate permission and record access
+6. Add deleteUser with canDelete permission and scope validation
+7. Implement bulkUpdateUsers with proper permission validation for each user
+8. Return appropriate HTTP status codes (403 for permission denied, 404 for not found)
+9. Add user role assignment endpoint with proper permission checks
+10. Include data scope information in API responses for frontend use
+```
+
+---
+
+## Step 7: Update Role and Permission APIs
+
+**Goal:** Create APIs for managing roles and permissions with proper authorization.
+
+**Implementation Details:**
+- Role CRUD with tenant scope considerations
+- Permission matrix API for bulk permission assignment
+- User role assignment with validation
+- Permission preview API for frontend
+
+**Cursor Prompt:**
+```
+Create/update role and permission endpoints in src/controllers/roleController.ts:
+
+1. GET /api/roles - list roles with tenant filtering (global roles + tenant roles)
+2. POST /api/roles - create role with tenant scope validation
+3. GET /api/roles/:id/permissions - get permission matrix for a role
+4. PUT /api/roles/:id/permissions - bulk update role permissions with validation
+5. GET /api/users/:id/effective-permissions - calculate and return user's effective permissions
+6. POST /api/users/:id/roles - assign roles to user with permission validation
+7. GET /api/permissions/preview - preview permissions for role combination
+8. DELETE /api/roles/:id - delete role with cascade permission cleanup
+9. All endpoints should respect user's permission to manage roles
+10. Return comprehensive permission data for frontend permission matrix UI
+```
+
+---
+???====>
+## Step 8: Create Menu API with Permission Filtering
+
+**Goal:** Build API endpoint that returns dynamic menu based on user permissions.
+
+**Implementation Details:**
+- Filter modules based on canRead permission
+- Build hierarchical menu structure
+- Include permission flags for frontend actions
+- Support for menu customization per tenant
+
+**Cursor Prompt:**
+```
+Create menu endpoint in src/controllers/menuController.ts:
+
+1. GET /api/menu endpoint that returns user-specific navigation menu
+2. Filter modules where user has canRead permission (or is superadmin)
+3. Build hierarchical structure with modules and submodules
+4. Include permission flags for each menu item (canCreate, canUpdate, etc.)
+5. Sort by order_index and respect is_active flags
+6. Support for tenant-specific module visibility
+7. Return menu structure with proper nesting and icons
+8. Cache menu data per user with permission-based cache keys
+9. Include quick action indicators based on canCreate permissions
+10. Return proper menu metadata for frontend sidebar rendering
+```
+
+---
+
+## Step 9: Implement Dashboard API with Scoped Data
+
+**Goal:** Create dashboard endpoint that returns different data based on user's scope.
+
+**Implementation Details:**
+- Scope-based statistics calculation
+- Different metrics for different permission levels
+- Efficient aggregation queries
+ 
+**Dashboard Data Examples:**
+```json
+// Superadmin Response
+{
+  "stats": {
+    "totalUsers": 1247,
+    "totalTenants": 23,
+    "totalTickets": 456,
+    "activeUsers": 1100
+  },
+  "scope": "all"
+}
+
+// Tenant Admin (canViewAll) Response  
+{
+  "stats": {
+    "tenantUsers": 45,
+    "tenantTickets": 12,
+    "activeUsers": 42
+  },
+  "scope": "tenant",
+  "tenantId": "tenant123"
+}
+
+// Regular User (canRead) Response
+{
+  "stats": {
+    "myTickets": 3,
+    "lastLogin": "2024-01-15T10:30:00Z"
+  },
+  "scope": "own",
+  "userId": "user456"
+}
+```
+
+**Cursor Prompt:**
+```
+Create dashboard endpoint in src/controllers/dashboardController.ts:
+
+1. GET /api/dashboard/stats endpoint with scope-based data aggregation
+2. Calculate different metrics based on user's data scope:
+   - 'all' scope: platform-wide statistics
+   - 'tenant' scope: tenant-specific statistics  
+   - 'own' scope: user-specific statistics
+3. Efficient database queries using proper indexes and aggregations
+4. Include recent activity feed filtered by user's scope
+5. Add quick actions based on user's create permissions
+6. Return chart data for analytics (user growth, ticket trends, etc.)
+7. Implement caching for expensive aggregation queries
+8. Include scope metadata in response for frontend use
+9. Support for date range filters in statistics
+ ```
+
+---
+
+## Step 10: Update Support Ticket APIs
+
+**Goal:** Modify support system to respect data scopes and permissions.
+
+**Implementation Details:**
+- Scope-based ticket visibility
+- Permission-based ticket assignment
+- Attachment access control
+- Status change permissions
+
+**Cursor Prompt:**
+```
+Update support ticket endpoints in src/controllers/supportController.ts:
+
+1. GET /api/support/tickets - filter tickets based on user's data scope
+2. POST /api/support/tickets - create tickets with proper tenant assignment
+3. GET /api/support/tickets/:id - validate user can access specific ticket
+4. PUT /api/support/tickets/:id/status - permission-based status changes
+5. POST /api/support/tickets/:id/replies - add replies with attachment support
+6. GET /api/support/attachments/:id - secure attachment download with access validation
+7. Support for internal notes (admin-only) vs public replies
+8. Ticket assignment based on user permissions and scope
+9. Bulk ticket operations with proper permission validation
+10. Include permission flags in ticket responses (canUpdate, canClose, etc.)
+```
+
+---
+
+## Step 11: Enhance Audit Logging System
+
+**Goal:** Update audit logging to capture permission context and provide scoped access.
+
+**Implementation Details:**
+- Log permission context with actions
+- Scope-based audit log access
+- Enhanced audit data with user roles
+- Performance optimized audit queries
+
+**Cursor Prompt:**
+```
+Update audit logging in src/services/AuditService.ts and controller:
+
+1. Enhance createAuditLog to include permission context and user roles at time of action
+2. GET /api/audit endpoint with scope-based filtering of audit logs
+3. Include additional metadata: user permissions, tenant context, IP geolocation
+4. Advanced filtering: by user, action type, date range, module, permission level
+5. Export functionality for audit logs within user's scope
+6. Efficient pagination for large audit datasets
+7. Audit log retention policies based on tenant settings
+ 9. Include before/after data comparison with permission validation
+10. Audit log analytics and suspicious activity detection
+```
+
+---
+
+## Step 12: Create Tenant Management APIs (SuperAdmin)
+
+**Goal:** Build tenant management endpoints with superadmin restrictions.
+
+**Implementation Details:**
+- Superadmin-only tenant CRUD
+- Tenant settings management
+- User management per tenant
+- Tenant analytics and usage
+
+**Cursor Prompt:**
+```
+Create tenant management endpoints in src/controllers/tenantController.ts:
+
+1. GET /api/tenants - list all tenants (superadmin only) with usage statistics
+2. POST /api/tenants - create new tenant with initial setup
+3. PUT /api/tenants/:id - update tenant settings and configuration
+4. DELETE /api/tenants/:id - soft delete tenant with cleanup
+5. GET /api/tenants/:id/users - list users within specific tenant
+6. PUT /api/tenants/:id/status - activate/deactivate tenant
+7. GET /api/tenants/:id/analytics - tenant usage analytics and metrics
+8. POST /api/tenants/:id/settings - override global settings for tenant
+9. All endpoints require is_superadmin = true
+10. Include tenant health metrics and compliance status
+```
+
+---
+
+## Step 13: Implement Device and Session Management
+
+**Goal:** Create device/session management APIs with proper security controls.
+
+**Implementation Details:**
+- Device registration and tracking
+- Session management with permissions
+- Security analytics for suspicious activity
+- Multi-device support with limits
+
+**Cursor Prompt:**
+```
+Create device and session management in src/controllers/deviceController.ts:
+
+1. GET /api/devices - list user's active devices and sessions
+2. POST /api/devices/register - register new device on login
+3. DELETE /api/devices/:id - revoke specific device/session
+4. DELETE /api/devices/revoke-all - revoke all other sessions except current
+5. GET /api/devices/analytics - security analytics for user's devices
+6. PUT /api/devices/:id/trust - mark device as trusted
+7. Include device fingerprinting and geolocation data
+8. Implement device limits per tenant settings
+9. Security alerts for suspicious login patterns
+10. Integration with audit logging for all device management actions
+```
+
+---
+
+## Step 14: Add Advanced Filtering and Search
+
+**Goal:** Implement advanced search capabilities that respect user permissions and scope.
+
+**Implementation Details:**
+- Global search across permitted modules
+- Advanced filter builders
+- Saved search functionality
+- Performance optimized search queries
+
+**Cursor Prompt:**
+```
+Create advanced search service in src/services/SearchService.ts and endpoints:
+
+1. POST /api/search - global search across all permitted modules within user's scope
+2. GET /api/search/filters/:module - get available filter options for module
+3. POST /api/search/advanced - advanced search with complex filter combinations
+4. GET /api/search/saved - user's saved search queries
+5. POST /api/search/save - save search query for future use
+6. Full-text search implementation with relevance scoring
+7. Search result aggregation by module type
+8. Search analytics and popular queries tracking
+9. Export search results with permission validation
+10. Real-time search suggestions with scope-aware autocomplete
+```
+
+---
+
+## Step 15: Create Settings and Configuration APIs
+
+**Goal:** Build settings management with proper permission controls.
+
+**Implementation Details:**
+- User settings management
+- System settings (admin only)
+- Tenant-specific settings
+- Settings inheritance and overrides
+
+**Cursor Prompt:**
+```
+Create settings management in src/controllers/settingsController.ts:
+
+1. GET /api/settings/user - get user-specific settings and preferences
+2. PUT /api/settings/user - update user settings
+3. GET /api/settings/system - get system settings (admin only)
+4. PUT /api/settings/system - update system settings (superadmin only)
+5. GET /api/settings/tenant - get tenant settings with inheritance from system
+6. PUT /api/settings/tenant - update tenant-specific settings
+7. Settings validation and type checking
+8. Settings backup and restore functionality
+9. Settings change audit logging
+10. Default settings management with override capabilities
+```
+
+---
+
+## Step 16: Add Bulk Operations Support
+
+**Goal:** Implement bulk operations with proper permission validation for each item.
+
+**Implementation Details:**
+- Bulk user operations (activate, deactivate, role assignment)
+- Permission validation for each item in bulk operation
+- Progress tracking for long-running operations
+- Rollback capability for failed operations
+
+**Cursor Prompt:**
+```
+Create bulk operations service in src/services/BulkOperationService.ts:
+
+1. POST /api/bulk/users/activate - bulk activate users with individual permission checks
+2. POST /api/bulk/users/roles - bulk role assignment with validation
+3. POST /api/bulk/delete - bulk delete with permission validation per item
+4. GET /api/bulk/operations/:id/status - track bulk operation progress
+5. DELETE /api/bulk/operations/:id - cancel running bulk operation
+6. Implement queue system for large bulk operations
+7. Individual permission validation for each item in bulk operation
+8. Partial success handling (some items succeed, some fail)
+9. Comprehensive error reporting for failed items
+10. Audit logging for all bulk operations with detailed results
+```
+
+
+## Step 18: Add Export and Reporting
+
+**Goal:** Create export functionality that respects user permissions and data scope.
+
+**Implementation Details:**
+- Scope-based data export (CSV, Excel, PDF)
+- Custom report generation
+- Scheduled reports
+- Export permission validation
+
+**Cursor Prompt:**
+```
+Create export service in src/services/ExportService.ts and endpoints:
+
+1. POST /api/export/users - export user data within accessible scope
+2. POST /api/export/audit - export audit logs with scope filtering
+3. POST /api/export/reports - generate custom reports based on user permissions
+4. GET /api/export/templates - get available report templates for user's roles
+5. POST /api/export/schedule - schedule recurring reports
+6. GET /api/export/jobs - list user's export jobs and status
+7. Support for CSV, Excel, PDF export formats
+8. Large dataset streaming for efficient exports
+9. Export permission validation before data processing
+10. Export audit logging and download tracking
+```
+
+---
+
+## Step 19: Enhance Error Handling and Validation
+
+**Goal:** Improve error handling to provide clear permission-related feedback.
+
+**Implementation Details:**
+- Permission-specific error messages
+- Validation errors with context
+- Standardized error response format
+- Rate limiting and security error handling
+
+**Cursor Prompt:**
+```
+Enhance error handling across the application:
+
+1. Create PermissionError class extending AppError with specific error codes
+2. Update all permission checks to throw descriptive permission errors
+3. Add validation middleware with Zod schemas for all endpoints
+4. Implement rate limiting with permission-aware limits
+5. Create error response formatter with permission context
+6. Add security error handling (brute force, suspicious activity)
+7. Comprehensive logging for all permission denied scenarios
+8. Error response localization support
+9. Development vs production error detail levels
+10. Error analytics and monitoring integration
+```
+
+---
+
+## Step 20: Performance Optimization and Caching
+
+**Goal:** Optimize performance for permission checking and data retrieval.
+
+**Implementation Details:**
+- Permission result caching
+- Query optimization with proper indexes
+- Database connection pooling
+- Response caching for static data
+
+**Cursor Prompt:**
+```
+Implement performance optimizations across the system:
+
+1. Redis caching for user permissions with 15-minute TTL
+2. Database query optimization with proper indexes on permission-related fields
+3. Connection pooling configuration for high-traffic scenarios
+4. Response caching for static data (modules, roles) with cache invalidation
+5. Pagination optimization for large datasets
+6. Bulk permission loading to reduce N+1 queries
+7. Database query monitoring and slow query identification
+8. API response compression and optimization
+9. Background job processing for heavy operations
+10. Performance monitoring and alerting setup
+```
+
+---
+
+## Step 21: Security Hardening
+
+**Goal:** Implement additional security measures for the permission system.
+
+**Implementation Details:**
+- SQL injection prevention in dynamic queries
+- Input sanitization and validation
+- Security headers and CORS configuration
+- Audit trail for security events
+
+**Cursor Prompt:**
+```
+Implement comprehensive security hardening:
+
+1. SQL injection prevention in all dynamic queries and filters
+2. Input sanitization and validation for all user inputs
+3. Security headers (HELMET) with proper CSP configuration
+4. CORS configuration with tenant-specific domain restrictions
+5. Rate limiting per user and per IP with different limits based on user roles
+6. Security audit trail for all authentication and authorization events
+7. Brute force protection with account lockout mechanisms
+8. Session security with proper token rotation and invalidation
+9. File upload security with virus scanning and type validation
+10. Security monitoring and intrusion detection system integration
+```
+
+---
+
+## Step 22: API Documentation and Testing
+
+**Goal:** Create comprehensive API documentation and testing for the permission system.
+
+**Implementation Details:**
+- OpenAPI/Swagger documentation with permission examples
+- Integration tests for all permission scenarios
+- Performance testing for permission checking
+- Security testing for authorization bypasses
+
+**Cursor Prompt:**
+```
+Create comprehensive API documentation and testing:
+
+1. OpenAPI/Swagger documentation with permission requirements for each endpoint
+2. Integration tests covering all permission scenarios (superadmin, tenant, own scope)
+3. Unit tests for PermissionService and DataScopeService
+4. Performance testing for permission checking under load
+5. Security testing for potential authorization bypasses
+6. API documentation with examples for different user roles
+7. Postman collection with pre-configured auth tokens for different user types
+8. Test data seeding for different permission scenarios
+9. Automated testing pipeline with permission-specific test suites
+10. Load testing for multi-tenant scenarios with concurrent users
+```
+
+---
+
+## Expected API Response Examples
+
+### User List API Response
+
+```json
+// Superadmin Response (scope: 'all')
+{
+  "success": true,
+  "message": "Users retrieved successfully",
+  "data": [
+    {
+      "id": "user1",
+      "name": "John Doe",
+      "email": "john@tenant1.com",
+      "tenant_id": "tenant1",
+      "tenant_name": "Tenant One",
+      "is_active": true,
+      "roles": ["admin", "user"]
+    },
+    {
+      "id": "user2", 
+      "name": "Jane Smith",
+      "email": "jane@tenant2.com",
+      "tenant_id": "tenant2",
+      "tenant_name": "Tenant Two",
+      "is_active": true,
+      "roles": ["user"]
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 10,
+    "total": 247,
+    "scope": "all"
+  }
+}
+
+// Tenant Admin Response (scope: 'tenant')
+{
+  "success": true,
+  "message": "Tenant users retrieved successfully", 
+  "data": [
+    {
+      "id": "user1",
+      "name": "John Doe", 
+      "email": "john@tenant1.com",
+      "is_active": true,
+      "roles": ["admin", "user"]
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 10, 
+    "total": 15,
+    "scope": "tenant",
+    "tenant_id": "tenant1"
+  }
+}
+
+// Regular User Response (scope: 'own') 
+{
+  "success": true,
+  "message": "Profile retrieved successfully",
+  "data": [
+    {
+      "id": "user1",
+      "name": "John Doe",
+      "email": "john@tenant1.com", 
+      "is_active": true,
+      "roles": ["user"]
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 10,
+    "total": 1, 
+    "scope": "own",
+    "user_id": "user1"
+  }
+}
+```
+
+### Menu API Response with Permissions
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "dashboard",
+      "name": "Dashboard", 
+      "icon": "BarChart3",
+      "href": "/dashboard",
+      "order_index": 1,
+      "permissions": {
+        "canRead": true,
+        "canCreate": false,
+        "canUpdate": false, 
+        "canDelete": false
+      }
+    },
+    {
+      "id": "users",
+      "name": "Users",
+      "icon": "Users", 
+      "href": "/users",
+      "order_index": 2,
+      "permissions": {
+        "canRead": true,
+        "canCreate": true,
+        "canUpdate": true,
+        "canDelete": false,
+        "canViewAll": true
+      },
+      "children": [
+        {
+          "id": "user-roles", 
+          "name": "User Roles",
+          "href": "/users/roles",
+          "permissions": {
+            "canRead": true,
+            "canUpdate": true
+          }
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "user_scope": "tenant",
+    "total_modules": 8,
+    "accessible_modules": 6
+  }
+}
+```
+

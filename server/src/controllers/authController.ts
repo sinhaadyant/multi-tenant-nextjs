@@ -5,7 +5,8 @@ import {
   errorResponse,
   badRequestResponse,
 } from '@/utils/apiResponse';
-import { loginSchema } from '@/validation/userValidation';
+import { loginSchema, createUserSchema } from '@/validation/userValidation';
+import { validateRequestBody } from '@/utils/validationErrorHandler';
 
 const authService = new AuthService();
 
@@ -51,17 +52,10 @@ const authService = new AuthService();
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     // Validate request body
-    const validationResult = loginSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      badRequestResponse(
-        res,
-        'Validation failed',
-        validationResult.error.issues
-      );
-      return;
-    }
+    const validatedData = validateRequestBody(loginSchema, req.body, res);
+    if (!validatedData) return; // Validation failed, response already sent
 
-    const { email, password, tenantSlug } = validationResult.data;
+    const { email, password, tenantSlug } = validatedData;
 
     // Get device info
     const deviceInfo = {
@@ -158,14 +152,23 @@ export const refreshToken = async (
       return;
     }
 
-    // TODO: Implement refresh token validation and generation
-    // This would involve:
-    // 1. Verifying the refresh token
-    // 2. Checking if it's not expired
-    // 3. Generating new access and refresh tokens
-    // 4. Invalidating the old refresh token
+    // Get device info
+    const deviceInfo = {
+      userAgent: req.headers['user-agent'] || '',
+      ipAddress: req.ip || '127.0.0.1',
+    };
 
-    successResponse(res, 'Token refresh endpoint - implementation pending');
+    // Refresh tokens
+    const result = await authService.refreshToken(refreshToken, deviceInfo);
+
+    successResponse(
+      res,
+      {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      },
+      'Token refreshed successfully'
+    );
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Token refresh failed';
@@ -203,15 +206,34 @@ export const refreshToken = async (
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-export const logout = async (_req: Request, res: Response): Promise<void> => {
+export const logout = async (req: Request, res: Response): Promise<void> => {
   try {
-    // TODO: Implement token invalidation
-    // This would involve:
-    // 1. Adding the current token to a blacklist
-    // 2. Invalidating refresh tokens
-    // 3. Logging the logout action
+    let refreshToken = req.body.refreshToken;
 
-    successResponse(res, 'Logout successful');
+    // If no refresh token in body, try to get it from the user's active tokens
+    if (!refreshToken && req.user) {
+      // Get the most recent refresh token for the user
+      const userTokens = await authService.getUserRefreshTokens(req.user.id);
+      if (userTokens.length > 0) {
+        refreshToken = userTokens[0].token;
+      }
+    }
+
+    if (!refreshToken) {
+      badRequestResponse(res, 'Refresh token is required');
+      return;
+    }
+
+    // Get device info
+    const deviceInfo = {
+      userAgent: req.headers['user-agent'] || '',
+      ipAddress: req.ip || '127.0.0.1',
+    };
+
+    // Logout user
+    await authService.logout(refreshToken, deviceInfo);
+
+    successResponse(res, null, 'Logged out successfully');
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Logout failed';
     errorResponse(res, message, 500);
@@ -260,15 +282,239 @@ export const getCurrentUser = async (
       return;
     }
 
-    const user = await authService.validateAccessToken(
-      req.headers.authorization?.replace('Bearer ', '') || ''
-    );
+    // Get user data from database to ensure we have the latest information
+    const user = await authService.getUserById(req.user.id);
+    if (!user) {
+      errorResponse(res, 'User not found', 404);
+      return;
+    }
+
+    // Remove sensitive data
     const { passwordHash, ...userData } = user;
 
-    successResponse(res, 'User information retrieved successfully', userData);
+    successResponse(res, userData, 'User information retrieved successfully');
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Failed to get user information';
     errorResponse(res, message, 500);
+  }
+};
+
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     summary: Register a new user
+ *     description: Create a new user account with email and password
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: User's full name
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: User's email address
+ *               password:
+ *                 type: string
+ *                 minLength: 8
+ *                 description: User's password
+ *               tenantSlug:
+ *                 type: string
+ *                 description: Tenant slug for multi-tenant setup
+ *             required:
+ *               - name
+ *               - email
+ *               - password
+ *     responses:
+ *       201:
+ *         description: User registered successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: User registered successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Validation error or user already exists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+export const register = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Validate request body using the createUserSchema
+    const validatedData = validateRequestBody(createUserSchema, req.body, res);
+    if (!validatedData) return; // Validation failed, response already sent
+
+    const { name, email, password } = validatedData;
+    const { tenantSlug } = req.body; // Get tenantSlug from original request body
+
+    // Create user data
+    const userData = {
+      name,
+      email,
+      password,
+      tenantId: undefined, // Will be set based on tenant slug
+      isSuperadmin: false,
+      isActive: true,
+    };
+
+    // If tenant slug is provided, find the tenant
+    if (tenantSlug) {
+      // TODO: Implement tenant lookup by slug
+      // const tenant = await tenantService.findBySlug(tenantSlug);
+      // if (!tenant) {
+      //   badRequestResponse(res, 'Tenant not found');
+      //   return;
+      // }
+      // userData.tenantId = tenant.id;
+    }
+
+    // Create user
+    const user = await authService.register(userData);
+
+    // Remove sensitive data from response
+    const { passwordHash, ...userResponse } = user;
+
+    successResponse(
+      res,
+      { user: userResponse },
+      'User registered successfully',
+      201
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Registration failed';
+    if (message.includes('already exists')) {
+      badRequestResponse(res, message);
+    } else {
+      errorResponse(res, message, 500);
+    }
+  }
+};
+
+/**
+ * @swagger
+ * /api/auth/change-password:
+ *   post:
+ *     summary: Change user password
+ *     description: Change the current user's password
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               currentPassword:
+ *                 type: string
+ *                 description: Current password
+ *               newPassword:
+ *                 type: string
+ *                 minLength: 8
+ *                 description: New password
+ *             required:
+ *               - currentPassword
+ *               - newPassword
+ *     responses:
+ *       200:
+ *         description: Password changed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Password changed successfully
+ *       400:
+ *         description: Validation error or incorrect current password
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+export const changePassword = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      errorResponse(res, 'User not authenticated', 401);
+      return;
+    }
+
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      badRequestResponse(res, 'Current password and new password are required');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      badRequestResponse(
+        res,
+        'New password must be at least 8 characters long'
+      );
+      return;
+    }
+
+    // Change password
+    await authService.changePassword(req.user.id, {
+      currentPassword,
+      newPassword,
+    });
+
+    successResponse(res, null, 'Password changed successfully');
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Password change failed';
+    if (message.includes('incorrect')) {
+      badRequestResponse(res, message);
+    } else {
+      errorResponse(res, message, 500);
+    }
   }
 };

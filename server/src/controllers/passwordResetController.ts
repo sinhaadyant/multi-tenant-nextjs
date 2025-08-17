@@ -6,18 +6,41 @@ import {
   badRequestResponse,
 } from '@/utils/apiResponse';
 import { z } from 'zod';
+import { validateRequestBody } from '@/utils/validationErrorHandler';
 
 const resetTokenService = new ResetTokenService();
 
 // Validation schemas
 const requestResetSchema = z.object({
-  email: z.string().email('Invalid email format'),
+  email: z
+    .string({
+      required_error: 'Email is required',
+      invalid_type_error: 'Email is required',
+    })
+    .refine(val => val && val.trim().length > 0, {
+      message: 'Email is required',
+    })
+    .refine(val => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), {
+      message: 'Invalid email format',
+    }),
   tenantSlug: z.string().optional(),
 });
 
 const confirmResetSchema = z.object({
-  token: z.string().min(1, 'Token is required'),
-  newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+  token: z
+    .string({
+      required_error: 'Reset token is required',
+      invalid_type_error: 'Reset token is required',
+    })
+    .refine(val => val && val.trim().length > 0, {
+      message: 'Reset token is required',
+    }),
+  newPassword: z
+    .string({
+      required_error: 'New password is required',
+      invalid_type_error: 'New password is required',
+    })
+    .min(8, 'Password must be at least 8 characters'),
 });
 
 /**
@@ -71,17 +94,14 @@ export const requestPasswordReset = async (
 ): Promise<void> => {
   try {
     // Validate request body
-    const validationResult = requestResetSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      badRequestResponse(
-        res,
-        'Validation failed',
-        validationResult.error.issues
-      );
-      return;
-    }
+    const validatedData = validateRequestBody(
+      requestResetSchema,
+      req.body,
+      res
+    );
+    if (!validatedData) return; // Validation failed, response already sent
 
-    const { email, tenantSlug } = validationResult.data;
+    const { email, tenantSlug } = validatedData;
     const ipAddress = req.ip || '127.0.0.1';
 
     // Generate reset token
@@ -158,17 +178,14 @@ export const confirmPasswordReset = async (
 ): Promise<void> => {
   try {
     // Validate request body
-    const validationResult = confirmResetSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      badRequestResponse(
-        res,
-        'Validation failed',
-        validationResult.error.issues
-      );
-      return;
-    }
+    const validatedData = validateRequestBody(
+      confirmResetSchema,
+      req.body,
+      res
+    );
+    if (!validatedData) return; // Validation failed, response already sent
 
-    const { token, newPassword } = validationResult.data;
+    const { token, newPassword } = validatedData;
     const ipAddress = req.ip || '127.0.0.1';
 
     // Reset password

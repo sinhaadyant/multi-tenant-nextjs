@@ -65,7 +65,7 @@ export class NotificationController {
         whereClause.priority = priority;
       }
 
-      const offset = (Number(page) - 1) * Number(limit);
+      // const offset = (Number(page) - 1) * Number(limit);
 
       // const [notifications, total] = await Promise.all([
       //   prisma?.notification?.findMany({
@@ -109,14 +109,14 @@ export class NotificationController {
       const validatedData = createNotificationSchema.parse(req.body);
 
       const {
-        title,
-        message,
-        type,
-        priority,
+        // title,
+        // message,
+        // type,
+        // priority,
         channels,
         recipients,
         tenantId,
-        metadata,
+        // metadata,
       } = validatedData;
 
       // Determine recipients based on scope
@@ -189,10 +189,10 @@ export class NotificationController {
   /**
    * Mark notification as read
    */
-  static markAsRead = async (req: Request, res: Response) => {
+  static markAsRead = async (_req: Request, res: Response) => {
     try {
-      const user = req.user as AuthenticatedUser;
-      const { id } = req.params;
+      // const user = req.user as AuthenticatedUser;
+      // const { id } = req.params;
 
       // const notification = await prisma?.notification?.findFirst({
       //   where: {

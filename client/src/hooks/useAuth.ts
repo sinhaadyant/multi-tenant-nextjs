@@ -1,109 +1,217 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { useApiMutation } from "./useApiMutation";
+import { AuthService } from "@/services/authService";
+import { notificationService } from "@/services/notificationService";
 import {
   loginStart,
   loginSuccess,
   loginFailure,
   logout,
+  updateToken,
+  updateUser,
+  setTenant,
+  setPermissions,
+  setLoading,
+  clearError,
 } from "@/store/slices/authSlice";
-import api from "@/lib/axios";
-
-interface LoginCredentials {
-  email: string;
-  password: string;
-  tenantSlug?: string;
-}
-
-interface LoginResponse {
-  success: boolean;
-  message: string;
-  data: {
-    user: {
-      id: string;
-      name: string;
-      email: string;
-      is_superadmin: boolean;
-      is_active: boolean;
-      tenant_id?: string;
-      last_login_at?: string;
-      created_at: string;
-      updated_at: string;
-    };
-    token: string;
-    refreshToken: string;
-  };
-}
+import type {
+  LoginRequest,
+  LoginResponse,
+  RefreshTokenResponse,
+  AuthUser,
+  Tenant,
+  Permission,
+} from "@/types";
 
 export const useAuth = () => {
   const dispatch = useAppDispatch();
   const auth = useAppSelector(state => state.auth);
 
-  const loginMutation = useMutation({
-    mutationFn: async (credentials: LoginCredentials) => {
+  // Login mutation
+  const loginMutation = useApiMutation<LoginResponse, LoginRequest>(
+    async (credentials: LoginRequest) => {
       dispatch(loginStart());
-      const response = await api.post<LoginResponse>(
-        "/auth/login",
-        credentials
-      );
-      return response.data;
-    },
-    onSuccess: data => {
-      if (data.success) {
+      try {
+        const response = await AuthService.login(credentials);
+
+        // Extract user, token, and other data from response
+        const { user, token, refresh_token } = response;
+
+        // Dispatch success action with all data
         dispatch(
           loginSuccess({
-            user: data.data.user,
-            token: data.data.token,
-            refreshToken: data.data.refreshToken,
+            user,
+            token,
+            refreshToken: refresh_token,
+            tenant: user.tenant || undefined,
+            permissions: user.permissions || [],
           })
         );
-      } else {
-        dispatch(loginFailure(data.message || "Login failed"));
+
+        notificationService.success({
+          message: `Welcome back, ${user.name}!`,
+        });
+
+        return {
+          success: true,
+          message: "Login successful",
+          data: response,
+        };
+      } catch (error: any) {
+        const message = error?.response?.data?.message || "Login failed";
+        dispatch(loginFailure(message));
+        throw error;
       }
     },
-    onError: (error: any) => {
-      const message =
-        error.response?.data?.message || error.message || "Login failed";
-      dispatch(loginFailure(message));
-    },
-  });
+    {
+      onError: (error: any) => {
+        const message = error?.response?.data?.message || "Login failed";
+        notificationService.error({ message });
+      },
+    }
+  );
 
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      await api.post("/auth/logout");
-    },
-    onSuccess: () => {
+  // Logout function
+  const logoutUser = useCallback(async () => {
+    try {
+      if (auth.token) {
+        await AuthService.logout();
+      }
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
       dispatch(logout());
-    },
-    onError: () => {
-      // Even if logout API fails, clear local state
-      dispatch(logout());
-    },
-  });
+      notificationService.success({ message: "Logged out successfully" });
+    }
+  }, [dispatch, auth.token]);
 
-  const refreshUserQuery = useQuery({
-    queryKey: ["user", "profile"],
-    queryFn: async () => {
-      const response = await api.get("/auth/profile");
-      return response.data;
+  // Refresh token function
+  const refreshToken = useCallback(async () => {
+    if (!auth.refreshToken) {
+      throw new Error("No refresh token available");
+    }
+
+    try {
+      const response = await AuthService.refreshToken(auth.refreshToken);
+      dispatch(updateToken(response.token));
+      return response;
+    } catch (error) {
+      dispatch(logout());
+      throw error;
+    }
+  }, [dispatch, auth.refreshToken]);
+
+  // Update user profile
+  const updateUserProfile = useCallback(
+    (user: AuthUser) => {
+      dispatch(updateUser(user));
     },
-    enabled: !!auth.token && auth.isAuthenticated,
-  });
+    [dispatch]
+  );
+
+  // Set current tenant
+  const setCurrentTenant = useCallback(
+    (tenant: Tenant) => {
+      dispatch(setTenant(tenant));
+    },
+    [dispatch]
+  );
+
+  // Set permissions
+  const setUserPermissions = useCallback(
+    (permissions: Permission[]) => {
+      dispatch(setPermissions(permissions));
+    },
+    [dispatch]
+  );
+
+  // Set loading state
+  const setAuthLoading = useCallback(
+    (loading: boolean) => {
+      dispatch(setLoading(loading));
+    },
+    [dispatch]
+  );
+
+  // Clear error
+  const clearAuthError = useCallback(() => {
+    dispatch(clearError());
+  }, [dispatch]);
+
+  // Check if user has permission
+  const hasPermission = useCallback(
+    (module: string, action: string): boolean => {
+      if (!auth.user?.is_superadmin && auth.permissions.length === 0) {
+        return false;
+      }
+
+      // Superadmin bypass
+      if (auth.user?.is_superadmin) {
+        return true;
+      }
+
+      // Check specific permission
+      return auth.permissions.some(
+        permission =>
+          permission.module_id === module &&
+          permission[
+            `can${action.charAt(0).toUpperCase() + action.slice(1)}` as keyof Permission
+          ] === true
+      );
+    },
+    [auth.user, auth.permissions]
+  );
+
+  // Check if user can view all data (data scope)
+  const canViewAll = useCallback(
+    (module: string): boolean => {
+      if (!auth.user?.is_superadmin && auth.permissions.length === 0) {
+        return false;
+      }
+
+      // Superadmin can view all data
+      if (auth.user?.is_superadmin) {
+        return true;
+      }
+
+      // Check canViewAll permission for module
+      return auth.permissions.some(
+        permission =>
+          permission.module_id === module && permission.can_view_all === true
+      );
+    },
+    [auth.user, auth.permissions]
+  );
 
   return {
     // State
     user: auth.user,
+    token: auth.token,
+    refreshToken: auth.refreshToken,
     isAuthenticated: auth.isAuthenticated,
+    tenant: auth.tenant,
+    permissions: auth.permissions,
     isLoading: auth.isLoading,
     error: auth.error,
 
     // Actions
     login: loginMutation.mutate,
-    logout: logoutMutation.mutate,
-    isLoginLoading: loginMutation.isPending,
-    isLogoutLoading: logoutMutation.isPending,
+    loginAsync: loginMutation.mutateAsync,
+    logout: logoutUser,
+    refreshTokenFn: refreshToken,
+    updateUser: updateUserProfile,
+    setTenant: setCurrentTenant,
+    setPermissions: setUserPermissions,
+    setLoading: setAuthLoading,
+    clearError: clearAuthError,
 
-    // Queries
-    refreshUser: refreshUserQuery.refetch,
-    isRefreshingUser: refreshUserQuery.isFetching,
+    // Permission checks
+    hasPermission,
+    canViewAll,
+
+    // Mutation state
+    isLoginLoading: loginMutation.isPending,
+    loginError: loginMutation.error,
   };
 };

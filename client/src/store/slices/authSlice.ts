@@ -1,22 +1,13 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  is_superadmin: boolean;
-  is_active: boolean;
-  tenant_id?: string;
-  last_login_at?: string;
-  created_at: string;
-  updated_at: string;
-}
+import type { AuthUser, Tenant, Permission } from "@/types";
 
 export interface AuthState {
-  user: User | null;
+  user: AuthUser | null;
   token: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
+  tenant: Tenant | null;
+  permissions: Permission[];
   isLoading: boolean;
   error: string | null;
 }
@@ -26,6 +17,8 @@ const initialState: AuthState = {
   token: null,
   refreshToken: null,
   isAuthenticated: false,
+  tenant: null,
+  permissions: [],
   isLoading: false,
   error: null,
 };
@@ -41,9 +34,11 @@ const authSlice = createSlice({
     loginSuccess: (
       state,
       action: PayloadAction<{
-        user: User;
+        user: AuthUser;
         token: string;
         refreshToken: string;
+        tenant?: Tenant;
+        permissions?: Permission[];
       }>
     ) => {
       state.isLoading = false;
@@ -51,6 +46,8 @@ const authSlice = createSlice({
       state.user = action.payload.user;
       state.token = action.payload.token;
       state.refreshToken = action.payload.refreshToken;
+      state.tenant = action.payload.tenant || null;
+      state.permissions = action.payload.permissions || [];
       state.error = null;
     },
     loginFailure: (state, action: PayloadAction<string>) => {
@@ -66,13 +63,24 @@ const authSlice = createSlice({
       state.token = null;
       state.refreshToken = null;
       state.isAuthenticated = false;
+      state.tenant = null;
+      state.permissions = [];
       state.error = null;
     },
     updateToken: (state, action: PayloadAction<string>) => {
       state.token = action.payload;
     },
-    updateUser: (state, action: PayloadAction<User>) => {
+    updateUser: (state, action: PayloadAction<AuthUser>) => {
       state.user = action.payload;
+    },
+    setTenant: (state, action: PayloadAction<Tenant>) => {
+      state.tenant = action.payload;
+    },
+    setPermissions: (state, action: PayloadAction<Permission[]>) => {
+      state.permissions = action.payload;
+    },
+    setLoading: (state, action: PayloadAction<boolean>) => {
+      state.isLoading = action.payload;
     },
     clearError: state => {
       state.error = null;
@@ -87,6 +95,9 @@ export const {
   logout,
   updateToken,
   updateUser,
+  setTenant,
+  setPermissions,
+  setLoading,
   clearError,
 } = authSlice.actions;
 

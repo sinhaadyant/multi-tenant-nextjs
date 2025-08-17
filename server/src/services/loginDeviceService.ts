@@ -66,7 +66,7 @@ export class LoginDeviceService {
     // Log audit
     await this.auditRepository.logUserAction(
       userId,
-      userId,
+      null, // We don't have user object here, so pass null for tenantId
       'DEVICE_REGISTERED',
       deviceInfo.ipAddress,
       {
@@ -118,7 +118,7 @@ export class LoginDeviceService {
     // Log audit
     await this.auditRepository.logUserAction(
       device.userId,
-      device.userId,
+      null, // We don't have user object here, so pass null for tenantId
       'DEVICE_REVOKED',
       device.ipAddress,
       {
@@ -138,7 +138,7 @@ export class LoginDeviceService {
     // Log audit
     await this.auditRepository.logUserAction(
       userId,
-      userId,
+      null, // We don't have user object here, so pass null for tenantId
       'ALL_DEVICES_REVOKED',
       '127.0.0.1',
       { userId }
