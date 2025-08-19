@@ -4,9 +4,9 @@ import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 import { verifyToken } from '@/lib/jwt';
 import { createAuditLog } from '@/lib/audit';
 
-export async function GET(req: NextRequest, { params }: { params: { tenantSlug: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) {
   try {
-    const { tenantSlug } = params;
+    const { tenantSlug } = await params;
     
     console.log('🔍 Tenant /me endpoint called for tenant:', tenantSlug);
 
@@ -68,11 +68,7 @@ export async function GET(req: NextRequest, { params }: { params: { tenantSlug: 
               include: {
                 permissions: {
                   include: {
-                    permission: {
-                      include: {
-                        module: true
-                      }
-                    }
+                    module: true
                   }
                 }
               }
@@ -125,25 +121,29 @@ export async function GET(req: NextRequest, { params }: { params: { tenantSlug: 
         description: userRole.role.description,
         isDefault: userRole.role.isDefault,
         permissions: userRole.role.permissions.map(rolePermission => ({
-          id: rolePermission.permission.id,
-          name: rolePermission.permission.name,
-          description: rolePermission.permission.description,
-          module: rolePermission.permission.module.moduleKey,
-          action: rolePermission.permission.action
+          id: rolePermission.id,
+          moduleKey: rolePermission.moduleKey,
+          moduleName: rolePermission.module.moduleName,
+          canCreate: rolePermission.canCreate,
+          canRead: rolePermission.canRead,
+          canUpdate: rolePermission.canUpdate,
+          canDelete: rolePermission.canDelete,
+          canViewAll: rolePermission.canViewAll
         }))
       })),
       permissions: user.userRoles.flatMap(userRole => 
         userRole.role.permissions.map(rolePermission => ({
-          id: rolePermission.permission.id,
-          name: rolePermission.permission.name,
-          description: rolePermission.permission.description,
-          module: rolePermission.permission.module.moduleKey,
-          action: rolePermission.permission.action
+          id: rolePermission.id,
+          moduleKey: rolePermission.moduleKey,
+          moduleName: rolePermission.module.moduleName,
+          canCreate: rolePermission.canCreate,
+          canRead: rolePermission.canRead,
+          canUpdate: rolePermission.canUpdate,
+          canDelete: rolePermission.canDelete,
+          canViewAll: rolePermission.canViewAll
         }))
       )
     };
-
-
 
     return createSuccessResponse(userProfile);
 

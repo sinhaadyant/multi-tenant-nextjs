@@ -4,6 +4,7 @@ import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 import { createAuditLogFromRequest } from '@/lib/audit';
 import { prisma } from '@/lib/prisma';
 import { hashPassword } from '@/lib/jwt';
+import { checkTenantPermission } from '@/lib/permissions';
 import { z } from 'zod';
 
 // Validation schemas
@@ -39,6 +40,14 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
     const userId = req.user!.id;
     const tenantId = req.user!.tenantId;
 
+    // Check permissions
+    const hasViewPermission = await checkTenantPermission(req.user!, tenantId, 'users.view');
+    const hasViewAllPermission = await checkTenantPermission(req.user!, tenantId, 'users.viewAll');
+
+    if (!hasViewPermission && !hasViewAllPermission) {
+      return createErrorResponse('Insufficient permissions to view users', 403);
+    }
+
     // Parse query parameters
     const url = new URL(req.url);
     const page = parseInt(url.searchParams.get('page') || '1');
@@ -47,18 +56,25 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
     const sortBy = url.searchParams.get('sortBy') || 'createdAt';
     const sortOrder = url.searchParams.get('sortOrder') || 'desc';
     const status = url.searchParams.get('status') || '';
-    const role = url.searchParams.get('role') || '';
+    const roleId = url.searchParams.get('roleId') || '';
+    const department = url.searchParams.get('department') || '';
 
     // Build where clause
     const where: any = {
       tenantId: tenantId
     };
 
+    // If user doesn't have viewAll permission, only show their own data
+    if (!hasViewAllPermission) {
+      where.id = userId;
+    }
+
     // Add search filter
     if (search) {
       where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } }
+        { name: { contains: search } },
+        { email: { contains: search } },
+        { contactNumber: { contains: search } }
       ];
     }
 
@@ -68,26 +84,43 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
     }
 
     // Add role filter
-    if (role) {
+    if (roleId && roleId !== 'all') {
       where.userRoles = {
         some: {
-          role: {
-            name: {
-              contains: role,
-              mode: 'insensitive'
-            }
-          }
+          roleId: roleId
         }
       };
+    }
+
+    // Add department filter (if you have department field)
+    if (department) {
+      where.department = { contains: department };
+    }
+
+    // Build order by clause
+    const orderBy: any = {};
+    if (sortBy === 'role') {
+      orderBy.userRoles = {
+        role: {
+          name: sortOrder
+        }
+      };
+    } else if (sortBy === 'lastLogin') {
+      orderBy.lastLogin = sortOrder;
+    } else {
+      orderBy[sortBy] = sortOrder;
     }
 
     // Calculate pagination
     const skip = (page - 1) * limit;
 
     // Fetch users with pagination and stats
-    const [users, totalUsers] = await Promise.all([
+    const [users, totalUsers, stats] = await Promise.all([
       prisma.user.findMany({
         where,
+        skip,
+        take: limit,
+        orderBy,
         include: {
           userRoles: {
             include: {
@@ -95,312 +128,279 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
                 select: {
                   id: true,
                   name: true,
-                  description: true
+                  description: true,
+                  color: true
                 }
               }
             }
+          },
+          auditLogs: {
+            take: 1,
+            orderBy: { createdAt: 'desc' },
+            select: { action: true, createdAt: true }
           }
-        },
-        orderBy: {
-          [sortBy]: sortOrder
-        },
-        skip,
-        take: limit
+        }
       }),
-      prisma.user.count({ where })
+      prisma.user.count({ where }),
+      prisma.user.groupBy({
+        by: ['isActive'],
+        where: { tenantId },
+        _count: { _all: true }
+      })
     ]);
 
-    // Calculate stats
-    const activeUsers = await prisma.user.count({
-      where: { ...where, isActive: true }
-    });
+    // Calculate statistics
+    const userStats = {
+      total: totalUsers,
+      active: stats.find(s => s.isActive)?._count._all || 0,
+      inactive: stats.find(s => !s.isActive)?._count._all || 0
+    };
 
-    const inactiveUsers = await prisma.user.count({
-      where: { ...where, isActive: false }
-    });
+    // Format response
+    const formattedUsers = users.map(user => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      contactNumber: user.contactNumber,
+      isActive: user.isActive,
+      lastLogin: user.lastLogin,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      roles: user.userRoles.map(ur => ur.role),
+      lastActivity: user.auditLogs[0]?.action || null,
+      lastActivityAt: user.auditLogs[0]?.createdAt || null
+    }));
 
-    const newThisMonth = await prisma.user.count({
-      where: {
-        ...where,
-        createdAt: {
-          gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-        }
-      }
-    });
-
-    const data = {
-      users: users.map(user => ({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        isActive: user.isActive,
-        contactNumber: user.contactNumber,
-        lastLogin: user.lastLogin,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-        roles: user.userRoles.map(ur => ur.role),
-        rolesCount: user.userRoles.length
-      })),
-      stats: {
-        total: totalUsers,
-        active: activeUsers,
-        inactive: inactiveUsers,
-        newThisMonth
-      },
+    return createSuccessResponse({
+      users: formattedUsers,
       pagination: {
         page,
         limit,
         total: totalUsers,
-        totalPages: Math.ceil(totalUsers / limit)
+        totalPages: Math.ceil(totalUsers / limit),
+        hasNext: page * limit < totalUsers,
+        hasPrev: page > 1
+      },
+      stats: userStats,
+      permissions: {
+        canView: hasViewPermission,
+        canViewAll: hasViewAllPermission,
+        canCreate: await checkTenantPermission(req.user!, tenantId, 'users.create'),
+        canUpdate: await checkTenantPermission(req.user!, tenantId, 'users.update'),
+        canDelete: await checkTenantPermission(req.user!, tenantId, 'users.delete')
       }
-    };
+    }, 'Users retrieved successfully');
 
-    // Create audit log
-    await createAuditLogFromRequest(req, {
-      id: req.user!.id,
-      email: req.user!.email,
-      role: req.user!.role as 'user' | 'superadmin',
-      tenantId: req.user!.tenantId
-    }, 'users.list', {
-      page,
-      totalUsers,
-      filters: { search, status, role }
-    });
-
-    return createSuccessResponse(data, 'Users retrieved successfully');
   } catch (error: any) {
     console.error('Error fetching users:', error);
-    return createErrorResponse('Failed to fetch users', 500);
+    return createErrorResponse(
+      error.message || 'Failed to fetch users',
+      error.status || 500
+    );
   }
 });
 
-// POST /api/tenant/[tenantSlug]/users - Create a new user
+// POST /api/tenant/[tenantSlug]/users - Create new user
 export const POST = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
   const { tenantSlug } = await params;
   
   try {
     const userId = req.user!.id;
     const tenantId = req.user!.tenantId;
-    const body = await req.json();
 
-    // Validate request body
-    const validationResult = createUserSchema.safeParse(body);
-    if (!validationResult.success) {
-      return createErrorResponse('Validation failed', 400, validationResult.error.errors);
+    // Check create permission
+    const hasCreatePermission = await checkTenantPermission(req.user!, tenantId, 'users.create');
+    if (!hasCreatePermission) {
+      return createErrorResponse('Insufficient permissions to create users', 403);
     }
 
-    const { name, email, password, contactNumber, roleIds, sendInvitation } = validationResult.data;
+    const body = await req.json();
+    const validatedData = createUserSchema.parse(body);
 
-    // Check if user already exists
+    // Check if email already exists in tenant
     const existingUser = await prisma.user.findFirst({
       where: {
-        email,
-        tenantId
+        email: validatedData.email,
+        tenantId: tenantId
       }
     });
 
     if (existingUser) {
-      return createErrorResponse('User with this email already exists', 400);
+      return createErrorResponse('User with this email already exists in this tenant', 400);
     }
 
     // Hash password
-    const hashedPassword = await hashPassword(password);
+    const hashedPassword = await hashPassword(validatedData.password);
 
     // Create user
-    const user = await prisma.user.create({
+    const newUser = await prisma.user.create({
       data: {
-        name,
-        email,
+        name: validatedData.name,
+        email: validatedData.email,
         password: hashedPassword,
-        contactNumber,
-        tenantId,
+        contactNumber: validatedData.contactNumber,
+        tenantId: tenantId,
         isActive: true
       },
       include: {
         userRoles: {
           include: {
-            role: {
-              select: {
-                id: true,
-                name: true,
-                description: true
-              }
-            }
+            role: true
           }
         }
       }
     });
 
-    // Assign role if provided (only one role allowed)
-    if (roleIds && roleIds.length > 0) {
-      const roleId = roleIds[0]; // Take only the first role
-      
-      await prisma.userRole.create({
-        data: {
-          userId: user.id,
-          roleId: roleId,
-          assignedBy: req.user!.id
-        }
+    // Assign roles if provided
+    if (validatedData.roleIds && validatedData.roleIds.length > 0) {
+      await prisma.userRole.createMany({
+        data: validatedData.roleIds.map(roleId => ({
+          userId: newUser.id,
+          roleId: roleId
+        }))
       });
     }
 
     // Create audit log
     await createAuditLogFromRequest(req, {
-      id: req.user!.id,
-      email: req.user!.email,
-      role: req.user!.role as 'user' | 'superadmin',
-      tenantId: req.user!.tenantId
-    }, 'user_created', {
-      userId: user.id,
-      email: user.email
+      action: 'user.created',
+      details: `Created user: ${newUser.name} (${newUser.email})`,
+      resource: 'user',
+      resourceId: newUser.id
     });
 
-    return createSuccessResponse(user, 'User created successfully');
+    return createSuccessResponse({
+      user: {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        contactNumber: newUser.contactNumber,
+        isActive: newUser.isActive,
+        createdAt: newUser.createdAt
+      }
+    }, 'User created successfully');
+
   } catch (error: any) {
     console.error('Error creating user:', error);
-    return createErrorResponse('Failed to create user', 500);
+    if (error.name === 'ZodError') {
+      return createErrorResponse('Validation error: ' + error.errors[0].message, 400);
+    }
+    return createErrorResponse(
+      error.message || 'Failed to create user',
+      error.status || 500
+    );
   }
 });
 
-// PATCH /api/tenant/[tenantSlug]/users - Bulk actions
-export const PATCH = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
+// PUT /api/tenant/[tenantSlug]/users - Bulk actions
+export const PUT = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
   const { tenantSlug } = await params;
   
   try {
     const userId = req.user!.id;
     const tenantId = req.user!.tenantId;
-    const body = await req.json();
 
-    // Validate request body
-    const validationResult = bulkActionSchema.safeParse(body);
-    if (!validationResult.success) {
-      return createErrorResponse('Validation failed', 400, validationResult.error.errors);
+    const body = await req.json();
+    const validatedData = bulkActionSchema.parse(body);
+
+    // Check permissions based on action
+    let hasPermission = false;
+    switch (validatedData.action) {
+      case 'activate':
+      case 'deactivate':
+        hasPermission = await checkTenantPermission(req.user!, tenantId, 'users.update');
+        break;
+      case 'delete':
+        hasPermission = await checkTenantPermission(req.user!, tenantId, 'users.delete');
+        break;
+      case 'assignRoles':
+        hasPermission = await checkTenantPermission(req.user!, tenantId, 'users.update');
+        break;
     }
 
-    const { userIds, action, roleIds } = validationResult.data;
+    if (!hasPermission) {
+      return createErrorResponse('Insufficient permissions for this action', 403);
+    }
 
-    // Verify all users belong to this tenant
+    // Verify all users belong to the tenant
     const users = await prisma.user.findMany({
       where: {
-        id: { in: userIds },
-        tenantId
+        id: { in: validatedData.userIds },
+        tenantId: tenantId
       }
     });
 
-    if (users.length !== userIds.length) {
+    if (users.length !== validatedData.userIds.length) {
       return createErrorResponse('Some users not found or do not belong to this tenant', 400);
     }
 
     let result;
-    switch (action) {
+    switch (validatedData.action) {
       case 'activate':
         result = await prisma.user.updateMany({
-          where: { id: { in: userIds }, tenantId },
+          where: { id: { in: validatedData.userIds }, tenantId },
           data: { isActive: true }
         });
         break;
-
       case 'deactivate':
-        // Prevent deactivating all admin users
-        const adminUsers = await prisma.user.findMany({
-          where: {
-            id: { in: userIds },
-            tenantId,
-            userRoles: {
-              some: {
-                role: {
-                  name: { contains: 'Admin', mode: 'insensitive' }
-                }
-              }
-            }
-          }
-        });
-
-        if (adminUsers.length > 0) {
-          return createErrorResponse('Cannot deactivate admin users', 400);
-        }
-
         result = await prisma.user.updateMany({
-          where: { id: { in: userIds }, tenantId },
+          where: { id: { in: validatedData.userIds }, tenantId },
           data: { isActive: false }
         });
         break;
-
       case 'delete':
-        // Prevent deleting admin users
-        const adminUsersToDelete = await prisma.user.findMany({
-          where: {
-            id: { in: userIds },
-            tenantId,
-            userRoles: {
-              some: {
-                role: {
-                  name: { contains: 'Admin', mode: 'insensitive' }
-                }
-              }
-            }
-          }
+        // Delete user roles first
+        await prisma.userRole.deleteMany({
+          where: { userId: { in: validatedData.userIds } }
         });
-
-        if (adminUsersToDelete.length > 0) {
-          return createErrorResponse('Cannot delete admin users', 400);
-        }
-
         result = await prisma.user.deleteMany({
-          where: { id: { in: userIds }, tenantId }
+          where: { id: { in: validatedData.userIds }, tenantId }
         });
         break;
-
       case 'assignRoles':
-        if (!roleIds || roleIds.length === 0) {
-          return createErrorResponse('Role ID is required for role assignment', 400);
+        if (!validatedData.roleIds || validatedData.roleIds.length === 0) {
+          return createErrorResponse('Role IDs are required for assignRoles action', 400);
         }
-
-        if (roleIds.length > 1) {
-          return createErrorResponse('Only one role can be assigned per user', 400);
-        }
-
-        const roleId = roleIds[0]; // Take only the first role
-
-        // Remove existing role assignments
+        
+        // Delete existing roles and assign new ones
         await prisma.userRole.deleteMany({
-          where: { userId: { in: userIds } }
+          where: { userId: { in: validatedData.userIds } }
         });
-
-        // Assign new role to all users
-        const roleAssignments = userIds.map(userId => ({
-          userId,
-          roleId: roleId,
-          assignedBy: req.user!.id
-        }));
-
+        
+        const roleAssignments = validatedData.userIds.flatMap(userId =>
+          validatedData.roleIds!.map(roleId => ({ userId, roleId }))
+        );
+        
         await prisma.userRole.createMany({
           data: roleAssignments
         });
-
-        result = { count: userIds.length };
+        
+        result = { count: validatedData.userIds.length };
         break;
-
-      default:
-        return createErrorResponse('Invalid action', 400);
     }
 
     // Create audit log
     await createAuditLogFromRequest(req, {
-      id: req.user!.id,
-      email: req.user!.email,
-      role: req.user!.role as 'user' | 'superadmin',
-      tenantId: req.user!.tenantId
-    }, `users.bulk_${action}`, {
-      userIds,
-      action,
-      roleIds,
-      affectedCount: result.count
+      action: `users.${validatedData.action}`,
+      details: `${validatedData.action} action performed on ${validatedData.userIds.length} users`,
+      resource: 'user',
+      resourceId: validatedData.userIds.join(',')
     });
 
-    return createSuccessResponse(result, `Bulk ${action} completed successfully`);
+    return createSuccessResponse({
+      action: validatedData.action,
+      affectedUsers: result.count,
+      userIds: validatedData.userIds
+    }, `Bulk action '${validatedData.action}' completed successfully`);
+
   } catch (error: any) {
     console.error('Error performing bulk action:', error);
-    return createErrorResponse('Failed to perform bulk action', 500);
+    if (error.name === 'ZodError') {
+      return createErrorResponse('Validation error: ' + error.errors[0].message, 400);
+    }
+    return createErrorResponse(
+      error.message || 'Failed to perform bulk action',
+      error.status || 500
+    );
   }
 }); 

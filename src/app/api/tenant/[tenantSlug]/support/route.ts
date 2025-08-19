@@ -1,416 +1,333 @@
 import { NextRequest } from 'next/server';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-import { verifyToken } from '@/lib/auth';
+import { requireTenantAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { createAuditLogFromRequest } from '@/lib/audit';
+import { asyncHandler } from '@/lib/errorHandler';
+import { z } from 'zod';
 
-export async function GET(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
-    
-    if (!tenantSlug) {
-      return createErrorResponse('Tenant slug is required', 400);
-    }
+// Validation schemas
+const supportTicketSchema = z.object({
+  title: z.string().min(1, 'Title is required').max(200, 'Title must be less than 200 characters'),
+  description: z.string().min(1, 'Description is required').max(5000, 'Description must be less than 5000 characters'),
+  category: z.enum(['general', 'technical', 'billing', 'feature-request', 'bug-report']),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']).optional().default('medium'),
+  attachments: z.array(z.object({
+    filename: z.string(),
+    originalName: z.string(),
+    mimeType: z.string(),
+    size: z.number().max(10 * 1024 * 1024), // 10MB max
+    path: z.string()
+  })).optional().default([])
+});
 
-    // Verify authentication token
-    const token = req.headers.get('authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return createErrorResponse('No authentication token found', 401);
-    }
+const supportFiltersSchema = z.object({
+  page: z.coerce.number().min(1).default(1),
+  limit: z.coerce.number().min(1).max(100).default(10),
+  status: z.enum(['open', 'pending', 'closed']).optional(),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+  category: z.enum(['general', 'technical', 'billing', 'feature-request', 'bug-report']).optional(),
+  search: z.string().optional(),
+  sortBy: z.enum(['createdAt', 'updatedAt', 'title', 'status', 'priority']).default('createdAt'),
+  sortOrder: z.enum(['asc', 'desc']).default('desc')
+});
 
-    const decoded = await verifyToken(token);
-    if (!decoded || !decoded.id) {
-      return createErrorResponse('Invalid authentication token', 401);
-    }
-
-    // Get tenant
-    const tenant = await prisma.tenant.findUnique({
-      where: { slug: tenantSlug },
-      select: { id: true, name: true, slug: true, isActive: true }
-    });
-
-    if (!tenant) {
-      return createErrorResponse('Tenant not found', 404);
-    }
-
-    if (!tenant.isActive) {
-      return createErrorResponse('Tenant is inactive', 403);
-    }
-
-    // Verify user belongs to this tenant
-    const user = await prisma.user.findFirst({
-      where: {
-        id: decoded.id,
-        tenantId: tenant.id,
-        isActive: true
-      }
-    });
-
-    if (!user) {
-      return createErrorResponse('User not found or not authorized for this tenant', 404);
-    }
-
-    // Parse query parameters
-    const resourceType = searchParams.get('type') || 'tickets';
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const status = searchParams.get('status') || '';
-    const priority = searchParams.get('priority') || '';
-    const category = searchParams.get('category') || '';
-
-    let data: any = {};
-
-    switch (resourceType) {
-      case 'tickets':
-        data = await getSupportTickets(tenant.id, user.id, page, limit, status, priority, category);
-        break;
-      case 'knowledge-base':
-        data = await getKnowledgeBase(tenant.id, searchParams.get('search') || '');
-        break;
-      case 'faq':
-        data = await getFAQ(tenant.id, searchParams.get('search') || '');
-        break;
-      case 'categories':
-        data = await getSupportCategories();
-        break;
-      default:
-        return createErrorResponse('Invalid resource type', 400);
-    }
-
-    // Create audit log
-    await createAuditLogFromRequest(
-      req,
-      { id: user.id, email: user.email, role: 'user' },
-      'support.view',
-      { 
-        tenantId: tenant.id,
-        tenantSlug: tenant.slug,
-        resourceType
-      }
-    );
-
-    return createSuccessResponse(data, 'Support data retrieved successfully');
-
-  } catch (error: any) {
-    console.error('Error fetching support data:', error);
-    return createErrorResponse(
-      error.message || 'Internal server error',
-      error.status || 500
-    );
+export const GET = asyncHandler(async (req: NextRequest) => {
+  const { searchParams } = new URL(req.url);
+  const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
+  
+  if (!tenantSlug) {
+    return createErrorResponse('Tenant slug is required', 400);
   }
-}
 
-export async function POST(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
-    
-    if (!tenantSlug) {
-      return createErrorResponse('Tenant slug is required', 400);
-    }
+  // Authenticate user and verify tenant access
+  const authResult = await requireTenantAuth(req);
+  if (authResult instanceof Response) {
+    return authResult;
+  }
 
-    // Verify authentication token
-    const token = req.headers.get('authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return createErrorResponse('No authentication token found', 401);
-    }
+  const user = authResult as any;
+  
+  // Get tenant
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: { id: true, name: true, slug: true, isActive: true }
+  });
 
-    const decoded = await verifyToken(token);
-    if (!decoded || !decoded.id) {
-      return createErrorResponse('Invalid authentication token', 401);
-    }
+  if (!tenant) {
+    return createErrorResponse('Tenant not found', 404);
+  }
 
-    // Get tenant
-    const tenant = await prisma.tenant.findUnique({
-      where: { slug: tenantSlug },
-      select: { id: true, name: true, slug: true, isActive: true }
-    });
+  if (!tenant.isActive) {
+    return createErrorResponse('Tenant is inactive', 403);
+  }
 
-    if (!tenant) {
-      return createErrorResponse('Tenant not found', 404);
-    }
+  // Verify user belongs to this tenant
+  if (user.tenantId !== tenant.id) {
+    return createErrorResponse('Access denied', 403);
+  }
 
-    if (!tenant.isActive) {
-      return createErrorResponse('Tenant is inactive', 403);
-    }
+  // Parse and validate query parameters
+  const filters = supportFiltersSchema.parse(Object.fromEntries(searchParams));
+  
+  // Build where clause
+  const where: any = {
+    tenantId: tenant.id,
+  };
 
-    // Verify user belongs to this tenant
-    const user = await prisma.user.findFirst({
-      where: {
-        id: decoded.id,
-        tenantId: tenant.id,
-        isActive: true
-      }
-    });
+  if (filters.status) where.status = filters.status;
+  if (filters.priority) where.priority = filters.priority;
+  if (filters.category) where.category = filters.category;
+  if (filters.search) {
+    where.OR = [
+      { title: { contains: filters.search, mode: 'insensitive' } },
+      { description: { contains: filters.search, mode: 'insensitive' } },
+    ];
+  }
 
-    if (!user) {
-      return createErrorResponse('User not found or not authorized for this tenant', 404);
-    }
-
-    const body = await req.json();
-    const { title, description, category, priority, attachments } = body;
-
-    // Validate required fields
-    if (!title || !description || !category) {
-      return createErrorResponse('Missing required fields', 400);
-    }
-
-    // Create support ticket
-    const ticket = await prisma.supportTicket.create({
-      data: {
-        title,
-        description,
-        category,
-        priority: priority || 'medium',
-        status: 'open',
-        tenantId: tenant.id,
-        createdBy: user.id,
-        assignedTo: null,
-        attachments: attachments || []
-      },
-      include: {
-        createdByUser: {
-          select: {
-            name: true,
-            email: true
-          }
-        },
-        assignedToUser: {
-          select: {
-            name: true,
-            email: true
+  // Check if user has permission to view all tickets or only their own
+  const userRoles = await prisma.userRole.findMany({
+    where: { userId: user.id },
+    include: {
+      role: {
+        include: {
+          permissions: {
+            where: { moduleKey: 'support' }
           }
         }
       }
-    });
+    }
+  });
 
-    // Create audit log
-    await createAuditLogFromRequest(
-      req,
-      { id: user.id, email: user.email, role: 'user' },
-      'support.ticket.create',
-      { 
-        tenantId: tenant.id,
-        tenantSlug: tenant.slug,
-        ticketId: ticket.id,
-        category,
-        priority
-      }
-    );
+  const hasViewAllPermission = userRoles.some(userRole => 
+    userRole.role.permissions.some(permission => permission.canViewAll)
+  );
 
-    return createSuccessResponse(ticket, 'Support ticket created successfully');
-
-  } catch (error: any) {
-    console.error('Error creating support ticket:', error);
-    return createErrorResponse(
-      error.message || 'Internal server error',
-      error.status || 500
-    );
-  }
-}
-
-// Helper functions
-async function getSupportTickets(tenantId: string, userId: string, page: number, limit: number, status: string, priority: string, category: string) {
-  const skip = (page - 1) * limit;
-
-  // Build where clause
-  const where: any = {
-    tenantId
-  };
-
-  if (status) {
-    where.status = status;
+  // If user doesn't have viewAll permission, only show their own tickets
+  if (!hasViewAllPermission) {
+    where.userId = user.id;
   }
 
-  if (priority) {
-    where.priority = priority;
-  }
+  const skip = (filters.page - 1) * filters.limit;
 
-  if (category) {
-    where.category = category;
-  }
-
-  // Get tickets with pagination
-  const [tickets, totalTickets] = await Promise.all([
+  // Get tickets with related data
+  const [tickets, total] = await Promise.all([
     prisma.supportTicket.findMany({
       where,
       include: {
-        createdByUser: {
+        user: {
           select: {
+            id: true,
             name: true,
-            email: true
-          }
-        },
-        assignedToUser: {
-          select: {
-            name: true,
-            email: true
-          }
-        },
-        messages: {
-          include: {
-            user: {
-              select: {
-                name: true,
-                email: true
-              }
-            }
+            email: true,
           },
-          orderBy: {
-            createdAt: 'asc'
-          }
-        }
+        },
+        comments: {
+          select: {
+            id: true,
+          },
+        },
+        attachments: {
+          select: {
+            id: true,
+          },
+        },
       },
       orderBy: {
-        createdAt: 'desc'
+        [filters.sortBy]: filters.sortOrder,
       },
       skip,
-      take: limit
+      take: filters.limit,
     }),
-    prisma.supportTicket.count({ where })
+    prisma.supportTicket.count({ where }),
   ]);
 
-  // Get ticket statistics
-  const stats = await prisma.supportTicket.groupBy({
-    by: ['status'],
-    where: { tenantId },
+  // Transform data to include counts
+  const ticketsWithCounts = tickets.map(ticket => ({
+    ...ticket,
     _count: {
-      id: true
-    }
-  });
+      comments: ticket.comments.length,
+      attachments: ticket.attachments.length,
+    },
+    comments: undefined,
+    attachments: undefined,
+  }));
 
-  return {
-    tickets: tickets.map(ticket => ({
-      id: ticket.id,
-      title: ticket.title,
-      description: ticket.description,
-      category: ticket.category,
-      priority: ticket.priority,
-      status: ticket.status,
-      createdAt: ticket.createdAt.toISOString(),
-      updatedAt: ticket.updatedAt.toISOString(),
-      createdBy: ticket.createdByUser ? {
-        name: ticket.createdByUser.name,
-        email: ticket.createdByUser.email
-      } : null,
-      assignedTo: ticket.assignedToUser ? {
-        name: ticket.assignedToUser.name,
-        email: ticket.assignedToUser.email
-      } : null,
-      messageCount: ticket.messages.length,
-      lastMessage: ticket.messages.length > 0 ? {
-        content: ticket.messages[ticket.messages.length - 1].content,
-        createdAt: ticket.messages[ticket.messages.length - 1].createdAt.toISOString(),
-        user: ticket.messages[ticket.messages.length - 1].user ? {
-          name: ticket.messages[ticket.messages.length - 1].user.name,
-          email: ticket.messages[ticket.messages.length - 1].user.email
-        } : null
-      } : null
-    })),
+  const totalPages = Math.ceil(total / filters.limit);
+
+  // Create audit log
+  await createAuditLogFromRequest(
+    req,
+    { id: user.id, email: user.email, role: 'user' },
+    'support.view',
+    { 
+      tenantId: tenant.id,
+      tenantSlug: tenant.slug,
+      filters: Object.keys(filters).filter(key => filters[key as keyof typeof filters])
+    }
+  );
+
+  return createSuccessResponse({
+    tickets: ticketsWithCounts,
     pagination: {
-      page,
-      limit,
-      total: totalTickets,
-      totalPages: Math.ceil(totalTickets / limit)
-    },
-    stats: stats.map(stat => ({
-      status: stat.status,
-      count: stat._count.id
-    }))
-  };
-}
+      page: filters.page,
+      limit: filters.limit,
+      totalCount: total,
+      totalPages,
+      hasNextPage: filters.page < totalPages,
+      hasPrevPage: filters.page > 1,
+    }
+  }, 'Support tickets retrieved successfully');
+});
 
-async function getKnowledgeBase(tenantId: string, search: string) {
-  const where: any = {
-    isActive: true
-  };
-
-  if (search) {
-    where.OR = [
-      { title: { contains: search, mode: 'insensitive' } },
-      { content: { contains: search, mode: 'insensitive' } },
-      { tags: { has: search } }
-    ];
+export const POST = asyncHandler(async (req: NextRequest) => {
+  const { searchParams } = new URL(req.url);
+  const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
+  
+  if (!tenantSlug) {
+    return createErrorResponse('Tenant slug is required', 400);
   }
 
-  const articles = await prisma.knowledgeBaseArticle.findMany({
-    where,
+  // Authenticate user and verify tenant access
+  const authResult = await requireTenantAuth(req);
+  if (authResult instanceof Response) {
+    return authResult;
+  }
+
+  const user = authResult as any;
+  
+  // Get tenant
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: { id: true, name: true, slug: true, isActive: true }
+  });
+
+  if (!tenant) {
+    return createErrorResponse('Tenant not found', 404);
+  }
+
+  if (!tenant.isActive) {
+    return createErrorResponse('Tenant is inactive', 403);
+  }
+
+  // Verify user belongs to this tenant
+  if (user.tenantId !== tenant.id) {
+    return createErrorResponse('Access denied', 403);
+  }
+
+  // Check if user has permission to create support tickets
+  const userRoles = await prisma.userRole.findMany({
+    where: { userId: user.id },
     include: {
-      category: {
+      role: {
+        include: {
+          permissions: {
+            where: { moduleKey: 'support' }
+          }
+        }
+      }
+    }
+  });
+
+  const hasCreatePermission = userRoles.some(userRole => 
+    userRole.role.permissions.some(permission => permission.canCreate)
+  );
+
+  if (!hasCreatePermission) {
+    return createErrorResponse('You do not have permission to create support tickets', 403);
+  }
+
+  const body = await req.json();
+  
+  // Validate request body
+  const validationResult = supportTicketSchema.safeParse(body);
+  if (!validationResult.success) {
+    return createErrorResponse(
+      'Validation failed',
+      400,
+      validationResult.error.issues.map((err: any) => ({
+        field: err.path.join('.'),
+        message: err.message
+      }))
+    );
+  }
+
+  const { title, description, category, priority, attachments } = validationResult.data;
+
+  // Create support ticket
+  const ticket = await prisma.supportTicket.create({
+    data: {
+      title,
+      description,
+      category,
+      priority,
+      status: 'open',
+      tenantId: tenant.id,
+      userId: user.id,
+      attachments: {
+        create: attachments.map(attachment => ({
+          filename: attachment.filename,
+          originalName: attachment.originalName,
+          mimeType: attachment.mimeType,
+          size: attachment.size,
+          path: attachment.path
+        }))
+      }
+    },
+    include: {
+      user: {
         select: {
+          id: true,
           name: true,
-          description: true
-        }
-      }
+          email: true,
+        },
+      },
+      attachments: true,
     },
-    orderBy: {
-      updatedAt: 'desc'
-    }
   });
 
-  return {
-    articles: articles.map(article => ({
-      id: article.id,
-      title: article.title,
-      content: article.content,
-      category: article.category?.name || 'General',
-      tags: article.tags || [],
-      createdAt: article.createdAt.toISOString(),
-      updatedAt: article.updatedAt.toISOString()
-    }))
-  };
-}
-
-async function getFAQ(tenantId: string, search: string) {
-  const where: any = {
-    isActive: true
-  };
-
-  if (search) {
-    where.OR = [
-      { question: { contains: search, mode: 'insensitive' } },
-      { answer: { contains: search, mode: 'insensitive' } }
-    ];
-  }
-
-  const faqs = await prisma.faq.findMany({
-    where,
-    include: {
-      category: {
-        select: {
-          name: true
-        }
-      }
-    },
-    orderBy: {
-      orderIndex: 'asc'
+  // Create audit log
+  await createAuditLogFromRequest(
+    req,
+    { id: user.id, email: user.email, role: 'user' },
+    'support.ticket.create',
+    { 
+      tenantId: tenant.id,
+      tenantSlug: tenant.slug,
+      ticketId: ticket.id,
+      category,
+      priority
     }
-  });
+  );
 
-  return {
-    faqs: faqs.map(faq => ({
-      id: faq.id,
-      question: faq.question,
-      answer: faq.answer,
-      category: faq.category?.name || 'General',
-      orderIndex: faq.orderIndex
-    }))
-  };
-}
+  return createSuccessResponse({
+    ticket
+  }, 'Support ticket created successfully', 201);
+});
 
+// Helper functions for other resource types
 async function getSupportCategories() {
-  const categories = await prisma.supportCategory.findMany({
-    where: { isActive: true },
-    orderBy: { orderIndex: 'asc' }
-  });
+  return [
+    { key: 'general', label: 'General', description: 'General inquiries and questions' },
+    { key: 'technical', label: 'Technical', description: 'Technical issues and problems' },
+    { key: 'billing', label: 'Billing', description: 'Billing and payment questions' },
+    { key: 'feature-request', label: 'Feature Request', description: 'Request new features' },
+    { key: 'bug-report', label: 'Bug Report', description: 'Report bugs and issues' }
+  ];
+}
 
+async function getKnowledgeBase(tenantId: string, search?: string) {
+  // Placeholder for knowledge base implementation
   return {
-    categories: categories.map(category => ({
-      id: category.id,
-      name: category.name,
-      description: category.description,
-      orderIndex: category.orderIndex
-    }))
+    articles: [],
+    categories: []
+  };
+}
+
+async function getFAQ(tenantId: string, search?: string) {
+  // Placeholder for FAQ implementation
+  return {
+    questions: [],
+    categories: []
   };
 } 

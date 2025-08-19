@@ -50,10 +50,10 @@ export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params:
           select: { name: true, slug: true }
         },
         permissions: {
-          include: {
-            permission: true
-          }
-        },
+                  include: {
+                    module: true
+                  }
+                },
         _count: {
           select: { userRoles: true }
         }

@@ -130,7 +130,7 @@ export const useRolesPermissionsAPI = () => {
     }
   }, []);
 
-  // Fetch roles for a specific tenant
+  // Fetch roles for a specific tenant (including global roles)
   const fetchRoles = useCallback(async (tenantId: string, filters: RoleFilters = {}) => {
     try {
       setLoading(true);
@@ -149,7 +149,16 @@ export const useRolesPermissionsAPI = () => {
       
       if (response.data.success) {
         const rolesData = response.data.data?.roles || response.data.roles || [];
-        setRoles(rolesData);
+        
+        // Debug logging
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 fetchRoles Debug:', {
+            rolesCount: rolesData.length,
+            roles: rolesData.map((r: any) => ({ id: r.id, name: r.name }))
+          });
+        }
+        
+        setRoles(Array.isArray(rolesData) ? rolesData : []);
         return response.data;
       } else {
         throw new Error(response.data.message || 'Failed to fetch roles');
@@ -161,6 +170,72 @@ export const useRolesPermissionsAPI = () => {
       setLoading(false);
     }
   }, []);
+
+  // Fetch global roles
+  const fetchGlobalRoles = useCallback(async (filters: RoleFilters = {}) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const params = new URLSearchParams();
+      params.append('isGlobal', 'true');
+      if (filters.search) params.append('search', filters.search);
+      if (filters.status && filters.status !== 'all') params.append('status', filters.status);
+      if (filters.sortBy) params.append('sortBy', filters.sortBy);
+      if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
+      if (filters.page) params.append('page', filters.page.toString());
+      if (filters.limit) params.append('limit', filters.limit.toString());
+      
+      const response = await api.get(`/superadmin/roles?${params.toString()}`);
+      
+      if (response.data.success) {
+        const globalRolesData = response.data.data?.roles || response.data.roles || [];
+        return globalRolesData;
+      } else {
+        throw new Error(response.data.message || 'Failed to fetch global roles');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch global roles');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch all roles (global + tenant-specific) for a tenant
+  const fetchAllRolesForTenant = useCallback(async (tenantId: string, filters: RoleFilters = {}) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Fetch both global roles and tenant-specific roles
+      const [globalRoles, tenantRolesResponse] = await Promise.all([
+        fetchGlobalRoles(filters),
+        fetchRoles(tenantId, filters)
+      ]);
+      
+      // Extract roles array from tenant roles response
+      const tenantRoles = tenantRolesResponse?.data?.roles || tenantRolesResponse?.roles || [];
+      
+      // Ensure both are arrays before combining
+      const safeGlobalRoles = Array.isArray(globalRoles) ? globalRoles : [];
+      const safeTenantRoles = Array.isArray(tenantRoles) ? tenantRoles : [];
+      
+      // Combine and deduplicate roles
+      const allRoles = [...safeGlobalRoles, ...safeTenantRoles];
+      const uniqueRoles = allRoles.filter((role, index, self) => 
+        index === self.findIndex(r => r.id === role.id)
+      );
+      
+      setRoles(Array.isArray(uniqueRoles) ? uniqueRoles : []);
+      return uniqueRoles;
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch all roles');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchGlobalRoles, fetchRoles]);
 
   // Fetch modules
   const fetchModules = useCallback(async () => {
@@ -205,6 +280,16 @@ export const useRolesPermissionsAPI = () => {
       
       if (response.data.success) {
         const usersData = response.data.data?.users || response.data.users || [];
+        
+        // Debug logging
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 fetchUsers Debug:', {
+            usersCount: usersData.length,
+            usersWithRoles: usersData.filter((u: any) => u.roleId).length,
+            sampleUser: usersData[0] || null
+          });
+        }
+        
         setUsers(usersData);
         return response.data;
       } else {
@@ -227,7 +312,7 @@ export const useRolesPermissionsAPI = () => {
       
       if (response.data.success) {
         const newRole = response.data.role;
-        setRoles(prev => [...prev, newRole]);
+        setRoles(prev => Array.isArray(prev) ? [...prev, newRole] : [newRole]);
         return newRole;
       } else {
         throw new Error(response.data.message || 'Failed to create role');
@@ -247,9 +332,9 @@ export const useRolesPermissionsAPI = () => {
       
       if (response.data.success) {
         const updatedRole = response.data.role;
-        setRoles(prev => prev.map(role => 
+        setRoles(prev => Array.isArray(prev) ? prev.map(role =>
           role.id === roleId ? updatedRole : role
-        ));
+        ) : [updatedRole]);
         return updatedRole;
       } else {
         throw new Error(response.data.message || 'Failed to update role');
@@ -268,7 +353,8 @@ export const useRolesPermissionsAPI = () => {
       const response = await api.delete(`/superadmin/roles/${roleId}`);
       
       if (response.data.success) {
-        setRoles(prev => prev.filter(role => role.id !== roleId));
+        setRoles(prev => Array.isArray(prev) ? prev.filter(role => role.id !== roleId) : []);
+        return response.data;
       } else {
         throw new Error(response.data.message || 'Failed to delete role');
       }
@@ -321,19 +407,26 @@ export const useRolesPermissionsAPI = () => {
     }
   }, [fetchUsers]);
 
-  // Load data for a selected tenant
+  // Load all data for a specific tenant
   const loadTenantData = useCallback(async (tenant: Tenant) => {
-    setSelectedTenant(tenant);
     try {
+      setLoading(true);
+      setError(null);
+      setSelectedTenant(tenant);
+      
+      // Fetch all data in parallel
       await Promise.all([
-        fetchRoles(tenant.id),
-        fetchUsers(tenant.id),
-        fetchModules()
+        fetchAllRolesForTenant(tenant.id),
+        fetchModules(),
+        fetchUsers(tenant.id)
       ]);
-    } catch (error) {
-      console.error('Error loading tenant data:', error);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load tenant data');
+      throw err;
+    } finally {
+      setLoading(false);
     }
-  }, [fetchRoles, fetchUsers, fetchModules]);
+  }, [fetchAllRolesForTenant, fetchModules, fetchUsers]);
 
   // Clear all data
   const clearData = useCallback(() => {
@@ -356,6 +449,8 @@ export const useRolesPermissionsAPI = () => {
     // Actions
     fetchTenants,
     fetchRoles,
+    fetchGlobalRoles,
+    fetchAllRolesForTenant,
     fetchModules,
     fetchUsers,
     createRole,

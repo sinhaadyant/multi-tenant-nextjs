@@ -71,7 +71,11 @@ Role List is not there
 
  Superadmin - 
 
-Non auth Element - Login, Forgot, Invite, - test after login / before login pages
+Non auth Element 
+      - Login,  - done
+      Forgot, - done
+      Invite, 
+      - test after login / before login pages
 
 Improvelemts - 
     Social Login 
@@ -79,11 +83,11 @@ Improvelemts -
 ==
 Dashboard - Counts / Notification / Refreshing - Updated Data - Charts / ALL 
 Tenant management - 
-    CRUD 
-    Detail Page
-    User List- CRUD 
-    Audit Logs 
-    Settings 
+    CRUD - Done
+    Detail Page - Done
+    User List- CRUD  - Done
+    Audit Logs - Done - Detail button
+    Settings - pending
     
 
 User List - List , Search, Sort, Export 
@@ -117,3 +121,13 @@ Notification -
 
 Superadmin - 
     List - Active Deactive , Invite
+
+=====
+
+Modules- 
+profile,Support,Dashboard will show in sidebar for all loggedin users 
+
+Tenant Management, will only visible to superadmin so remove from tenant sidebar
+update the new modules in database and seed new proper data
+and update in credentils
+create multiple types of users with different custom roles and permissions

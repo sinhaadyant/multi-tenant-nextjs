@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
               include: {
                 permissions: {
                   include: {
-                    permission: true
+                    module: true
                   }
                 }
               }
@@ -81,26 +81,35 @@ export async function GET(req: NextRequest) {
 
     user.userRoles.forEach(userRole => {
       userRole.role.permissions.forEach(rp => {
-        const permission = rp.permission;
-        const permissionKey = `${permission.moduleKey}:${permission.action}`;
+        // Check each permission type
+        const actions = [];
+        if (rp.canCreate) actions.push('create');
+        if (rp.canRead) actions.push('read');
+        if (rp.canUpdate) actions.push('update');
+        if (rp.canDelete) actions.push('delete');
+        if (rp.canViewAll) actions.push('viewAll');
         
-        // Add to all permissions
-        if (!allPermissions.includes(permissionKey)) {
-          allPermissions.push(permissionKey);
-        }
+        actions.forEach(action => {
+          const permissionKey = `${rp.moduleKey}:${action}`;
+          
+          // Add to all permissions
+          if (!allPermissions.includes(permissionKey)) {
+            allPermissions.push(permissionKey);
+          }
 
-        // Add to module permissions
-        if (!modulePermissions[permission.moduleKey]) {
-          modulePermissions[permission.moduleKey] = [];
-        }
-        if (!modulePermissions[permission.moduleKey].includes(permission.action)) {
-          modulePermissions[permission.moduleKey].push(permission.action);
-        }
+          // Add to module permissions
+          if (!modulePermissions[rp.moduleKey]) {
+            modulePermissions[rp.moduleKey] = [];
+          }
+          if (!modulePermissions[rp.moduleKey].includes(action)) {
+            modulePermissions[rp.moduleKey].push(action);
+          }
 
-        // Add to accessible modules
-        if (!accessibleModules.includes(permission.moduleKey)) {
-          accessibleModules.push(permission.moduleKey);
-        }
+          // Add to accessible modules
+          if (!accessibleModules.includes(rp.moduleKey)) {
+            accessibleModules.push(rp.moduleKey);
+          }
+        });
       });
     });
 

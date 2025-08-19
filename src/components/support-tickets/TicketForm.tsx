@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Save, X } from 'lucide-react';
 import { useCreateSupportTicket, useUpdateSupportTicket, CreateTicketData, UpdateTicketData, SupportTicket } from '@/hooks/useSupportTickets';
@@ -21,6 +21,8 @@ export const TicketForm: React.FC<TicketFormProps> = ({
   className = ''
 }) => {
   const router = useRouter();
+  const params = useParams();
+  const tenantSlug = params.tenantSlug as string;
   const { success, error } = useToast();
   const queryClient = useQueryClient();
   
@@ -86,35 +88,26 @@ export const TicketForm: React.FC<TicketFormProps> = ({
           description: formData.description.trim(),
           priority: formData.priority as any,
           category: formData.category as any,
-          attachments: attachments.map(att => ({
-            filename: att.filename,
-            originalName: att.originalName,
-            mimeType: att.mimeType,
-            size: att.size,
-            path: att.path || ''
-          }))
+          attachments: attachments
+            .filter(att => !att.isUploading && !att.uploadError)
+            .map(att => ({
+              filename: att.filename,
+              originalName: att.originalName,
+              mimeType: att.mimeType,
+              size: att.size,
+              path: att.path || ''
+            }))
         };
 
         await createTicketMutation.mutateAsync(createData);
         success('Support ticket created successfully!');
         
         // Force refresh the tickets list
-        queryClient.invalidateQueries({ queryKey: ['superadmin-support-tickets'] });
+        queryClient.invalidateQueries({ queryKey: ['tenant-support-tickets', tenantSlug] });
         
         // Add a small delay to ensure cache is updated
         setTimeout(() => {
-          // Determine redirect path based on current URL
-          const currentPath = window.location.pathname;
-          if (currentPath.includes('/superadmin/')) {
-            router.push('/superadmin/support-tickets');
-          } else if (currentPath.includes('/[tenantSlug]/') || currentPath.includes('/tenant/')) {
-            // Extract tenant slug from current path
-            const pathParts = currentPath.split('/');
-            const tenantSlug = pathParts[1];
-            router.push(`/${tenantSlug}/support-tickets`);
-          } else {
-            router.push('/support-tickets');
-          }
+          router.push(`/${tenantSlug}/support-tickets`);
         }, 500);
       } else {
         const updateData: UpdateTicketData = {
@@ -127,18 +120,7 @@ export const TicketForm: React.FC<TicketFormProps> = ({
         await updateTicketMutation.mutateAsync({ id: ticket!.id, data: updateData });
         success('Support ticket updated successfully!');
         
-        // Determine redirect path based on current URL
-        const currentPath = window.location.pathname;
-        if (currentPath.includes('/superadmin/')) {
-          router.push(`/superadmin/support-tickets/${ticket!.id}`);
-        } else if (currentPath.includes('/[tenantSlug]/') || currentPath.includes('/tenant/')) {
-          // Extract tenant slug from current path
-          const pathParts = currentPath.split('/');
-          const tenantSlug = pathParts[1];
-          router.push(`/${tenantSlug}/support-tickets/${ticket!.id}`);
-        } else {
-          router.push(`/support-tickets/${ticket!.id}`);
-        }
+        router.push(`/${tenantSlug}/support-tickets/${ticket!.id}`);
       }
     } catch (err: any) {
       error(err.message || 'An error occurred while saving the ticket');
@@ -156,7 +138,7 @@ export const TicketForm: React.FC<TicketFormProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Link
-              href="/superadmin/support-tickets"
+              href={`/${tenantSlug}/support-tickets`}
               className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -199,9 +181,6 @@ export const TicketForm: React.FC<TicketFormProps> = ({
             {errors.title && (
               <p className="mt-1 text-sm text-red-600">{errors.title}</p>
             )}
-            <p className="mt-1 text-xs text-gray-500">
-              {formData.title.length}/100 characters
-            </p>
           </div>
 
           {/* Description */}
@@ -217,18 +196,15 @@ export const TicketForm: React.FC<TicketFormProps> = ({
               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                 errors.description ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder="Please provide detailed information about your issue, including steps to reproduce, error messages, and any relevant context."
+              placeholder="Provide detailed information about your issue..."
             />
             {errors.description && (
               <p className="mt-1 text-sm text-red-600">{errors.description}</p>
             )}
-            <p className="mt-1 text-xs text-gray-500">
-              Minimum 10 characters required
-            </p>
           </div>
 
           {/* Priority and Category */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <label htmlFor="priority" className="block text-sm font-medium text-gray-700 mb-2">
                 Priority
@@ -264,36 +240,37 @@ export const TicketForm: React.FC<TicketFormProps> = ({
               </select>
             </div>
           </div>
+
+          {/* Attachments */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Attachments
+            </label>
+            <AttachmentUploader
+              attachments={attachments}
+              onAttachmentsChange={setAttachments}
+              maxFiles={10}
+              maxSize={5 * 1024 * 1024} // 5MB
+            />
+          </div>
         </div>
 
-        {/* Attachments */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Attachments</h3>
-          <AttachmentUploader
-            attachments={attachments}
-            onAttachmentsChange={setAttachments}
-            maxFiles={10}
-            maxSize={5 * 1024 * 1024} // 5MB
-          />
-        </div>
-
-        {/* Submit Buttons */}
-        <div className="flex items-center justify-end space-x-4">
+        {/* Submit Button */}
+        <div className="flex justify-end space-x-4">
           <Link
-            href="/superadmin/support-tickets"
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+            href={`/${tenantSlug}/support-tickets`}
+            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
           >
-            <X className="w-4 h-4 mr-2" />
             Cancel
           </Link>
           <button
             type="submit"
             disabled={isSubmittingAny}
-            className="inline-flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
           >
             {isSubmittingAny ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                 {mode === 'create' ? 'Creating...' : 'Updating...'}
               </>
             ) : (

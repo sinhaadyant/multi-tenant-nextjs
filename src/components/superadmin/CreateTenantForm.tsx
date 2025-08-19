@@ -274,7 +274,13 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
       
       // Check for specific conflict types and set field-specific errors
       if (error.response.status === 409) {
-        if (errorMessage.toLowerCase().includes('subdomain') || errorMessage.toLowerCase().includes('slug')) {
+        // Handle "Resource already exists" error
+        if (errorMessage === 'Resource already exists') {
+          errorMessage = 'This subdomain or email is already in use. Please try different values.';
+          // Generate alternative suggestions for subdomain
+          const suggestions = generateSubdomainSuggestions(watchedSubdomain || '');
+          setSubdomainSuggestions(suggestions);
+        } else if (errorMessage.toLowerCase().includes('subdomain') || errorMessage.toLowerCase().includes('slug')) {
           errorMessage = 'This subdomain is already taken. Please choose a different one.';
           fieldError = { field: 'subdomain', message: 'This subdomain is already taken' };
           // Generate alternative suggestions
@@ -386,6 +392,12 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
   const onSubmit = useCallback(async (data: any) => {
     console.log('Form submission started with data:', data);
     
+    // Prevent duplicate submissions
+    if (createTenantMutation.isPending || isSubmitting) {
+      console.log('Form submission already in progress, ignoring duplicate submit');
+      return;
+    }
+    
     // Custom validation for subdomain availability
     let hasErrors = false;
     
@@ -413,7 +425,7 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
     
     console.log('Form validation passed, submitting...');
     createTenantMutation.mutate(data);
-  }, [subdomainAvailable, passwordStrength.score, setError, createTenantMutation]);
+  }, [subdomainAvailable, passwordStrength.score, setError, createTenantMutation, createTenantMutation.isPending, isSubmitting]);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">

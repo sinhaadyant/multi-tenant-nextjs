@@ -1,0 +1,168 @@
+{
+  "timestamp": "2025-08-19T08:25:25.371Z",
+  "summary": {
+    "total": 26,
+    "passed": 26,
+    "failed": 0,
+    "errors": [],
+    "successRate": "100.00%"
+  },
+  "tests": [
+    {
+      "name": "Tenant Info - acme-corp",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:25.592Z"
+    },
+    {
+      "name": "Login - admin@acme-corp.com",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:26.785Z"
+    },
+    {
+      "name": "User Profile - acme-corp",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:26.897Z"
+    },
+    {
+      "name": "Role Permissions - admin@acme-corp.com",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:26.898Z"
+    },
+    {
+      "name": "Dashboard Access - acme-corp",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:27.718Z"
+    },
+    {
+      "name": "Token Validation - acme-corp",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:27.794Z"
+    },
+    {
+      "name": "Logout - acme-corp",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:30.913Z"
+    },
+    {
+      "name": "Login - user@acme-corp.com",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:31.370Z"
+    },
+    {
+      "name": "User Profile - acme-corp",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:31.400Z"
+    },
+    {
+      "name": "Role Permissions - user@acme-corp.com",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:31.400Z"
+    },
+    {
+      "name": "Dashboard Access - acme-corp",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:31.458Z"
+    },
+    {
+      "name": "Logout - acme-corp",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:31.508Z"
+    },
+    {
+      "name": "Tenant Info - techstart",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:31.552Z"
+    },
+    {
+      "name": "Login - admin@techstart.com",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:32.135Z"
+    },
+    {
+      "name": "User Profile - techstart",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:32.292Z"
+    },
+    {
+      "name": "Role Permissions - admin@techstart.com",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:32.292Z"
+    },
+    {
+      "name": "Dashboard Access - techstart",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:32.386Z"
+    },
+    {
+      "name": "Token Validation - techstart",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:32.429Z"
+    },
+    {
+      "name": "Logout - techstart",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:32.472Z"
+    },
+    {
+      "name": "Tenant Info - global-solutions",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:32.528Z"
+    },
+    {
+      "name": "Login - admin@global-solutions.com",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:32.950Z"
+    },
+    {
+      "name": "User Profile - global-solutions",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:32.973Z"
+    },
+    {
+      "name": "Role Permissions - admin@global-solutions.com",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:32.973Z"
+    },
+    {
+      "name": "Dashboard Access - global-solutions",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:32.993Z"
+    },
+    {
+      "name": "Token Validation - global-solutions",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:33.037Z"
+    },
+    {
+      "name": "Logout - global-solutions",
+      "passed": true,
+      "error": null,
+      "timestamp": "2025-08-19T08:25:33.063Z"
+    }
+  ]
+}

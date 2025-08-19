@@ -24,7 +24,7 @@ export async function GET(
     const token = authHeader.substring(7);
     const decoded = await verifyToken(token);
     
-    if (!decoded || !decoded.userId) {
+    if (!decoded || !decoded.id) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
@@ -45,7 +45,7 @@ export async function GET(
     // Check if user has access to this tenant
     const user = await prisma.user.findFirst({
       where: {
-        id: decoded.userId,
+        id: decoded.id,
         tenantId: tenant.id
       },
       include: {
@@ -55,7 +55,7 @@ export async function GET(
               include: {
                 permissions: {
                   include: {
-                    permission: true
+                    module: true
                   }
                 }
               }
@@ -85,7 +85,11 @@ export async function GET(
       where: { isActive: true },
       orderBy: { orderIndex: 'asc' },
       include: {
-        permissions: true,
+        rolePermissions: {
+                  include: {
+                    role: true
+                  }
+                },
         childModules: {
           where: { isActive: true },
           orderBy: { orderIndex: 'asc' }
@@ -99,7 +103,11 @@ export async function GET(
       include: {
         module: {
           include: {
-            permissions: true,
+            rolePermissions: {
+                  include: {
+                    role: true
+                  }
+                },
             childModules: {
               where: { isActive: true },
               orderBy: { orderIndex: 'asc' }
@@ -126,7 +134,7 @@ export async function GET(
         releaseNotes: module.releaseNotes,
         isVisible: module.isVisible,
         orderIndex: module.orderIndex,
-        permissions: module.permissions,
+        permissions: module.rolePermissions,
         childModules: module.childModules,
         // Tenant-specific settings
         isEnabled: tenantModule?.isEnabled ?? true,
@@ -139,21 +147,21 @@ export async function GET(
         disabledBy: tenantModule?.disabledBy
       };
 
-      // Include analytics if requested and user has permission
-      if (includeAnalytics) {
-        const hasAnalyticsPermission = checkTenantPermission(
-          user,
-          tenant.id,
-          MODULE_PERMISSIONS.VIEW_MODULE_ANALYTICS
-        );
+              // Include analytics if requested and user has permission
+        if (includeAnalytics) {
+          const hasAnalyticsPermission = checkTenantPermission(
+            user,
+            tenant.id,
+            MODULE_PERMISSIONS.VIEW_MODULE_ANALYTICS
+          );
 
-        if (hasAnalyticsPermission && tenantModule) {
-          baseModule.analytics = {
-            lastAccessedAt: tenantModule.lastAccessedAt,
-            accessCount: tenantModule.accessCount
-          };
+          if (hasAnalyticsPermission && tenantModule) {
+            (baseModule as any).analytics = {
+              lastAccessedAt: tenantModule.lastAccessedAt,
+              accessCount: tenantModule.accessCount
+            };
+          }
         }
-      }
 
       return baseModule;
     });
@@ -202,9 +210,16 @@ export async function POST(
   { params }: { params: { tenantSlug: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const token = authHeader.substring(7);
+    const decoded = await verifyToken(token);
+    
+    if (!decoded || !decoded.id) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
     const { tenantSlug } = params;
@@ -223,7 +238,7 @@ export async function POST(
     // Get user with roles and permissions
     const user = await prisma.user.findFirst({
       where: {
-        email: session.user.email,
+        id: decoded.id,
         tenantId: tenant.id
       },
       include: {
@@ -233,7 +248,7 @@ export async function POST(
               include: {
                 permissions: {
                   include: {
-                    permission: true
+                    module: true
                   }
                 }
               }

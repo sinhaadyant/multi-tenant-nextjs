@@ -1,8 +1,10 @@
-// Real authentication service for SuperAdmin
+// Real authentication service for SuperAdmin and Tenant
 
 export interface LoginRequest {
   email: string;
   password: string;
+  tenantSlug?: string;
+  rememberMe?: boolean;
 }
 
 export interface LoginResponse {
@@ -18,6 +20,7 @@ export interface LoginResponse {
 
 export interface PasswordResetRequest {
   email: string;
+  tenantSlug?: string;
 }
 
 export interface PasswordResetResponse {
@@ -30,6 +33,7 @@ export interface ResetPasswordRequest {
   token: string;
   newPassword: string;
   confirmPassword: string;
+  tenantSlug?: string;
 }
 
 export interface ResetPasswordResponse {
@@ -38,17 +42,26 @@ export interface ResetPasswordResponse {
 }
 
 /**
- * Login SuperAdmin
+ * Login SuperAdmin or Tenant
  * Makes actual API call to backend
  */
-export const login = async (data: LoginRequest): Promise<LoginResponse> => {
+export const login = async (data: LoginRequest, tenantSlug?: string): Promise<LoginResponse> => {
   try {
-    const response = await fetch('/api/superadmin/auth/login', {
+    const endpoint = tenantSlug 
+      ? `/api/tenant/auth/login`
+      : '/api/superadmin/auth/login';
+
+    // Prepare request body
+    const requestBody = tenantSlug 
+      ? { ...data, tenantSlug }
+      : data;
+
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(requestBody),
     });
 
     const result = await response.json();
@@ -75,17 +88,25 @@ export const login = async (data: LoginRequest): Promise<LoginResponse> => {
 };
 
 /**
- * Request password reset for SuperAdmin
+ * Request password reset for SuperAdmin or Tenant
  * Makes actual API call to backend
  */
-export const requestPasswordReset = async (email: string): Promise<PasswordResetResponse> => {
+export const requestPasswordReset = async (email: string, tenantSlug?: string): Promise<PasswordResetResponse> => {
   try {
-    const response = await fetch('/api/superadmin/auth/forgot-password', {
+    const endpoint = tenantSlug 
+      ? `/api/tenant/auth/forgot-password`
+      : '/api/superadmin/auth/forgot-password';
+
+    const requestBody = tenantSlug 
+      ? { email, tenantSlug }
+      : { email };
+
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify(requestBody),
     });
 
     const data = await response.json();
@@ -118,19 +139,24 @@ export const requestPasswordReset = async (email: string): Promise<PasswordReset
 export const resetPassword = async (
   token: string,
   newPassword: string,
-  confirmPassword: string
+  confirmPassword: string,
+  tenantSlug?: string
 ): Promise<ResetPasswordResponse> => {
   try {
-    const response = await fetch('/api/superadmin/auth/reset-password', {
+    const endpoint = tenantSlug 
+      ? `/api/tenant/auth/reset-password`
+      : '/api/superadmin/auth/reset-password';
+
+    const requestBody = tenantSlug 
+      ? { token, newPassword, confirmPassword, tenantSlug }
+      : { token, newPassword, confirmPassword };
+
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        token,
-        newPassword,
-        confirmPassword,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     const data = await response.json();
@@ -156,21 +182,26 @@ export const resetPassword = async (
 };
 
 /**
- * Logout SuperAdmin
+ * Logout SuperAdmin or Tenant
  * Clears all authentication data
  */
-export const logout = async (): Promise<{ success: boolean; message: string }> => {
+export const logout = async (tenantSlug?: string): Promise<{ success: boolean; message: string }> => {
   try {
+    const endpoint = tenantSlug 
+      ? `/api/tenant/${tenantSlug}/logout`
+      : '/api/superadmin/auth/logout';
+
     // Call logout API if needed
-    await fetch('/api/superadmin/auth/logout', {
+    await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
     });
 
-    // Clear cookie
+    // Clear cookies
     document.cookie = 'superadmin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    document.cookie = 'tenant_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     
     return {
       success: true,
@@ -180,6 +211,7 @@ export const logout = async (): Promise<{ success: boolean; message: string }> =
     console.error('Logout error:', error);
     // Even if API fails, clear local data
     document.cookie = 'superadmin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    document.cookie = 'tenant_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     
     return {
       success: true,

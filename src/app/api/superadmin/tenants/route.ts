@@ -198,6 +198,12 @@ export const POST = asyncHandler(async (req: NextRequest) => {
 
   const { tenant, admin } = await req.json();
 
+  // Add request deduplication check
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔍 Checking for existing tenant with slug:', tenant.slug);
+    console.log('🔍 Checking for existing user with email:', admin.email);
+  }
+
   if (!tenant || !admin) {
     if (process.env.NODE_ENV === 'development') {
       console.log('❌ Missing required fields for tenant creation');
@@ -261,31 +267,31 @@ export const POST = asyncHandler(async (req: NextRequest) => {
         orderBy: { orderIndex: 'asc' }
       });
 
-      // Create default roles for the tenant
+      // Create default roles for the tenant with unique names
       const defaultRoles = [
         {
-          name: 'Admin',
+          name: `${newTenant.name} Admin`,
           description: 'Full administrative access with all permissions',
           isDefault: true,
           priority: 1,
           color: '#dc2626' // Red
         },
         {
-          name: 'Manager',
+          name: `${newTenant.name} Manager`,
           description: 'Management level access with most permissions',
           isDefault: true,
           priority: 2,
           color: '#ea580c' // Orange
         },
         {
-          name: 'User',
+          name: `${newTenant.name} User`,
           description: 'Standard user access with basic permissions',
           isDefault: true,
           priority: 3,
           color: '#2563eb' // Blue
         },
         {
-          name: 'Viewer',
+          name: `${newTenant.name} Viewer`,
           description: 'Read-only access with limited permissions',
           isDefault: true,
           priority: 4,
@@ -305,10 +311,10 @@ export const POST = asyncHandler(async (req: NextRequest) => {
       }
 
       // Assign permissions to roles based on modules
-      const adminRole = createdRoles.find(r => r.name === 'Admin');
-      const managerRole = createdRoles.find(r => r.name === 'Manager');
-      const userRole = createdRoles.find(r => r.name === 'User');
-      const viewerRole = createdRoles.find(r => r.name === 'Viewer');
+      const adminRole = createdRoles.find(r => r.name === `${newTenant.name} Admin`);
+      const managerRole = createdRoles.find(r => r.name === `${newTenant.name} Manager`);
+      const userRole = createdRoles.find(r => r.name === `${newTenant.name} User`);
+      const viewerRole = createdRoles.find(r => r.name === `${newTenant.name} Viewer`);
 
       // Admin gets all permissions for all modules
       if (adminRole) {

@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { TicketDetails } from '@/components/support-tickets/TicketDetails';
 import { TicketForm } from '@/components/support-tickets/TicketForm';
 import { useSupportTicket, useDeleteSupportTicket } from '@/hooks/useSupportTickets';
@@ -11,13 +11,15 @@ type ViewMode = 'details' | 'edit';
 
 export default function TenantSupportTicketDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { success, error } = useToast();
   const deleteTicketMutation = useDeleteSupportTicket();
 
-  const ticketId = params.id as string;
   const tenantSlug = params.tenantSlug as string;
-  const [viewMode, setViewMode] = React.useState<ViewMode>('details');
+  const ticketId = params.id as string;
+  const initialMode = searchParams.get('mode') as ViewMode || 'details';
+  const [viewMode, setViewMode] = React.useState<ViewMode>(initialMode);
 
   const { data: ticketData, isLoading, error: ticketError } = useSupportTicket(ticketId);
 

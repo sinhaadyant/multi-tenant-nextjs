@@ -21,11 +21,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
       include: {
         permissions: {
           include: {
-            permission: {
-              include: {
-                module: true
-              }
-            }
+            module: true
           }
         }
       }
@@ -91,7 +87,7 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
       include: {
         permissions: {
           include: {
-            permission: true
+            module: true
           }
         }
       }
@@ -110,34 +106,22 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
 
       // Add new permissions
       if (permissions.length > 0) {
-        // First, get all available permissions to map module actions to permission IDs
-        const allPermissions = await tx.permission.findMany({
-          where: { isActive: true }
-        });
-
-        const rolePermissions = permissions.flatMap((modulePerm: any) => {
+        const rolePermissions = permissions.map((modulePerm: any) => {
           if (!modulePerm.moduleId || !modulePerm.actions || !Array.isArray(modulePerm.actions)) {
-            return [];
+            return null;
           }
 
-          // Map module actions to actual permission IDs
-          return modulePerm.actions.map((action: string) => {
-            // Find the permission that matches the module and action
-            const permission = allPermissions.find(p => 
-              p.moduleKey === modulePerm.moduleId && p.action === action
-            );
-            
-            if (!permission) {
-              console.warn(`Permission not found for module: ${modulePerm.moduleId}, action: ${action}`);
-              return null;
-            }
-
-            return {
-              roleId,
-              permissionId: permission.id
-            };
-          }).filter(Boolean); // Remove null entries
-        });
+          // Create role permission with the correct structure
+          return {
+            roleId,
+            moduleKey: modulePerm.moduleId,
+            canCreate: modulePerm.actions.includes('create'),
+            canRead: modulePerm.actions.includes('view'),
+            canUpdate: modulePerm.actions.includes('edit'),
+            canDelete: modulePerm.actions.includes('delete'),
+            canViewAll: modulePerm.actions.includes('view')
+          };
+        }).filter((item): item is NonNullable<typeof item> => item !== null); // Remove null entries
 
         if (rolePermissions.length > 0) {
           await tx.rolePermission.createMany({
@@ -153,11 +137,7 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
       include: {
         permissions: {
           include: {
-            permission: {
-              include: {
-                module: true
-              }
-            }
+            module: true
           }
         }
       }
@@ -167,7 +147,7 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
       throw new Error('Failed to fetch updated role');
     }
 
-    // Transform the data
+    // Transform the data to match the expected format
     const transformedRole = {
       id: updatedRole.id,
       name: updatedRole.name,
@@ -177,12 +157,14 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
       createdAt: updatedRole.createdAt.toISOString(),
       updatedAt: updatedRole.updatedAt.toISOString(),
       permissions: updatedRole.permissions.map(rp => ({
-        id: rp.permission.id,
-        name: rp.permission.name,
-        description: rp.permission.description,
-        module: rp.permission.moduleKey,
-        action: rp.permission.action,
-        moduleName: rp.permission.module.name
+        id: rp.id,
+        moduleKey: rp.moduleKey,
+        moduleName: rp.module.moduleName,
+        canCreate: rp.canCreate,
+        canRead: rp.canRead,
+        canUpdate: rp.canUpdate,
+        canDelete: rp.canDelete,
+        canViewAll: rp.canViewAll
       }))
     };
 

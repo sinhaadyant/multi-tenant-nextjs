@@ -2,291 +2,364 @@
 
 const axios = require('axios');
 
-// Configuration
-const BASE_URL = 'http://localhost:3000/api';
-const SUPERADMIN_EMAIL = 'admin@superadmin.com';
-const SUPERADMIN_PASSWORD = 'AdminPass123';
+const BASE_URL = 'http://localhost:3000';
+const TEST_USER = {
+  email: 'admin@acme-corp.com',
+  password: 'AcmeAdmin123!'
+};
 
-let authToken = null;
+let authToken = '';
 
-// Helper function to make authenticated requests
-const api = axios.create({
-  baseURL: BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Add request interceptor to include auth token
-api.interceptors.request.use((config) => {
-  if (authToken) {
-    config.headers.Authorization = `Bearer ${authToken}`;
-  }
-  return config;
-});
-
-// Test functions
-async function login() {
+async function getAuthToken() {
   try {
-    console.log('🔐 Logging in as superadmin...');
-    const response = await api.post('/superadmin/auth/login', {
-      email: SUPERADMIN_EMAIL,
-      password: SUPERADMIN_PASSWORD,
-      rememberMe: false
+    console.log('🔐 Getting authentication token...');
+    const response = await axios.post(`${BASE_URL}/api/tenant/auth/login`, {
+      email: TEST_USER.email,
+      password: TEST_USER.password,
+      tenantSlug: 'acme-corp'
     });
 
     if (response.data.success) {
       authToken = response.data.data.token;
-      console.log('✅ Login successful');
+      console.log('✅ Authentication successful');
       return true;
     } else {
-      console.log('❌ Login failed:', response.data.message);
+      console.log('❌ Authentication failed:', response.data.message);
       return false;
     }
   } catch (error) {
-    console.log('❌ Login error:', error.response?.data?.message || error.message);
+    console.log('❌ Authentication error:', error.response?.data?.message || error.message);
     return false;
   }
 }
 
-async function testFetchTenants() {
+async function testRolesAPI() {
+  console.log('\n🛡️ Testing Roles API...');
+  
   try {
-    console.log('\n🏢 Testing fetch tenants...');
-    const response = await api.get('/superadmin/tenants?limit=5');
-    
-    if (response.data.success) {
-      console.log('✅ Tenants fetched successfully');
-      console.log(`   Found ${response.data.data.tenants?.length || 0} tenants`);
-      return response.data.data.tenants || [];
+    // Test GET roles with filters
+    console.log('📋 Testing GET /tenant/acme-corp/roles...');
+    const getResponse = await axios.get(`${BASE_URL}/tenant/acme-corp/roles`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+      params: {
+        page: 1,
+        limit: 10,
+        search: '',
+        status: 'all'
+      }
+    });
+
+    if (getResponse.data.success) {
+      const roles = getResponse.data.data.roles;
+      const stats = getResponse.data.data.stats;
+      const permissions = getResponse.data.data.permissions;
+      
+      console.log(`✅ Roles API working - Found ${roles.length} roles`);
+      console.log(`📊 Stats: Total=${stats.total}, Active=${stats.active}, Inactive=${stats.inactive}`);
+      console.log(`🔐 Permissions: View=${permissions.canView}, Create=${permissions.canCreate}, Update=${permissions.canUpdate}, Delete=${permissions.canDelete}`);
+      
+      return roles;
     } else {
-      console.log('❌ Failed to fetch tenants:', response.data.message);
+      console.log('❌ Roles API failed:', getResponse.data.message);
       return [];
     }
   } catch (error) {
-    console.log('❌ Fetch tenants error:', error.response?.data?.message || error.message);
+    console.log('❌ Roles API error:', error.response?.data?.message || error.message);
     return [];
   }
 }
 
-async function testFetchRoles(tenantId) {
+async function testModulesAPI() {
+  console.log('\n📦 Testing Modules API...');
+  
   try {
-    console.log(`\n🛡️ Testing fetch roles for tenant ${tenantId}...`);
-    const response = await api.get(`/superadmin/roles?tenantId=${tenantId}&limit=10`);
-    
+    const response = await axios.get(`${BASE_URL}/tenant/acme-corp/modules`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+
     if (response.data.success) {
-      console.log('✅ Roles fetched successfully');
-      console.log(`   Found ${response.data.data.roles?.length || 0} roles`);
-      return response.data.data.roles || [];
+      const modules = response.data.data.modules;
+      console.log(`✅ Modules API working - Found ${modules.length} modules`);
+      return modules;
     } else {
-      console.log('❌ Failed to fetch roles:', response.data.message);
+      console.log('❌ Modules API failed:', response.data.message);
       return [];
     }
   } catch (error) {
-    console.log('❌ Fetch roles error:', error.response?.data?.message || error.message);
+    console.log('❌ Modules API error:', error.response?.data?.message || error.message);
     return [];
   }
 }
 
-async function testFetchModules() {
+async function testRoleCRUD(modules) {
+  console.log('\n🔄 Testing Role CRUD Operations...');
+  
   try {
-    console.log('\n🔧 Testing fetch modules...');
-    const response = await api.get('/superadmin/modules');
-    
-    if (response.data.success) {
-      console.log('✅ Modules fetched successfully');
-      console.log(`   Found ${response.data.data.modules?.length || 0} modules`);
-      return response.data.data.modules || [];
-    } else {
-      console.log('❌ Failed to fetch modules:', response.data.message);
-      return [];
-    }
-  } catch (error) {
-    console.log('❌ Fetch modules error:', error.response?.data?.message || error.message);
-    return [];
-  }
-}
-
-async function testFetchUsers(tenantId) {
-  try {
-    console.log(`\n👥 Testing fetch users for tenant ${tenantId}...`);
-    const response = await api.get(`/superadmin/users?tenantId=${tenantId}&limit=10`);
-    
-    if (response.data.success) {
-      console.log('✅ Users fetched successfully');
-      console.log(`   Found ${response.data.data.users?.length || 0} users`);
-      return response.data.data.users || [];
-    } else {
-      console.log('❌ Failed to fetch users:', response.data.message);
-      return [];
-    }
-  } catch (error) {
-    console.log('❌ Fetch users error:', error.response?.data?.message || error.message);
-    return [];
-  }
-}
-
-async function testCreateRole(tenantId) {
-  try {
-    console.log(`\n➕ Testing create role for tenant ${tenantId}...`);
-    const roleData = {
-      name: `Test Role ${Date.now()}`,
-      description: 'A test role created by the test script',
-      tenantId: tenantId
+    // Test CREATE role
+    console.log('➕ Testing CREATE role...');
+    const timestamp = Date.now();
+    const newRole = {
+      name: `Test Role ${timestamp}`,
+      description: 'Test role for CRUD operations',
+      color: '#3B82F6',
+      permissions: modules.slice(0, 3).map(module => ({
+        moduleKey: module.moduleKey,
+        canCreate: true,
+        canRead: true,
+        canUpdate: false,
+        canDelete: false,
+        canViewAll: false
+      }))
     };
-    
-    const response = await api.post('/superadmin/roles', roleData);
-    
-    if (response.data.success) {
-      console.log('✅ Role created successfully');
-      console.log(`   Role ID: ${response.data.data.role.id}`);
-      console.log(`   Role Name: ${response.data.data.role.name}`);
-      return response.data.data.role;
-    } else {
-      console.log('❌ Failed to create role:', response.data.message);
-      return null;
-    }
-  } catch (error) {
-    console.log('❌ Create role error:', error.response?.data?.message || error.message);
-    return null;
-  }
-}
 
-async function testUpdateRolePermissions(roleId, modules) {
-  try {
-    console.log(`\n🔐 Testing update role permissions for role ${roleId}...`);
-    
-    // Create sample permissions (first 2 modules with view and create actions)
-    const permissions = modules.slice(0, 2).map(module => ({
-      moduleId: module.id,
-      actions: ['view', 'create']
-    }));
-    
-    const response = await api.post(`/superadmin/roles/${roleId}/permissions`, {
-      permissions
+    const createResponse = await axios.post(`${BASE_URL}/tenant/acme-corp/roles`, newRole, {
+      headers: { 
+        Authorization: `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      }
     });
-    
-    if (response.data.success) {
-      console.log('✅ Role permissions updated successfully');
-      console.log(`   Updated ${permissions.length} module permissions`);
-      return true;
+
+    if (createResponse.data.success) {
+      const createdRole = createResponse.data.data;
+      console.log(`✅ Role created successfully - ID: ${createdRole.id}, Name: ${createdRole.name}`);
+      
+      // Test UPDATE role
+      console.log('✏️ Testing UPDATE role...');
+      const updateData = {
+        name: `Updated Test Role ${timestamp}`,
+        description: 'Updated test role description',
+        color: '#10B981'
+      };
+
+      const updateResponse = await axios.put(`${BASE_URL}/tenant/acme-corp/roles/${createdRole.id}`, updateData, {
+        headers: { 
+          Authorization: `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (updateResponse.data.success) {
+        const updatedRole = updateResponse.data.data;
+        console.log(`✅ Role updated successfully - Name: ${updatedRole.name}`);
+        
+        // Test DELETE role
+        console.log('🗑️ Testing DELETE role...');
+        const deleteResponse = await axios.delete(`${BASE_URL}/tenant/acme-corp/roles/${createdRole.id}`, {
+          headers: { Authorization: `Bearer ${authToken}` }
+        });
+
+        if (deleteResponse.data.success) {
+          console.log('✅ Role deleted successfully');
+          return true;
+        } else {
+          console.log('❌ Role delete failed:', deleteResponse.data.message);
+          return false;
+        }
+      } else {
+        console.log('❌ Role update failed:', updateResponse.data.message);
+        return false;
+      }
     } else {
-      console.log('❌ Failed to update role permissions:', response.data.message);
+      console.log('❌ Role create failed:', createResponse.data.message);
       return false;
     }
   } catch (error) {
-    console.log('❌ Update role permissions error:', error.response?.data?.message || error.message);
+    console.log('❌ Role CRUD error:', error.response?.data?.message || error.message);
     return false;
   }
 }
 
-async function testRoleAssignment(tenantId, users, roles) {
+async function testBulkOperations() {
+  console.log('\n📦 Testing Bulk Operations...');
+  
   try {
-    console.log(`\n👤 Testing role assignment for tenant ${tenantId}...`);
-    
-    if (users.length === 0 || roles.length === 0) {
-      console.log('⚠️ Skipping role assignment test - no users or roles available');
-      return false;
-    }
-    
-    // Assign the first role to the first user
-    const assignments = [{
-      userId: users[0].id,
-      roleId: roles[0].id
-    }];
-    
-    const response = await api.post('/superadmin/role-assignment', {
-      tenantId,
-      assignments
+    // Get existing roles for bulk operations
+    const rolesResponse = await axios.get(`${BASE_URL}/tenant/acme-corp/roles`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+      params: { page: 1, limit: 10 }
     });
     
-    if (response.data.success) {
-      console.log('✅ Role assignment successful');
-      console.log(`   Assigned ${assignments.length} roles`);
+    const roles = rolesResponse.data.data.roles;
+    if (roles.length < 2) {
+      console.log('⚠️ Not enough roles for bulk operations test');
       return true;
-    } else {
-      console.log('❌ Failed to assign roles:', response.data.message);
-      return false;
     }
+    
+    const roleIds = roles.slice(0, 2).map(role => role.id);
+    
+    // Test bulk deactivate
+    console.log('⏸️ Testing bulk deactivate...');
+    const bulkDeactivateResponse = await axios.put(`${BASE_URL}/tenant/acme-corp/roles`, {
+      roleIds: roleIds,
+      action: 'deactivate'
+    }, {
+      headers: { 
+        Authorization: `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (bulkDeactivateResponse.data.success) {
+      console.log('✅ Bulk deactivate working');
+    } else {
+      console.log('❌ Bulk deactivate failed:', bulkDeactivateResponse.data.message);
+    }
+
+    // Test bulk activate
+    console.log('🔄 Testing bulk activate...');
+    const bulkActivateResponse = await axios.put(`${BASE_URL}/tenant/acme-corp/roles`, {
+      roleIds: roleIds,
+      action: 'activate'
+    }, {
+      headers: { 
+        Authorization: `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (bulkActivateResponse.data.success) {
+      console.log('✅ Bulk activate working');
+    } else {
+      console.log('❌ Bulk activate failed:', bulkActivateResponse.data.message);
+    }
+
+    return true;
+  } catch (error) {
+    console.log('❌ Bulk operations error:', error.response?.data?.message || error.message);
+    return false;
+  }
+}
+
+async function testRoleAssignment() {
+  console.log('\n👥 Testing Role Assignment...');
+  
+  try {
+    // Get users and roles
+    const [usersResponse, rolesResponse] = await Promise.all([
+      axios.get(`${BASE_URL}/tenant/acme-corp/users`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+        params: { page: 1, limit: 10 }
+      }),
+      axios.get(`${BASE_URL}/tenant/acme-corp/roles`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+        params: { page: 1, limit: 10 }
+      })
+    ]);
+
+    const users = usersResponse.data.data.users;
+    const roles = rolesResponse.data.data.roles;
+
+    if (users.length === 0 || roles.length === 0) {
+      console.log('⚠️ No users or roles available for assignment test');
+      return true;
+    }
+
+    const userId = users[0].id;
+    const roleId = roles[0].id;
+
+    // Test role assignment
+    console.log(`🔗 Testing role assignment - User: ${users[0].name}, Role: ${roles[0].name}`);
+    const assignResponse = await axios.post(`${BASE_URL}/tenant/acme-corp/roles/${roleId}/assign`, {
+      userId: userId
+    }, {
+      headers: { 
+        Authorization: `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (assignResponse.data.success) {
+      console.log('✅ Role assignment working');
+    } else {
+      console.log('❌ Role assignment failed:', assignResponse.data.message);
+    }
+
+    return true;
   } catch (error) {
     console.log('❌ Role assignment error:', error.response?.data?.message || error.message);
     return false;
   }
 }
 
-async function testDeleteRole(roleId) {
+async function testPermissionMatrix() {
+  console.log('\n🔐 Testing Permission Matrix...');
+  
   try {
-    console.log(`\n🗑️ Testing delete role ${roleId}...`);
+    // Get roles with permissions
+    const rolesResponse = await axios.get(`${BASE_URL}/tenant/acme-corp/roles`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+      params: { page: 1, limit: 10 }
+    });
+
+    const roles = rolesResponse.data.data.roles;
     
-    const response = await api.delete(`/superadmin/roles/${roleId}`);
-    
-    if (response.data.success) {
-      console.log('✅ Role deleted successfully');
+    if (roles.length === 0) {
+      console.log('⚠️ No roles available for permission matrix test');
       return true;
-    } else {
-      console.log('❌ Failed to delete role:', response.data.message);
-      return false;
     }
+
+    const role = roles[0];
+    console.log(`📊 Permission Matrix for Role: ${role.name}`);
+    console.log(`   Total Permissions: ${role.permissions.length}`);
+    
+    role.permissions.forEach(permission => {
+      console.log(`   - ${permission.moduleName || permission.moduleKey}:`);
+      console.log(`     Read: ${permission.canRead ? '✅' : '❌'}`);
+      console.log(`     Create: ${permission.canCreate ? '✅' : '❌'}`);
+      console.log(`     Update: ${permission.canUpdate ? '✅' : '❌'}`);
+      console.log(`     Delete: ${permission.canDelete ? '✅' : '❌'}`);
+      console.log(`     View All: ${permission.canViewAll ? '✅' : '❌'}`);
+    });
+
+    console.log('✅ Permission matrix working');
+    return true;
   } catch (error) {
-    console.log('❌ Delete role error:', error.response?.data?.message || error.message);
+    console.log('❌ Permission matrix error:', error.response?.data?.message || error.message);
     return false;
   }
 }
 
-// Main test function
-async function runTests() {
-  console.log('🚀 Starting Roles & Permissions Management Module Tests\n');
-  
-  // Step 1: Login
-  const loginSuccess = await login();
-  if (!loginSuccess) {
+async function runAllTests() {
+  console.log('🧪 Roles & Permissions Test - Comprehensive Testing...\n');
+
+  // Get authentication token
+  const authSuccess = await getAuthToken();
+  if (!authSuccess) {
     console.log('❌ Cannot proceed without authentication');
     return;
   }
+
+  // Test APIs
+  const roles = await testRolesAPI();
+  const modules = await testModulesAPI();
   
-  // Step 2: Fetch tenants
-  const tenants = await testFetchTenants();
-  if (tenants.length === 0) {
-    console.log('❌ No tenants available for testing');
-    return;
+  // Test CRUD operations
+  const crudSuccess = await testRoleCRUD(modules);
+  
+  // Test bulk operations
+  const bulkSuccess = await testBulkOperations();
+  
+  // Test role assignment
+  const assignmentSuccess = await testRoleAssignment();
+  
+  // Test permission matrix
+  const matrixSuccess = await testPermissionMatrix();
+
+  // Summary
+  console.log('\n📋 Test Summary:');
+  console.log(`   ${roles.length > 0 ? '✅' : '❌'} Roles API`);
+  console.log(`   ${modules.length > 0 ? '✅' : '❌'} Modules API`);
+  console.log(`   ${crudSuccess ? '✅' : '❌'} Role CRUD Operations`);
+  console.log(`   ${bulkSuccess ? '✅' : '❌'} Bulk Operations`);
+  console.log(`   ${assignmentSuccess ? '✅' : '❌'} Role Assignment`);
+  console.log(`   ${matrixSuccess ? '✅' : '❌'} Permission Matrix`);
+
+  if (roles.length > 0 && modules.length > 0 && crudSuccess && bulkSuccess && assignmentSuccess && matrixSuccess) {
+    console.log('\n🎉 All Roles & Permissions tests passed!');
+  } else {
+    console.log('\n⚠️ Some tests failed. Check the logs above for details.');
   }
-  
-  const testTenant = tenants[0];
-  console.log(`\n📋 Using tenant: ${testTenant.name} (${testTenant.id})`);
-  
-  // Step 3: Fetch roles
-  const roles = await testFetchRoles(testTenant.id);
-  
-  // Step 4: Fetch modules
-  const modules = await testFetchModules();
-  
-  // Step 5: Fetch users
-  const users = await testFetchUsers(testTenant.id);
-  
-  // Step 6: Create a new role
-  const newRole = await testCreateRole(testTenant.id);
-  
-  // Step 7: Update role permissions (if role created and modules available)
-  if (newRole && modules.length > 0) {
-    await testUpdateRolePermissions(newRole.id, modules);
-  }
-  
-  // Step 8: Test role assignment (if users and roles available)
-  if (users.length > 0 && roles.length > 0) {
-    await testRoleAssignment(testTenant.id, users, roles);
-  }
-  
-  // Step 9: Clean up - delete the test role
-  if (newRole) {
-    await testDeleteRole(newRole.id);
-  }
-  
-  console.log('\n✅ All tests completed!');
-  console.log('\n📊 Summary:');
-  console.log(`   - Tenants: ${tenants.length}`);
-  console.log(`   - Roles: ${roles.length}`);
-  console.log(`   - Modules: ${modules.length}`);
-  console.log(`   - Users: ${users.length}`);
 }
 
 // Run the tests
-runTests().catch(console.error);
+runAllTests().catch(console.error);

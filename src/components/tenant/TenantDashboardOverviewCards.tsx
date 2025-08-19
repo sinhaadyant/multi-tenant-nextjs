@@ -1,172 +1,132 @@
 import React from 'react';
 import { 
   Users, 
+  Shield, 
   Activity, 
-  TrendingUp, 
-  TrendingDown,
-  Shield,
-  Clock,
-  UserCheck,
-  UserPlus
+  BarChart3,
+  TrendingUp,
+  TrendingDown
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface SummaryData {
   totalUsers: number;
   activeUsers: number;
-  totalActivities: number;
-  systemHealth: string;
+  totalRoles: number;
+  totalAuditEvents: number;
+  userGrowth: number;
+  auditGrowth: number;
 }
 
-interface StatsData {
-  users?: {
-    total: number;
-    active24h: number;
-    active7d: number;
-    new24h: number;
-    new7d: number;
-    growth24h: number;
-    growth7d: number;
-  };
-  activities?: {
-    total24h: number;
-    total7d: number;
-    growth24h: number;
-  };
-  system?: {
-    uptime: number;
-    activeSessions: number;
-    cpuUsage: number;
-    memoryUsage: number;
-  };
+interface Permissions {
+  canViewUsers: boolean;
+  canViewRoles: boolean;
+  canViewAudit: boolean;
+  canViewReports: boolean;
 }
 
-interface Props {
+interface TenantDashboardOverviewCardsProps {
   summary: SummaryData;
-  stats?: StatsData;
-  loading?: boolean;
+  selectedRange: string;
+  isLoading: boolean;
+  permissions: Permissions;
 }
 
-export const TenantDashboardOverviewCards: React.FC<Props> = ({ 
+// Format number with commas
+const formatNumber = (num: number) => {
+  return num.toLocaleString();
+};
+
+// Format percentage
+const formatPercentage = (num: number) => {
+  return `${num > 0 ? '+' : ''}${num.toFixed(1)}%`;
+};
+
+export const TenantDashboardOverviewCards: React.FC<TenantDashboardOverviewCardsProps> = ({ 
   summary, 
-  stats, 
-  loading = false 
+  selectedRange, 
+  isLoading,
+  permissions 
 }) => {
-  const getGrowthIcon = (growth: number) => {
-    if (growth > 0) {
-      return <TrendingUp className="h-4 w-4 text-green-500" />;
-    } else if (growth < 0) {
-      return <TrendingDown className="h-4 w-4 text-red-500" />;
-    }
-    return <TrendingUp className="h-4 w-4 text-gray-400" />;
-  };
+  const router = useRouter();
 
-  const getGrowthColor = (growth: number) => {
-    if (growth > 0) return 'text-green-600';
-    if (growth < 0) return 'text-red-600';
-    return 'text-gray-600';
-  };
-
-  const cards = [
+  const statsCards = [
     {
       title: 'Total Users',
       value: summary.totalUsers,
+      change: summary.userGrowth,
       icon: Users,
-      color: 'bg-blue-500',
-      change: stats?.users?.growth7d || 0,
-      changeLabel: 'vs last week',
-      loading: loading
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-100 dark:bg-blue-900',
+      permission: permissions.canViewUsers,
+      href: '/users'
     },
     {
       title: 'Active Users',
       value: summary.activeUsers,
-      icon: UserCheck,
-      color: 'bg-green-500',
-      change: stats?.users?.growth24h || 0,
-      changeLabel: 'vs yesterday',
-      loading: loading
+      change: 0, // No growth metric for active users
+      icon: Users,
+      color: 'text-green-600',
+      bgColor: 'bg-green-100 dark:bg-green-900',
+      permission: permissions.canViewUsers,
+      href: '/users'
     },
     {
-      title: 'New Users',
-      value: stats?.users?.new7d || 0,
-      icon: UserPlus,
-      color: 'bg-purple-500',
-      change: stats?.users?.growth7d || 0,
-      changeLabel: 'vs last week',
-      loading: loading
-    },
-    {
-      title: 'Total Activities',
-      value: summary.totalActivities,
-      icon: Activity,
-      color: 'bg-orange-500',
-      change: stats?.activities?.growth24h || 0,
-      changeLabel: 'vs yesterday',
-      loading: loading
-    },
-    {
-      title: 'System Health',
-      value: summary.systemHealth,
+      title: 'Total Roles',
+      value: summary.totalRoles,
+      change: 0, // No growth metric for roles
       icon: Shield,
-      color: 'bg-emerald-500',
-      change: 0,
-      changeLabel: 'status',
-      loading: loading,
-      isText: true
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-100 dark:bg-purple-900',
+      permission: permissions.canViewRoles,
+      href: '/roles'
     },
     {
-      title: 'Active Sessions',
-      value: stats?.system?.activeSessions || 0,
-      icon: Clock,
-      color: 'bg-indigo-500',
-      change: 0,
-      changeLabel: 'current',
-      loading: loading
-    }
+      title: 'Audit Events',
+      value: summary.totalAuditEvents,
+      change: summary.auditGrowth,
+      icon: Activity,
+      color: 'text-orange-600',
+      bgColor: 'bg-orange-100 dark:bg-orange-900',
+      permission: permissions.canViewAudit,
+      href: '/audit'
+    },
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {cards.map((card, index) => (
-        <div
-          key={index}
-          className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow duration-200"
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {statsCards.map((stat, index) => (
+        <div 
+          key={index} 
+          className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-200 dark:border-gray-700 ${
+            !stat.permission ? 'opacity-50' : 'hover:shadow-md transition-shadow cursor-pointer'
+          }`}
+          onClick={() => stat.permission && stat.href && router.push(stat.href)}
         >
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                {card.title}
-              </p>
-              <div className="mt-2 flex items-baseline">
-                {loading ? (
-                  <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                ) : (
-                  <>
-                    <p className={`text-2xl font-semibold text-gray-900 dark:text-white ${
-                      card.isText ? 'text-sm' : ''
-                    }`}>
-                      {card.isText ? card.value : card.value.toLocaleString()}
-                    </p>
-                    {card.change !== 0 && (
-                      <div className="ml-2 flex items-center">
-                        {getGrowthIcon(card.change)}
-                        <span className={`ml-1 text-sm font-medium ${getGrowthColor(card.change)}`}>
-                          {Math.abs(card.change).toFixed(1)}%
-                        </span>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-              {!loading && (
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {card.changeLabel}
-                </p>
-              )}
-            </div>
-            <div className={`p-3 rounded-lg ${card.color} bg-opacity-10`}>
-              <card.icon className={`h-6 w-6 ${card.color.replace('bg-', 'text-')}`} />
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-gray-900 dark:text-white">{stat.title}</h3>
+            <div className={`p-2 rounded-full ${stat.bgColor}`}>
+              <stat.icon className={`h-4 w-4 ${stat.color}`} />
             </div>
           </div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            {formatNumber(stat.value)}
+          </div>
+          {stat.change !== 0 && (
+            <div className="flex items-center mt-2">
+              {stat.change > 0 ? (
+                <TrendingUp className="w-4 h-4 text-green-600 mr-1" />
+              ) : (
+                <TrendingDown className="w-4 h-4 text-red-600 mr-1" />
+              )}
+              <span className={`text-sm ${stat.change > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {formatPercentage(stat.change)}
+              </span>
+            </div>
+          )}
+          {!stat.permission && (
+            <p className="text-xs text-gray-500 mt-1">Permission required</p>
+          )}
         </div>
       ))}
     </div>

@@ -127,6 +127,10 @@ const RolesPage = () => {
   // Handle role deletion
   const handleDeleteRole = async (role: any) => {
     try {
+      if (!role || !role.id) {
+        throw new Error('Invalid role data');
+      }
+      
       await deleteRole(role.id);
       showToast('Role deleted successfully', 'success');
     } catch (error: any) {
@@ -337,14 +341,16 @@ const RolesPage = () => {
                   <select
                     value={selectedRole?.id || ''}
                     onChange={(e) => {
-                      const role = roles.find(r => r.id === e.target.value);
+                      const role = roles.find(r => r && r.id === e.target.value);
                       handleRoleSelect(role || null);
                     }}
                     className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-300 dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:focus:ring-brand-400 dark:focus:border-brand-400"
                   >
                     <option value="">Select Role</option>
-                    {roles.map(role => (
-                      <option key={role.id} value={role.id}>{role.name}</option>
+                    {roles.filter(role => role && role.id).map(role => (
+                      <option key={role.id} value={role.id}>
+                        {role.name || 'Unnamed Role'}
+                      </option>
                     ))}
                   </select>
                 </div>

@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useParams } from 'next/navigation';
 import { api } from '@/lib/api';
 
 // Types
@@ -118,10 +119,18 @@ export interface ReplyData {
   }>;
 }
 
+// Hook to get tenant slug from URL params
+const useTenantSlug = () => {
+  const params = useParams();
+  return params.tenantSlug as string;
+};
+
 // Fetch support tickets list
 export const useSupportTickets = (filters: SupportTicketsFilters = {}) => {
+  const tenantSlug = useTenantSlug();
+  
   return useQuery({
-    queryKey: ['superadmin-support-tickets', filters],
+    queryKey: ['tenant-support-tickets', tenantSlug, filters],
     queryFn: async (): Promise<SupportTicketsResponse> => {
       const params = new URLSearchParams();
       
@@ -131,22 +140,25 @@ export const useSupportTickets = (filters: SupportTicketsFilters = {}) => {
         }
       });
 
-      const response = await api.get(`/superadmin/support-tickets?${params.toString()}`);
+      const response = await api.get(`/tenant/${tenantSlug}/support?${params.toString()}`);
       return response.data;
     },
+    enabled: !!tenantSlug,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 };
 
 // Fetch single support ticket
 export const useSupportTicket = (id: string) => {
+  const tenantSlug = useTenantSlug();
+  
   return useQuery({
-    queryKey: ['superadmin-support-ticket', id],
+    queryKey: ['tenant-support-ticket', tenantSlug, id],
     queryFn: async (): Promise<{ ticket: SupportTicket }> => {
-      const response = await api.get(`/superadmin/support-tickets/${id}`);
+      const response = await api.get(`/tenant/${tenantSlug}/support/${id}`);
       return response.data;
     },
-    enabled: !!id,
+    enabled: !!tenantSlug && !!id,
     staleTime: 1 * 60 * 1000, // 1 minute
   });
 };
@@ -154,14 +166,15 @@ export const useSupportTicket = (id: string) => {
 // Create support ticket
 export const useCreateSupportTicket = () => {
   const queryClient = useQueryClient();
+  const tenantSlug = useTenantSlug();
   
   return useMutation({
     mutationFn: async (data: CreateTicketData): Promise<{ message: string; ticket: SupportTicket }> => {
-      const response = await api.post('/superadmin/support-tickets', data);
+      const response = await api.post(`/tenant/${tenantSlug}/support`, data);
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['superadmin-support-tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-support-tickets', tenantSlug] });
     },
   });
 };
@@ -169,15 +182,16 @@ export const useCreateSupportTicket = () => {
 // Update support ticket
 export const useUpdateSupportTicket = () => {
   const queryClient = useQueryClient();
+  const tenantSlug = useTenantSlug();
   
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateTicketData }): Promise<{ message: string; ticket: SupportTicket }> => {
-      const response = await api.put(`/superadmin/support-tickets/${id}`, data);
+      const response = await api.put(`/tenant/${tenantSlug}/support/${id}`, data);
       return response.data;
     },
     onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: ['superadmin-support-tickets'] });
-      queryClient.invalidateQueries({ queryKey: ['superadmin-support-ticket', id] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-support-tickets', tenantSlug] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-support-ticket', tenantSlug, id] });
     },
   });
 };
@@ -185,14 +199,15 @@ export const useUpdateSupportTicket = () => {
 // Delete support ticket
 export const useDeleteSupportTicket = () => {
   const queryClient = useQueryClient();
+  const tenantSlug = useTenantSlug();
   
   return useMutation({
     mutationFn: async (id: string): Promise<{ message: string }> => {
-      const response = await api.delete(`/superadmin/support-tickets/${id}`);
+      const response = await api.delete(`/tenant/${tenantSlug}/support/${id}`);
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['superadmin-support-tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-support-tickets', tenantSlug] });
     },
   });
 };
@@ -200,15 +215,36 @@ export const useDeleteSupportTicket = () => {
 // Add reply to support ticket
 export const useAddReply = () => {
   const queryClient = useQueryClient();
+  const tenantSlug = useTenantSlug();
   
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: ReplyData }): Promise<{ message: string; comment: SupportTicketComment }> => {
-      const response = await api.post(`/superadmin/support-tickets/${id}/comments`, data);
+      const response = await api.post(`/tenant/${tenantSlug}/support/${id}/comments`, data);
       return response.data;
     },
     onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: ['superadmin-support-ticket', id] });
-      queryClient.invalidateQueries({ queryKey: ['superadmin-support-tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-support-ticket', tenantSlug, id] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-support-tickets', tenantSlug] });
+    },
+  });
+};
+
+// Upload file attachment
+export const useUploadAttachment = () => {
+  const tenantSlug = useTenantSlug();
+  
+  return useMutation({
+    mutationFn: async (file: File): Promise<{ filename: string; path: string; originalName: string; mimeType: string; size: number }> => {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await api.post(`/tenant/${tenantSlug}/support/upload`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      return response.data;
     },
   });
 }; 

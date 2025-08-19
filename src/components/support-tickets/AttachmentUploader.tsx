@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { X, Upload, File, Image, FileText, Archive } from 'lucide-react';
+import { useUploadAttachment } from '@/hooks/useSupportTickets';
 
 export interface AttachmentFile {
   file: File;
@@ -11,6 +12,8 @@ export interface AttachmentFile {
   size: number;
   path?: string;
   preview?: string;
+  isUploading?: boolean;
+  uploadError?: string;
 }
 
 interface AttachmentUploaderProps {
@@ -46,6 +49,7 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
   const [dragActive, setDragActive] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadAttachmentMutation = useUploadAttachment();
 
   const validateFile = (file: File): string | null => {
     // Check file size
@@ -79,7 +83,8 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
       filename: `${Date.now()}-${file.name}`,
       originalName: file.name,
       mimeType: file.type,
-      size: file.size
+      size: file.size,
+      isUploading: true
     };
 
     // Generate preview for images
@@ -98,6 +103,22 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
       };
       reader.readAsDataURL(file);
     });
+  };
+
+  const uploadFile = async (attachment: AttachmentFile): Promise<void> => {
+    try {
+      const result = await uploadAttachmentMutation.mutateAsync(attachment.file);
+      
+      // Update attachment with upload result
+      attachment.path = result.path;
+      attachment.filename = result.filename;
+      attachment.isUploading = false;
+      attachment.uploadError = undefined;
+    } catch (error: any) {
+      attachment.isUploading = false;
+      attachment.uploadError = error.message || 'Upload failed';
+      throw error;
+    }
   };
 
   const handleFiles = async (files: FileList) => {
@@ -125,7 +146,28 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
     }
 
     if (newAttachments.length > 0) {
-      onAttachmentsChange([...attachments, ...newAttachments]);
+      const updatedAttachments = [...attachments, ...newAttachments];
+      onAttachmentsChange(updatedAttachments);
+
+      // Upload files in parallel
+      const uploadPromises = newAttachments.map(async (attachment, index) => {
+        try {
+          await uploadFile(attachment);
+          // Update the attachment in the list
+          const attachmentIndex = attachments.length + index;
+          const updatedList = [...updatedAttachments];
+          updatedList[attachmentIndex] = attachment;
+          onAttachmentsChange(updatedList);
+        } catch (error) {
+          // Error is already set in the attachment
+          const attachmentIndex = attachments.length + index;
+          const updatedList = [...updatedAttachments];
+          updatedList[attachmentIndex] = attachment;
+          onAttachmentsChange(updatedList);
+        }
+      });
+
+      await Promise.all(uploadPromises);
     }
   };
 
@@ -202,62 +244,78 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
       >
-        <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-        <p className="text-sm text-gray-600 mb-2">
-          Drag and drop files here, or{' '}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="text-blue-600 hover:text-blue-800 underline"
-          >
-            browse
-          </button>
-        </p>
-        <p className="text-xs text-gray-500">
-          Maximum {maxFiles} files, {formatFileSize(maxSize)} each
-        </p>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept={acceptedTypes.join(',')}
-          onChange={handleFileInput}
-          className="hidden"
-        />
+        <Upload className="mx-auto h-12 w-12 text-gray-400" />
+        <div className="mt-4">
+          <label htmlFor="file-upload" className="cursor-pointer">
+            <span className="mt-2 block text-sm font-medium text-gray-900">
+              Drop files here or{' '}
+              <span className="text-blue-600 hover:text-blue-500">browse</span>
+            </span>
+            <span className="mt-1 block text-xs text-gray-500">
+              Maximum {maxFiles} files, up to {formatFileSize(maxSize)} each
+            </span>
+          </label>
+          <input
+            ref={fileInputRef}
+            id="file-upload"
+            name="file-upload"
+            type="file"
+            multiple
+            accept={acceptedTypes.join(',')}
+            onChange={handleFileInput}
+            className="sr-only"
+          />
+        </div>
       </div>
 
       {/* Attachments List */}
       {attachments.length > 0 && (
         <div className="space-y-2">
-          <h4 className="text-sm font-medium text-gray-700">Attachments ({attachments.length}/{maxFiles})</h4>
+          <h4 className="text-sm font-medium text-gray-700">Attachments ({attachments.length})</h4>
           <div className="space-y-2">
             {attachments.map((attachment, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div
+                key={index}
+                className={`flex items-center justify-between p-3 rounded-lg border ${
+                  attachment.uploadError
+                    ? 'border-red-200 bg-red-50'
+                    : attachment.isUploading
+                    ? 'border-yellow-200 bg-yellow-50'
+                    : 'border-gray-200 bg-gray-50'
+                }`}
+              >
                 <div className="flex items-center space-x-3">
                   {attachment.preview ? (
                     <img
                       src={attachment.preview}
                       alt={attachment.originalName}
-                      className="w-10 h-10 object-cover rounded"
+                      className="w-8 h-8 object-cover rounded"
                     />
                   ) : (
-                    <div className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center">
+                    <div className="w-8 h-8 flex items-center justify-center bg-gray-200 rounded">
                       {getFileIcon(attachment.mimeType)}
                     </div>
                   )}
-                  <div>
-                    <p className="text-sm font-medium text-gray-900 truncate max-w-xs">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
                       {attachment.originalName}
                     </p>
                     <p className="text-xs text-gray-500">
                       {formatFileSize(attachment.size)}
                     </p>
+                    {attachment.uploadError && (
+                      <p className="text-xs text-red-600">{attachment.uploadError}</p>
+                    )}
+                    {attachment.isUploading && (
+                      <p className="text-xs text-yellow-600">Uploading...</p>
+                    )}
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => removeAttachment(index)}
                   className="text-gray-400 hover:text-red-500 transition-colors"
+                  disabled={attachment.isUploading}
                 >
                   <X className="w-4 h-4" />
                 </button>

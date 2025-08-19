@@ -10,12 +10,9 @@ interface TokenValidation {
   isValid: boolean;
   email?: string;
   error?: string;
-  data?: {
-    tenantSlug: string;
-  };
 }
 
-export default function TenantResetPasswordPage() {
+export default function ResetPasswordPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tokenValidation, setTokenValidation] = useState<TokenValidation | null>(null);
@@ -25,19 +22,21 @@ export default function TenantResetPasswordPage() {
 
   useEffect(() => {
     if (!token) {
+      console.log('❌ No token provided in URL');
       setTokenValidation({ isValid: false, error: 'No token provided' });
       setIsLoading(false);
       return;
     }
 
+    console.log('🔍 Token found in URL:', token.substring(0, 10) + '...');
     validateToken(token);
   }, [token]);
 
   const validateToken = async (token: string) => {
     try {
-      console.log('🔍 Validating tenant token with axios:', token);
+      console.log('🔍 Validating token with axios:', token.substring(0, 10) + '...');
       
-      const response = await axios.get(`/api/tenant/auth/verify-reset-token`, {
+      const response = await axios.get(`/api/superadmin/auth/verify-reset-token`, {
         params: { token },
         timeout: 10000 // 10 second timeout
       });
@@ -46,11 +45,19 @@ export default function TenantResetPasswordPage() {
 
       if (response.data.success) {
         console.log('✅ Token is valid');
-        setTokenValidation({
-          isValid: true,
-          email: response.data.email,
-          data: response.data
-        });
+        const email = response.data.data?.email;
+        if (!email) {
+          console.log('❌ No email found in response data');
+          setTokenValidation({
+            isValid: false,
+            error: 'Invalid response from server - no email found'
+          });
+        } else {
+          setTokenValidation({
+            isValid: true,
+            email: email
+          });
+        }
       } else {
         console.log('❌ Token is invalid:', response.data.message);
         setTokenValidation({
@@ -64,12 +71,15 @@ export default function TenantResetPasswordPage() {
       let errorMessage = 'Failed to verify reset token';
       if (error.response) {
         // Server responded with error status
+        console.log('❌ Server error response:', error.response.status, error.response.data);
         errorMessage = error.response.data?.message || errorMessage;
       } else if (error.request) {
         // Request was made but no response received
+        console.log('❌ No response received from server');
         errorMessage = 'Network error - no response from server';
       } else {
         // Something else happened
+        console.log('❌ Request setup error:', error.message);
         errorMessage = error.message || errorMessage;
       }
       
@@ -86,7 +96,7 @@ export default function TenantResetPasswordPage() {
   console.log('🔍 Current state:', {
     isLoading,
     tokenValidation,
-    token,
+    token: token ? token.substring(0, 10) + '...' : null,
     shouldRenderClient: tokenValidation?.isValid && tokenValidation.email && token
   });
 
@@ -104,43 +114,44 @@ export default function TenantResetPasswordPage() {
     );
   }
 
-  if (!tokenValidation?.isValid || !tokenValidation.email || !token) {
-    console.log('❌ Rendering error state');
+  // Only render ResetPasswordClient if token is valid and we have an email
+  if (tokenValidation?.isValid && tokenValidation.email && token) {
+    console.log('✅ Rendering ResetPasswordClient - token is valid');
     return (
-      <div className="flex flex-col flex-1 w-full">
-        <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto space-y-8">
-          <div className="text-center">
-            <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-full mb-4 shadow-sm">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </div>
-            <h2 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
-              Invalid Reset Link
-            </h2>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              {tokenValidation?.error || 'The password reset link is invalid or has expired.'}
-            </p>
-            <div className="mt-6">
-              <a
-                href="/forgot-password"
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Request New Reset Link
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
+      <ResetPasswordClient 
+        token={token} 
+        email={tokenValidation.email} 
+      />
     );
   }
 
-  console.log('✅ Rendering client component');
+  // Show error for invalid token
+  console.log('❌ Rendering error page - token is invalid or missing');
   return (
-    <ResetPasswordClient
-      token={token}
-      email={tokenValidation.email}
-      tenantSlug={tokenValidation.data?.tenantSlug || 'tenant'}
-    />
+    <div className="flex flex-col flex-1 w-full">
+      <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto space-y-8">
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-full mb-4 shadow-sm">
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90 sm:text-3xl">
+            Invalid Reset URL
+          </h1>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            {tokenValidation?.error || 'This reset link is invalid or has expired.'}
+          </p>
+          <div className="mt-6">
+            <button
+              onClick={() => router.push('/superadmin/forgot-password')}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Request New Reset Link
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
-} 
+}

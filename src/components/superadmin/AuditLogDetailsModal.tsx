@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, User, Building, Calendar, Globe, Monitor, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { X, User, Building, Calendar, Globe, Monitor, AlertTriangle, CheckCircle, XCircle, FileText, Clock, MapPin } from 'lucide-react';
 import { AuditLog } from '@/hooks/useAuditLogs';
 
 interface AuditLogDetailsModalProps {
@@ -27,12 +27,12 @@ const AuditLogDetailsModal: React.FC<AuditLogDetailsModalProps> = ({
 
   const getSeverityColor = (action: string) => {
     if (action.toLowerCase().includes('delete') || action.toLowerCase().includes('suspend')) {
-      return 'text-red-600 bg-red-50 border-red-200';
+      return 'text-red-600 bg-red-50 border-red-200 dark:text-red-400 dark:bg-red-900/20 dark:border-red-800';
     }
     if (action.toLowerCase().includes('update') || action.toLowerCase().includes('change')) {
-      return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+      return 'text-yellow-600 bg-yellow-50 border-yellow-200 dark:text-yellow-400 dark:bg-yellow-900/20 dark:border-yellow-800';
     }
-    return 'text-green-600 bg-green-50 border-green-200';
+    return 'text-green-600 bg-green-50 border-green-200 dark:text-green-400 dark:bg-green-900/20 dark:border-green-800';
   };
 
   const formatUserAgent = (userAgent: string) => {
@@ -51,39 +51,50 @@ const AuditLogDetailsModal: React.FC<AuditLogDetailsModalProps> = ({
     return { browser, os, full: userAgent };
   };
 
-  const renderJsonDiff = (details: any) => {
+  const renderReadableDetails = (details: any) => {
     if (!details) return null;
 
     const { before, after } = details;
     
     if (!before && !after) return null;
 
+    const renderObjectAsList = (obj: any, title: string, color: string) => {
+      if (!obj || typeof obj !== 'object') return null;
+
+      const entries = Object.entries(obj);
+      if (entries.length === 0) return null;
+
+      return (
+        <div className={`bg-${color}-50 dark:bg-${color}-900/20 border border-${color}-200 dark:border-${color}-800 rounded-lg p-4`}>
+          <h5 className={`text-sm font-medium text-${color}-700 dark:text-${color}-300 mb-3 flex items-center`}>
+            <FileText className="w-4 h-4 mr-2" />
+            {title}
+          </h5>
+          <div className="space-y-2">
+            {entries.map(([key, value]) => (
+              <div key={key} className="flex justify-between items-start">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">
+                  {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}:
+                </span>
+                <span className="text-sm text-gray-900 dark:text-white ml-4 text-right max-w-xs break-words">
+                  {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    };
+
     return (
       <div className="space-y-4">
-        <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-          Changes
+        <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center">
+          <FileText className="w-4 h-4 mr-2" />
+          Changes Made
         </h4>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {before && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-              <h5 className="text-xs font-medium text-red-700 dark:text-red-300 mb-2">
-                Before
-              </h5>
-              <pre className="text-xs text-red-600 dark:text-red-400 overflow-auto max-h-40">
-                {JSON.stringify(before, null, 2)}
-              </pre>
-            </div>
-          )}
-          {after && (
-            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
-              <h5 className="text-xs font-medium text-green-700 dark:text-green-300 mb-2">
-                After
-              </h5>
-              <pre className="text-xs text-green-600 dark:text-green-400 overflow-auto max-h-40">
-                {JSON.stringify(after, null, 2)}
-              </pre>
-            </div>
-          )}
+          {renderObjectAsList(before, 'Previous Values', 'red')}
+          {renderObjectAsList(after, 'New Values', 'green')}
         </div>
       </div>
     );
@@ -111,7 +122,8 @@ const AuditLogDetailsModal: React.FC<AuditLogDetailsModalProps> = ({
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                   Audit Log Details
                 </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
+                  <Clock className="w-4 h-4 mr-1" />
                   {new Date(log.createdAt).toLocaleString()}
                 </p>
               </div>
@@ -127,13 +139,13 @@ const AuditLogDetailsModal: React.FC<AuditLogDetailsModalProps> = ({
           {/* Action Summary */}
           <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
             <div className="flex items-center justify-between">
-              <div>
+              <div className="flex items-center space-x-3">
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getSeverityColor(log.action)}`}>
                   {log.action}
                 </span>
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                ID: {log.id}
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  ID: {log.id}
+                </span>
               </div>
             </div>
           </div>
@@ -143,7 +155,7 @@ const AuditLogDetailsModal: React.FC<AuditLogDetailsModalProps> = ({
             <div className="space-y-4">
               <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center">
                 <User className="w-4 h-4 mr-2" />
-                Actor Information
+                Who Performed This Action
               </h4>
               
               {actor && (
@@ -153,13 +165,13 @@ const AuditLogDetailsModal: React.FC<AuditLogDetailsModalProps> = ({
                       <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
                         Name
                       </label>
-                      <p className="text-sm text-gray-900 dark:text-white">
+                      <p className="text-sm text-gray-900 dark:text-white font-medium">
                         {actor.name}
                       </p>
                     </div>
                     <div>
                       <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                        Email
+                        Email Address
                       </label>
                       <p className="text-sm text-gray-900 dark:text-white">
                         {actor.email}
@@ -170,7 +182,7 @@ const AuditLogDetailsModal: React.FC<AuditLogDetailsModalProps> = ({
                         Role
                       </label>
                       <p className="text-sm text-gray-900 dark:text-white">
-                        {log.superAdmin ? 'Super Admin' : 'User'}
+                        {log.superAdmin ? 'Super Administrator' : 'User'}
                       </p>
                     </div>
                   </div>
@@ -188,17 +200,17 @@ const AuditLogDetailsModal: React.FC<AuditLogDetailsModalProps> = ({
                     <div className="space-y-3">
                       <div>
                         <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                          Name
+                          Tenant Name
                         </label>
-                        <p className="text-sm text-gray-900 dark:text-white">
+                        <p className="text-sm text-gray-900 dark:text-white font-medium">
                           {log.tenant.name}
                         </p>
                       </div>
                       <div>
                         <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                          Slug
+                          Tenant Identifier
                         </label>
-                        <p className="text-sm text-gray-900 dark:text-white">
+                        <p className="text-sm text-gray-900 dark:text-white font-mono">
                           {log.tenant.slug}
                         </p>
                       </div>
@@ -212,7 +224,7 @@ const AuditLogDetailsModal: React.FC<AuditLogDetailsModalProps> = ({
             <div className="space-y-4">
               <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center">
                 <Monitor className="w-4 h-4 mr-2" />
-                Technical Details
+                Technical Information
               </h4>
               
               <div className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
@@ -228,7 +240,7 @@ const AuditLogDetailsModal: React.FC<AuditLogDetailsModalProps> = ({
                   </div>
                   <div>
                     <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                      Browser
+                      Browser & Operating System
                     </label>
                     <p className="text-sm text-gray-900 dark:text-white">
                       {userAgentInfo.browser} on {userAgentInfo.os}
@@ -236,7 +248,7 @@ const AuditLogDetailsModal: React.FC<AuditLogDetailsModalProps> = ({
                   </div>
                   <div>
                     <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                      User Agent
+                      Full User Agent
                     </label>
                     <p className="text-xs text-gray-600 dark:text-gray-400 font-mono break-all">
                       {userAgentInfo.full}
@@ -245,10 +257,18 @@ const AuditLogDetailsModal: React.FC<AuditLogDetailsModalProps> = ({
                   <div>
                     <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center">
                       <Calendar className="w-3 h-3 mr-1" />
-                      Timestamp
+                      Exact Timestamp
                     </label>
                     <p className="text-sm text-gray-900 dark:text-white">
-                      {new Date(log.createdAt).toLocaleString()}
+                      {new Date(log.createdAt).toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        timeZoneName: 'short'
+                      })}
                     </p>
                   </div>
                 </div>
@@ -256,10 +276,10 @@ const AuditLogDetailsModal: React.FC<AuditLogDetailsModalProps> = ({
             </div>
           </div>
 
-          {/* JSON Diff */}
+          {/* Readable Details */}
           {log.details && (
             <div className="mt-6">
-              {renderJsonDiff(log.details)}
+              {renderReadableDetails(log.details)}
             </div>
           )}
 

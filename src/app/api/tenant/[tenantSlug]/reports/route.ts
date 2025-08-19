@@ -1,503 +1,318 @@
 import { NextRequest } from 'next/server';
+import { withTenantAuth, AuthenticatedRequest } from '@/lib/authMiddleware';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-import { verifyToken } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { createAuditLogFromRequest } from '@/lib/audit';
+import { prisma } from '@/lib/prisma';
+import { checkTenantPermission } from '@/lib/permissions';
+import { z } from 'zod';
 
-export async function GET(req: NextRequest) {
+// Validation schemas
+const createReportSchema = z.object({
+  name: z.string().min(1, 'Report name is required'),
+  type: z.string(),
+  data: z.string().optional(),
+  status: z.string().default('generating')
+});
+
+const bulkActionSchema = z.object({
+  reportIds: z.array(z.string()),
+  action: z.enum(['activate', 'deactivate', 'delete'])
+});
+
+// GET /api/tenant/[tenantSlug]/reports - Get reports list with filters and pagination
+export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
+  const { tenantSlug } = await params;
+  
   try {
-    const { searchParams } = new URL(req.url);
-    const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
-    
-    if (!tenantSlug) {
-      return createErrorResponse('Tenant slug is required', 400);
-    }
+    const userId = req.user!.id;
+    const tenantId = req.user!.tenantId;
 
-    // Verify authentication token
-    const token = req.headers.get('authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return createErrorResponse('No authentication token found', 401);
-    }
-
-    const decoded = await verifyToken(token);
-    if (!decoded || !decoded.id) {
-      return createErrorResponse('Invalid authentication token', 401);
-    }
-
-    // Get tenant
-    const tenant = await prisma.tenant.findUnique({
-      where: { slug: tenantSlug },
-      select: { id: true, name: true, slug: true, isActive: true }
-    });
-
-    if (!tenant) {
-      return createErrorResponse('Tenant not found', 404);
-    }
-
-    if (!tenant.isActive) {
-      return createErrorResponse('Tenant is inactive', 403);
-    }
-
-    // Verify user belongs to this tenant
-    const user = await prisma.user.findFirst({
-      where: {
-        id: decoded.id,
-        tenantId: tenant.id,
-        isActive: true
-      }
-    });
-
-    if (!user) {
-      return createErrorResponse('User not found or not authorized for this tenant', 404);
+    // Check permissions
+    const hasViewPermission = await checkTenantPermission(req.user!, tenantId!, 'reports.view');
+    if (!hasViewPermission) {
+      return createErrorResponse('Insufficient permissions to view reports', 403);
     }
 
     // Parse query parameters
-    const reportType = searchParams.get('type') || 'overview';
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
-    const groupBy = searchParams.get('groupBy') || 'day';
-    const limit = parseInt(searchParams.get('limit') || '30');
+    const url = new URL(req.url);
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const limit = parseInt(url.searchParams.get('limit') || '10');
+    const search = url.searchParams.get('search') || '';
+    const sortBy = url.searchParams.get('sortBy') || 'createdAt';
+    const sortOrder = url.searchParams.get('sortOrder') || 'desc';
+    const type = url.searchParams.get('type') || '';
+    const status = url.searchParams.get('status') || '';
 
-    // Calculate date range
-    const end = endDate ? new Date(endDate) : new Date();
-    const start = startDate ? new Date(startDate) : new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+    // Build where clause
+    const where: any = {
+      tenantId: tenantId
+    };
 
-    let reportData: any = {};
-
-    switch (reportType) {
-      case 'overview':
-        reportData = await generateOverviewReport(tenant.id, start, end);
-        break;
-      case 'user-activity':
-        reportData = await generateUserActivityReport(tenant.id, start, end, groupBy, limit);
-        break;
-      case 'system-usage':
-        reportData = await generateSystemUsageReport(tenant.id, start, end, groupBy);
-        break;
-      case 'security':
-        reportData = await generateSecurityReport(tenant.id, start, end);
-        break;
-      case 'performance':
-        reportData = await generatePerformanceReport(tenant.id, start, end);
-        break;
-      default:
-        return createErrorResponse('Invalid report type', 400);
+    // Add search filter
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { type: { contains: search, mode: 'insensitive' } }
+      ];
     }
 
-    // Create audit log
-    await createAuditLogFromRequest(
-      req,
-      { id: user.id, email: user.email, role: 'user' },
-      'reports.generate',
-      { 
-        tenantId: tenant.id,
-        tenantSlug: tenant.slug,
-        reportType,
-        startDate: start.toISOString(),
-        endDate: end.toISOString()
-      }
-    );
+    // Add type filter
+    if (type) {
+      where.type = type;
+    }
 
-    return createSuccessResponse(reportData, 'Report generated successfully');
+    // Add status filter
+    if (status) {
+      where.status = status;
+    }
+
+    // Build order by clause
+    const orderBy: any = {};
+    orderBy[sortBy] = sortOrder;
+
+    // Calculate pagination
+    const skip = (page - 1) * limit;
+
+    // Fetch reports with pagination
+    const [reports, totalReports] = await Promise.all([
+      prisma.report.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy,
+        include: {
+          superAdmin: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          },
+          tenant: {
+            select: {
+              id: true,
+              name: true,
+              slug: true
+            }
+          }
+        }
+      }),
+      prisma.report.count({ where })
+    ]);
+
+    // Calculate statistics
+    const reportStats = {
+      total: totalReports,
+      byType: reports.reduce((acc, report) => {
+        acc[report.type] = (acc[report.type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
+      byStatus: reports.reduce((acc, report) => {
+        acc[report.status] = (acc[report.status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>)
+    };
+
+    // Format response
+    const formattedReports = reports.map(report => ({
+      id: report.id,
+      name: report.name,
+      type: report.type,
+      data: report.data,
+      status: report.status,
+      createdAt: report.createdAt,
+      createdBy: report.superAdmin,
+      tenant: report.tenant
+    }));
+
+    return createSuccessResponse({
+      reports: formattedReports,
+      pagination: {
+        page,
+        limit,
+        total: totalReports,
+        totalPages: Math.ceil(totalReports / limit),
+        hasNext: page * limit < totalReports,
+        hasPrev: page > 1
+      },
+      stats: reportStats,
+      permissions: {
+        canView: hasViewPermission,
+        canCreate: await checkTenantPermission(req.user!, tenantId!, 'reports.create'),
+        canUpdate: await checkTenantPermission(req.user!, tenantId!, 'reports.update'),
+        canDelete: await checkTenantPermission(req.user!, tenantId!, 'reports.delete')
+      }
+    }, 'Reports retrieved successfully');
 
   } catch (error: any) {
-    console.error('Error generating report:', error);
+    console.error('Error fetching reports:', error);
     return createErrorResponse(
-      error.message || 'Internal server error',
+      error.message || 'Failed to fetch reports',
       error.status || 500
     );
   }
-}
+});
 
-// Helper functions to generate different types of reports
-async function generateOverviewReport(tenantId: string, start: Date, end: Date) {
-  const [
-    totalUsers,
-    activeUsers,
-    newUsers,
-    totalActivities,
-    loginCount,
-    errorCount,
-    roleDistribution,
-    moduleUsage
-  ] = await Promise.all([
-    // Total users
-    prisma.user.count({
-      where: { tenantId }
-    }),
-    
-    // Active users (logged in within last 30 days)
-    prisma.user.count({
-      where: {
-        tenantId,
-        lastLogin: {
-          gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-        }
-      }
-    }),
-    
-    // New users in date range
-    prisma.user.count({
-      where: {
-        tenantId,
-        createdAt: { gte: start, lte: end }
-      }
-    }),
-    
-    // Total activities in date range
-    prisma.auditLog.count({
-      where: {
-        tenantId,
-        createdAt: { gte: start, lte: end }
-      }
-    }),
-    
-    // Login count in date range
-    prisma.auditLog.count({
-      where: {
-        tenantId,
-        action: { contains: 'login' },
-        createdAt: { gte: start, lte: end }
-      }
-    }),
-    
-    // Error count in date range
-    prisma.auditLog.count({
-      where: {
-        tenantId,
-        action: { contains: 'error' },
-        createdAt: { gte: start, lte: end }
-      }
-    }),
-    
-    // Role distribution
-    prisma.userRole.groupBy({
-      by: ['roleId'],
-      where: {
-        user: { tenantId }
-      },
-      _count: {
-        userId: true
-      },
-      include: {
-        role: {
-          select: {
-            name: true
-          }
-        }
-      }
-    }),
-    
-    // Module usage
-    prisma.auditLog.groupBy({
-      by: ['action'],
-      where: {
-        tenantId,
-        createdAt: { gte: start, lte: end }
-      },
-      _count: {
-        id: true
-      }
-    })
-  ]);
-
-  return {
-    summary: {
-      totalUsers,
-      activeUsers,
-      newUsers,
-      totalActivities,
-      loginCount,
-      errorCount,
-      successRate: totalActivities > 0 ? ((totalActivities - errorCount) / totalActivities * 100).toFixed(2) : 100
-    },
-    roleDistribution: roleDistribution.map(rd => ({
-      roleName: rd.role.name,
-      userCount: rd._count.userId
-    })),
-    moduleUsage: moduleUsage.map(mu => ({
-      action: mu.action,
-      count: mu._count.id
-    }))
-  };
-}
-
-async function generateUserActivityReport(tenantId: string, start: Date, end: Date, groupBy: string, limit: number) {
-  const groupByClause = groupBy === 'hour' ? 'hour' : groupBy === 'week' ? 'week' : 'day';
+// POST /api/tenant/[tenantSlug]/reports - Create new report
+export const POST = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
+  const { tenantSlug } = await params;
   
-  const activityData = await prisma.auditLog.groupBy({
-    by: ['createdAt'],
-    where: {
-      tenantId,
-      createdAt: { gte: start, lte: end }
-    },
-    _count: {
-      id: true
-    },
-    orderBy: {
-      createdAt: 'asc'
-    }
-  });
-
-  const userActivity = await prisma.auditLog.groupBy({
-    by: ['userId'],
-    where: {
-      tenantId,
-      createdAt: { gte: start, lte: end }
-    },
-    _count: {
-      id: true
-    },
-    orderBy: {
-      _count: {
-        id: 'desc'
-      }
-    },
-    take: limit,
-    include: {
-      user: {
-        select: {
-          name: true,
-          email: true
-        }
-      }
-    }
-  });
-
-  return {
-    activityTrend: activityData.map(ad => ({
-      date: ad.createdAt.toISOString(),
-      count: ad._count.id
-    })),
-    topUsers: userActivity.map(ua => ({
-      userId: ua.userId,
-      userName: ua.user?.name || 'Unknown',
-      userEmail: ua.user?.email || 'Unknown',
-      activityCount: ua._count.id
-    }))
-  };
-}
-
-async function generateSystemUsageReport(tenantId: string, start: Date, end: Date, groupBy: string) {
-  const usageData = await prisma.auditLog.groupBy({
-    by: ['action'],
-    where: {
-      tenantId,
-      createdAt: { gte: start, lte: end }
-    },
-    _count: {
-      id: true
-    }
-  });
-
-  const dailyUsage = await prisma.auditLog.groupBy({
-    by: ['createdAt'],
-    where: {
-      tenantId,
-      createdAt: { gte: start, lte: end }
-    },
-    _count: {
-      id: true
-    },
-    orderBy: {
-      createdAt: 'asc'
-    }
-  });
-
-  return {
-    moduleUsage: usageData.map(ud => ({
-      module: ud.action,
-      count: ud._count.id
-    })),
-    dailyTrend: dailyUsage.map(du => ({
-      date: du.createdAt.toISOString(),
-      count: du._count.id
-    }))
-  };
-}
-
-async function generateSecurityReport(tenantId: string, start: Date, end: Date) {
-  const [
-    failedLogins,
-    suspiciousActivities,
-    permissionChanges,
-    userChanges
-  ] = await Promise.all([
-    // Failed login attempts
-    prisma.auditLog.findMany({
-      where: {
-        tenantId,
-        action: { contains: 'login.failed' },
-        createdAt: { gte: start, lte: end }
-      },
-      include: {
-        user: {
-          select: {
-            email: true,
-            name: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      },
-      take: 10
-    }),
-    
-    // Suspicious activities
-    prisma.auditLog.findMany({
-      where: {
-        tenantId,
-        OR: [
-          { action: { contains: 'permission' } },
-          { action: { contains: 'role' } },
-          { action: { contains: 'settings' } }
-        ],
-        createdAt: { gte: start, lte: end }
-      },
-      include: {
-        user: {
-          select: {
-            email: true,
-            name: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      },
-      take: 10
-    }),
-    
-    // Permission changes
-    prisma.auditLog.count({
-      where: {
-        tenantId,
-        action: { contains: 'permission' },
-        createdAt: { gte: start, lte: end }
-      }
-    }),
-    
-    // User changes
-    prisma.auditLog.count({
-      where: {
-        tenantId,
-        OR: [
-          { action: { contains: 'user.create' } },
-          { action: { contains: 'user.update' } },
-          { action: { contains: 'user.delete' } }
-        ],
-        createdAt: { gte: start, lte: end }
-      }
-    })
-  ]);
-
-  return {
-    securityEvents: {
-      failedLogins: failedLogins.length,
-      suspiciousActivities: suspiciousActivities.length,
-      permissionChanges,
-      userChanges
-    },
-    failedLoginDetails: failedLogins.map(fl => ({
-      id: fl.id,
-      action: fl.action,
-      ipAddress: fl.ipAddress,
-      userAgent: fl.userAgent,
-      createdAt: fl.createdAt.toISOString(),
-      user: fl.user ? {
-        email: fl.user.email,
-        name: fl.user.name
-      } : null
-    })),
-    suspiciousActivityDetails: suspiciousActivities.map(sa => ({
-      id: sa.id,
-      action: sa.action,
-      description: sa.description,
-      ipAddress: sa.ipAddress,
-      createdAt: sa.createdAt.toISOString(),
-      user: sa.user ? {
-        email: sa.user.email,
-        name: sa.user.name
-      } : null
-    }))
-  };
-}
-
-async function generatePerformanceReport(tenantId: string, start: Date, end: Date) {
-  const performanceData = await prisma.auditLog.groupBy({
-    by: ['action'],
-    where: {
-      tenantId,
-      createdAt: { gte: start, lte: end }
-    },
-    _count: {
-      id: true
-    },
-    _avg: {
-      // Note: This would require adding a responseTime field to the audit log
-      // For now, we'll use a placeholder
-    }
-  });
-
-  return {
-    performanceMetrics: {
-      totalRequests: performanceData.reduce((sum, pd) => sum + pd._count.id, 0),
-      averageResponseTime: 150, // Placeholder - would need to track this
-      slowestOperations: performanceData
-        .sort((a, b) => b._count.id - a._count.id)
-        .slice(0, 5)
-        .map(pd => ({
-          action: pd.action,
-          count: pd._count.id
-        }))
-    }
-  };
-}
-
-export async function POST(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
-    
-    if (!tenantSlug) {
-      return createErrorResponse('Tenant slug is required', 400);
-    }
+    const userId = req.user!.id;
+    const tenantId = req.user!.tenantId;
 
-    // Verify authentication token
-    const token = req.headers.get('authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return createErrorResponse('No authentication token found', 401);
-    }
-
-    const decoded = await verifyToken(token);
-    if (!decoded || !decoded.id) {
-      return createErrorResponse('Invalid authentication token', 401);
+    // Check create permission
+    const hasCreatePermission = await checkTenantPermission(req.user!, tenantId!, 'reports.create');
+    if (!hasCreatePermission) {
+      return createErrorResponse('Insufficient permissions to create reports', 403);
     }
 
     const body = await req.json();
-    const { reportName, filters, schedule, recipients } = body;
+    const validatedData = createReportSchema.parse(body);
 
-    // Create scheduled report
-    const scheduledReport = await prisma.scheduledReport.create({
-      data: {
-        name: reportName,
-        tenantSlug,
-        filters: filters || {},
-        schedule: schedule || 'weekly',
-        recipients: recipients || [],
-        isActive: true,
-        createdBy: decoded.id
+    // Check if report name already exists in tenant
+    const existingReport = await prisma.report.findFirst({
+      where: {
+        name: validatedData.name,
+        tenantId: tenantId
       }
     });
 
-    return createSuccessResponse(scheduledReport, 'Scheduled report created successfully');
+    if (existingReport) {
+      return createErrorResponse('Report with this name already exists in this tenant', 400);
+    }
+
+    // Create report
+    const newReport = await prisma.report.create({
+      data: {
+        name: validatedData.name,
+        type: validatedData.type,
+        data: validatedData.data || '',
+        status: validatedData.status,
+        tenantId: tenantId,
+        superAdminId: userId
+      }
+    });
+
+    // Create audit log
+    await createAuditLogFromRequest(req, req.user! as any, 'report.created', {
+      details: `Created report: ${newReport.name}`,
+      resource: 'report',
+      resourceId: newReport.id
+    });
+
+    return createSuccessResponse({
+      report: {
+        id: newReport.id,
+        name: newReport.name,
+        type: newReport.type,
+        status: newReport.status,
+        createdAt: newReport.createdAt
+      }
+    }, 'Report created successfully');
 
   } catch (error: any) {
-    console.error('Error creating scheduled report:', error);
+    console.error('Error creating report:', error);
+    if (error.name === 'ZodError') {
+      return createErrorResponse('Validation error: ' + error.errors[0].message, 400);
+    }
     return createErrorResponse(
-      error.message || 'Internal server error',
+      error.message || 'Failed to create report',
       error.status || 500
     );
   }
-} 
+});
+
+// PUT /api/tenant/[tenantSlug]/reports - Bulk actions
+export const PUT = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
+  const { tenantSlug } = await params;
+  
+  try {
+    const userId = req.user!.id;
+    const tenantId = req.user!.tenantId;
+
+    const body = await req.json();
+    const validatedData = bulkActionSchema.parse(body);
+
+    // Check permissions based on action
+    let hasPermission = false;
+    switch (validatedData.action) {
+      case 'activate':
+      case 'deactivate':
+        hasPermission = await checkTenantPermission(req.user!, tenantId!, 'reports.update');
+        break;
+      case 'delete':
+        hasPermission = await checkTenantPermission(req.user!, tenantId!, 'reports.delete');
+        break;
+    }
+
+    if (!hasPermission) {
+      return createErrorResponse('Insufficient permissions for this action', 403);
+    }
+
+    // Verify all reports belong to the tenant
+    const reports = await prisma.report.findMany({
+      where: {
+        id: { in: validatedData.reportIds },
+        tenantId: tenantId
+      }
+    });
+
+    if (reports.length !== validatedData.reportIds.length) {
+      return createErrorResponse('Some reports not found or do not belong to this tenant', 400);
+    }
+
+    let result;
+    switch (validatedData.action) {
+      case 'activate':
+        result = await prisma.report.updateMany({
+          where: { 
+            id: { in: validatedData.reportIds }, 
+            tenantId: tenantId
+          },
+          data: { status: 'ready' }
+        });
+        break;
+      case 'deactivate':
+        result = await prisma.report.updateMany({
+          where: { 
+            id: { in: validatedData.reportIds }, 
+            tenantId: tenantId
+          },
+          data: { status: 'generating' }
+        });
+        break;
+      case 'delete':
+        result = await prisma.report.deleteMany({
+          where: { 
+            id: { in: validatedData.reportIds }, 
+            tenantId: tenantId
+          }
+        });
+        break;
+    }
+
+    // Create audit log
+    await createAuditLogFromRequest(req, req.user! as any, `reports.${validatedData.action}`, {
+      details: `${validatedData.action} action performed on ${validatedData.reportIds.length} reports`,
+      resource: 'report',
+      resourceId: validatedData.reportIds.join(',')
+    });
+
+    return createSuccessResponse({
+      action: validatedData.action,
+      affectedReports: result.count,
+      reportIds: validatedData.reportIds
+    }, `Bulk action '${validatedData.action}' completed successfully`);
+
+  } catch (error: any) {
+    console.error('Error performing bulk action:', error);
+    if (error.name === 'ZodError') {
+      return createErrorResponse('Validation error: ' + error.errors[0].message, 400);
+    }
+    return createErrorResponse(
+      error.message || 'Failed to perform bulk action',
+      error.status || 500
+    );
+  }
+}); 

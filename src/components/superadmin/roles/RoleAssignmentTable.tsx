@@ -39,6 +39,17 @@ const RoleAssignmentTable: React.FC<RoleAssignmentTableProps> = ({
   // Initialize assignments from current user roles
   useMemo(() => {
     const initialAssignments: { [userId: string]: string } = {};
+    
+    // Debug logging
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 RoleAssignmentTable Debug:', {
+        usersCount: users?.length || 0,
+        rolesCount: roles?.length || 0,
+        usersWithRoles: users?.filter(u => u.roleId).length || 0,
+        roles: roles?.map(r => ({ id: r.id, name: r.name })) || []
+      });
+    }
+    
     users.forEach(user => {
       if (user.roleId) {
         initialAssignments[user.id] = user.roleId;
@@ -46,7 +57,7 @@ const RoleAssignmentTable: React.FC<RoleAssignmentTableProps> = ({
     });
     setAssignments(initialAssignments);
     setHasChanges(false);
-  }, [users]);
+  }, [users, roles]);
 
   // Filter users
   const filteredUsers = useMemo(() => {
@@ -117,8 +128,11 @@ const RoleAssignmentTable: React.FC<RoleAssignmentTableProps> = ({
 
   // Get role name by ID
   const getRoleName = (roleId: string): string => {
+    if (!roleId || !roles || !Array.isArray(roles)) {
+      return 'Unknown Role';
+    }
     const role = roles.find(r => r.id === roleId);
-    return role ? role.name : 'Unknown Role';
+    return role ? (role.name || 'Unnamed Role') : 'Unknown Role';
   };
 
   // Get assignment count
@@ -204,8 +218,10 @@ const RoleAssignmentTable: React.FC<RoleAssignmentTableProps> = ({
               >
                 <option value="all">All Roles</option>
                 <option value="unassigned">Unassigned</option>
-                {roles.map(role => (
-                  <option key={role.id} value={role.id}>{role.name}</option>
+                {(roles || []).map(role => (
+                  <option key={role.id || 'unknown'} value={role.id || ''}>
+                    {role.name || 'Unnamed Role'}
+                  </option>
                 ))}
               </select>
             </div>
@@ -238,8 +254,10 @@ const RoleAssignmentTable: React.FC<RoleAssignmentTableProps> = ({
               className="px-3 py-2 text-sm border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-300 dark:bg-blue-900/50 dark:border-blue-700 dark:text-white"
             >
               <option value="">Select Role</option>
-              {roles.map(role => (
-                <option key={role.id} value={role.id}>{role.name}</option>
+              {(roles || []).map(role => (
+                <option key={role.id || 'unknown'} value={role.id || ''}>
+                  {role.name || 'Unnamed Role'}
+                </option>
               ))}
             </select>
           </div>
@@ -326,8 +344,10 @@ const RoleAssignmentTable: React.FC<RoleAssignmentTableProps> = ({
                             className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-300 dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:focus:ring-brand-400 dark:focus:border-brand-400 disabled:opacity-50"
                           >
                             <option value="">Select Role</option>
-                            {roles.map(role => (
-                              <option key={role.id} value={role.id}>{role.name}</option>
+                            {(roles || []).map(role => (
+                              <option key={role.id || 'unknown'} value={role.id || ''}>
+                                {role.name || 'Unnamed Role'}
+                              </option>
                             ))}
                           </select>
                         </td>

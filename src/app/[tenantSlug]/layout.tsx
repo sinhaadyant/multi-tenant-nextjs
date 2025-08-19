@@ -1,13 +1,12 @@
 "use client";
 
-import { useSidebar } from "@/context/SidebarContext";
-import { DynamicPermissionsProvider } from "@/context/DynamicPermissionsContext";
-import { TenantAuthProvider } from "@/context/TenantAuthContext";
-import AppHeader from "@/layout/AppHeader";
-import DynamicSidebar from "@/layout/DynamicSidebar";
-import Backdrop from "@/layout/Backdrop";
 import React from "react";
-import { usePathname } from "next/navigation";
+import TenantSidebar from "@/layout/TenantSidebar";
+import TenantHeader from "@/components/header/TenantHeader";
+import Backdrop from "@/layout/Backdrop";
+import { useSidebar } from "@/context/SidebarContext";
+import { useTenantAuth } from "@/hooks/useTenantAuth";
+import { Loader2 } from "lucide-react";
 
 export default function TenantLayout({
   children,
@@ -15,13 +14,7 @@ export default function TenantLayout({
   children: React.ReactNode;
 }) {
   const { isExpanded, isHovered, isMobileOpen } = useSidebar();
-  const pathname = usePathname();
-
-  // Check if current page is login page
-  const isLoginPage = pathname?.includes('/login');
-  const isSignupPage = pathname?.includes('/signup');
-  const isForgotPasswordPage = pathname?.includes('/forgot-password');
-  const isResetPasswordPage = pathname?.includes('/reset-password');
+  const { isLoggedIn, isLoading, isFullyLoaded } = useTenantAuth();
 
   // Dynamic class for main content margin based on sidebar state
   const mainContentMargin = isMobileOpen
@@ -30,29 +23,49 @@ export default function TenantLayout({
     ? "lg:ml-[290px]"
     : "lg:ml-[90px]";
 
-  return (
-    <TenantAuthProvider>
-      <DynamicPermissionsProvider>
-        <div className="min-h-screen xl:flex">
-          {/* Always render components to maintain hook order */}
-          <DynamicSidebar isAuthPage={isLoginPage || isSignupPage || isForgotPasswordPage || isResetPasswordPage} />
-          <Backdrop />
-          
-          {/* Main Content Area */}
-          <div className={`flex-1 transition-all duration-300 ease-in-out ${
-            isLoginPage || isSignupPage || isForgotPasswordPage || isResetPasswordPage 
-              ? "ml-0" 
-              : mainContentMargin
-          }`}>
-            {/* Header - Only for authenticated pages */}
-            {!(isLoginPage || isSignupPage || isForgotPasswordPage || isResetPasswordPage) && (
-              <AppHeader />
-            )}
-            {/* Page Content */}
-            <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">{children}</div>
-          </div>
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
         </div>
-      </DynamicPermissionsProvider>
-    </TenantAuthProvider>
+      </div>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return <>{children}</>;
+  }
+
+  // Show loading state if auth is not fully loaded (permissions/modules not ready)
+  if (!isFullyLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Loading permissions and modules...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen xl:flex">
+      {/* Sidebar and Backdrop */}
+      <TenantSidebar />
+      <Backdrop />
+      {/* Main Content Area */}
+      <div
+        className={`flex-1 transition-all duration-300 ease-in-out ${mainContentMargin}`}
+      >
+        {/* Header */}
+        <TenantHeader />
+        {/* Page Content */}
+        <div className="p-4 mx-auto max-w-7xl md:p-6 bg-gray-50 dark:bg-gray-900">
+          {children}
+        </div>
+      </div>
+    </div>
   );
 }

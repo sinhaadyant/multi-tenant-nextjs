@@ -1,111 +1,265 @@
 import { NextRequest } from 'next/server';
+import { withTenantAuth, AuthenticatedRequest } from '@/lib/authMiddleware';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-import { verifyToken } from '@/lib/jwt';
-import { prisma } from '@/lib/prisma';
 import { createAuditLogFromRequest } from '@/lib/audit';
+import { prisma } from '@/lib/prisma';
+import { checkTenantPermission } from '@/lib/permissions';
 import { z } from 'zod';
 
+// Validation schemas
 const assignRoleSchema = z.object({
   userId: z.string().min(1, 'User ID is required'),
   roleId: z.string().min(1, 'Role ID is required')
 });
 
-export async function POST(req: NextRequest) {
+const bulkAssignSchema = z.object({
+  assignments: z.array(assignRoleSchema),
+  removeExisting: z.boolean().default(false)
+});
+
+const removeRoleSchema = z.object({
+  userId: z.string().min(1, 'User ID is required'),
+  roleId: z.string().min(1, 'Role ID is required')
+});
+
+const bulkRemoveSchema = z.object({
+  assignments: z.array(removeRoleSchema)
+});
+
+// GET /api/tenant/[tenantSlug]/roles/assign - Get role assignments
+export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
+  const { tenantSlug } = await params;
+  
   try {
-    const { searchParams } = new URL(req.url);
-    const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
-    
-    if (!tenantSlug) {
-      return createErrorResponse('Tenant slug is required', 400);
+    const userId = req.user!.id;
+    const tenantId = req.user!.tenantId;
+
+    // Check permissions
+    const hasViewPermission = await checkTenantPermission(req.user!, tenantId!, 'roles.view');
+    if (!hasViewPermission) {
+      return createErrorResponse('Insufficient permissions to view role assignments', 403);
     }
 
-    // Verify authentication token
-    const token = req.headers.get('authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return createErrorResponse('No authentication token found', 401);
-    }
+    // Parse query parameters
+    const url = new URL(req.url);
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const limit = parseInt(url.searchParams.get('limit') || '10');
+    const search = url.searchParams.get('search') || '';
+    const roleId = url.searchParams.get('roleId') || '';
+    const userIdFilter = url.searchParams.get('userId') || '';
+    const sortBy = url.searchParams.get('sortBy') || 'assignedAt';
+    const sortOrder = url.searchParams.get('sortOrder') || 'desc';
 
-    const decoded = await verifyToken(token);
-    if (!decoded || !decoded.id) {
-      return createErrorResponse('Invalid authentication token', 401);
-    }
-
-    // Get tenant
-    const tenant = await prisma.tenant.findUnique({
-      where: { slug: tenantSlug },
-      select: { id: true, name: true, slug: true, isActive: true }
-    });
-
-    if (!tenant) {
-      return createErrorResponse('Tenant not found', 404);
-    }
-
-    if (!tenant.isActive) {
-      return createErrorResponse('Tenant is inactive', 403);
-    }
-
-    // Verify user belongs to this tenant
-    const user = await prisma.user.findFirst({
-      where: {
-        id: decoded.id,
-        tenantId: tenant.id,
-        isActive: true
+    // Build where clause
+    const where: any = {
+      role: {
+        tenantId: tenantId,
+        isGlobal: false
       },
-      include: {
-        userRoles: {
-          include: {
-            role: {
-              include: {
-                permissions: {
-                  include: {
-                    permission: true
-                  }
-                }
-              }
+      user: {
+        tenantId: tenantId
+      }
+    };
+
+    // Add search filter
+    if (search) {
+      where.OR = [
+        {
+          user: {
+            name: { contains: search, mode: 'insensitive' }
+          }
+        },
+        {
+          user: {
+            email: { contains: search, mode: 'insensitive' }
+          }
+        },
+        {
+          role: {
+            name: { contains: search, mode: 'insensitive' }
+          }
+        }
+      ];
+    }
+
+    // Add role filter
+    if (roleId) {
+      where.roleId = roleId;
+    }
+
+    // Add user filter
+    if (userIdFilter) {
+      where.userId = userIdFilter;
+    }
+
+    // Build order by clause
+    const orderBy: any = {};
+    orderBy[sortBy] = sortOrder;
+
+    // Calculate pagination
+    const skip = (page - 1) * limit;
+
+    // Fetch role assignments with pagination
+    const [assignments, totalAssignments] = await Promise.all([
+      prisma.userRole.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy,
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              isActive: true,
+              lastLogin: true
+            }
+          },
+          role: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              isActive: true,
+              color: true
             }
           }
         }
+      }),
+      prisma.userRole.count({ where })
+    ]);
+
+    // Get available roles and users for filters
+    const [roles, users] = await Promise.all([
+      prisma.role.findMany({
+        where: {
+          tenantId: tenantId,
+          isGlobal: false,
+          isActive: true
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          color: true,
+          _count: {
+            select: {
+              userRoles: true
+            }
+          }
+        },
+        orderBy: { name: 'asc' }
+      }),
+      prisma.user.findMany({
+        where: {
+          tenantId: tenantId,
+          isActive: true
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          _count: {
+            select: {
+              userRoles: true
+            }
+          }
+        },
+        orderBy: { name: 'asc' }
+      })
+    ]);
+
+    // Calculate statistics
+    const assignmentStats = {
+      total: totalAssignments,
+      roles: roles.map(role => ({
+        id: role.id,
+        name: role.name,
+        assignmentCount: role._count.userRoles
+      })),
+      users: users.map(user => ({
+        id: user.id,
+        name: user.name,
+        roleCount: user._count.userRoles
+      }))
+    };
+
+    // Format response
+    const formattedAssignments = assignments.map(assignment => ({
+      id: assignment.id,
+      userId: assignment.userId,
+      roleId: assignment.roleId,
+      assignedAt: assignment.assignedAt,
+      assignedBy: assignment.assignedBy,
+      user: assignment.user,
+      role: assignment.role
+    }));
+
+    return createSuccessResponse({
+      assignments: formattedAssignments,
+      roles: roles,
+      users: users,
+      pagination: {
+        page,
+        limit,
+        total: totalAssignments,
+        totalPages: Math.ceil(totalAssignments / limit),
+        hasNext: page * limit < totalAssignments,
+        hasPrev: page > 1
+      },
+      stats: assignmentStats,
+      permissions: {
+        canView: hasViewPermission,
+        canAssign: await checkTenantPermission(req.user!, tenantId!, 'roles.assign'),
+        canRemove: await checkTenantPermission(req.user!, tenantId!, 'roles.remove')
       }
-    });
+    }, 'Role assignments retrieved successfully');
 
-    if (!user) {
-      return createErrorResponse('User not found or not authorized for this tenant', 404);
-    }
-
-    // Check if user has permission to assign roles
-    const hasAssignPermission = user.userRoles.some(userRole =>
-      userRole.role.permissions.some(rp => 
-        rp.permission.moduleKey === 'roles' && rp.permission.action === 'assign'
-      )
+  } catch (error: any) {
+    console.error('Error fetching role assignments:', error);
+    return createErrorResponse(
+      error.message || 'Failed to fetch role assignments',
+      error.status || 500
     );
+  }
+});
 
+// POST /api/tenant/[tenantSlug]/roles/assign - Assign role to user
+export const POST = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
+  const { tenantSlug } = await params;
+  
+  try {
+    const userId = req.user!.id;
+    const tenantId = req.user!.tenantId;
+
+    // Check permissions
+    const hasAssignPermission = await checkTenantPermission(req.user!, tenantId!, 'roles.assign');
     if (!hasAssignPermission) {
       return createErrorResponse('Insufficient permissions to assign roles', 403);
     }
 
-    // Parse and validate request body
     const body = await req.json();
     const validatedData = assignRoleSchema.parse(body);
 
-    // Verify target user belongs to this tenant
-    const targetUser = await prisma.user.findFirst({
+    // Verify user exists and belongs to tenant
+    const user = await prisma.user.findFirst({
       where: {
         id: validatedData.userId,
-        tenantId: tenant.id,
-        isActive: true
+        tenantId: tenantId
       }
     });
 
-    if (!targetUser) {
-      return createErrorResponse('Target user not found or not authorized for this tenant', 404);
+    if (!user) {
+      return createErrorResponse('User not found', 404);
     }
 
-    // Verify role belongs to this tenant
+    // Verify role exists and belongs to tenant
     const role = await prisma.role.findFirst({
       where: {
         id: validatedData.roleId,
-        tenantId: tenant.id,
-        isActive: true
+        tenantId: tenantId,
+        isGlobal: false
       }
     });
 
@@ -113,7 +267,7 @@ export async function POST(req: NextRequest) {
       return createErrorResponse('Role not found', 404);
     }
 
-    // Check if user already has this role
+    // Check if assignment already exists
     const existingAssignment = await prisma.userRole.findFirst({
       where: {
         userId: validatedData.userId,
@@ -122,15 +276,15 @@ export async function POST(req: NextRequest) {
     });
 
     if (existingAssignment) {
-      return createErrorResponse('User already has this role', 409);
+      return createErrorResponse('Role is already assigned to this user', 409);
     }
 
-    // Assign role to user
-    const userRole = await prisma.userRole.create({
+    // Create role assignment
+    const assignment = await prisma.userRole.create({
       data: {
         userId: validatedData.userId,
         roleId: validatedData.roleId,
-        assignedBy: user.id
+        assignedBy: userId
       },
       include: {
         user: {
@@ -152,26 +306,241 @@ export async function POST(req: NextRequest) {
 
     // Create audit log
     await createAuditLogFromRequest(req, {
-      id: user.id,
-      email: user.email,
-      role: 'user',
-      tenantId: tenant.id
-    }, 'ASSIGN_ROLE', {
-      roleName: role.name,
-      targetUserName: targetUser.name,
-      targetUserId: targetUser.id
+      action: 'role.assigned',
+      details: `Assigned role "${role.name}" to user "${user.name}"`,
+      tenantId: tenantId
     });
 
     return createSuccessResponse({
-      assignment: userRole,
-      message: `Role "${role.name}" assigned to user "${targetUser.name}" successfully`
-    });
+      assignment: {
+        id: assignment.id,
+        userId: assignment.userId,
+        roleId: assignment.roleId,
+        assignedAt: assignment.assignedAt,
+        assignedBy: assignment.assignedBy,
+        user: assignment.user,
+        role: assignment.role
+      }
+    }, 'Role assigned successfully');
 
   } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      return createErrorResponse('Validation error: ' + error.errors.map((e: any) => e.message).join(', '), 400);
-    }
     console.error('Error assigning role:', error);
-    return createErrorResponse('Failed to assign role', 500);
+    if (error.name === 'ZodError') {
+      return createErrorResponse('Invalid assignment data', 400, error.errors);
+    }
+    return createErrorResponse(
+      error.message || 'Failed to assign role',
+      error.status || 500
+    );
   }
-}
+});
+
+// PUT /api/tenant/[tenantSlug]/roles/assign - Bulk assign roles
+export const PUT = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
+  const { tenantSlug } = await params;
+  
+  try {
+    const userId = req.user!.id;
+    const tenantId = req.user!.tenantId;
+
+    // Check permissions
+    const hasAssignPermission = await checkTenantPermission(req.user!, tenantId!, 'roles.assign');
+    if (!hasAssignPermission) {
+      return createErrorResponse('Insufficient permissions to assign roles', 403);
+    }
+
+    const body = await req.json();
+    const validatedData = bulkAssignSchema.parse(body);
+
+    // Verify all users and roles exist and belong to tenant
+    const [users, roles] = await Promise.all([
+      prisma.user.findMany({
+        where: {
+          id: { in: validatedData.assignments.map(a => a.userId) },
+          tenantId: tenantId
+        }
+      }),
+      prisma.role.findMany({
+        where: {
+          id: { in: validatedData.assignments.map(a => a.roleId) },
+          tenantId: tenantId,
+          isGlobal: false
+        }
+      })
+    ]);
+
+    if (users.length !== validatedData.assignments.length) {
+      return createErrorResponse('Some users not found', 404);
+    }
+
+    if (roles.length !== validatedData.assignments.length) {
+      return createErrorResponse('Some roles not found', 404);
+    }
+
+    // Remove existing assignments if requested
+    if (validatedData.removeExisting) {
+      await prisma.userRole.deleteMany({
+        where: {
+          userId: { in: validatedData.assignments.map(a => a.userId) }
+        }
+      });
+    }
+
+    // Create new assignments
+    const assignments = await Promise.all(
+      validatedData.assignments.map(async (assignment) => {
+        // Check if assignment already exists
+        const existing = await prisma.userRole.findFirst({
+          where: {
+            userId: assignment.userId,
+            roleId: assignment.roleId
+          }
+        });
+
+        if (existing) {
+          return existing;
+        }
+
+        return prisma.userRole.create({
+          data: {
+            userId: assignment.userId,
+            roleId: assignment.roleId,
+            assignedBy: userId
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            },
+            role: {
+              select: {
+                id: true,
+                name: true,
+                description: true
+              }
+            }
+          }
+        });
+      })
+    );
+
+    // Create audit log
+    await createAuditLogFromRequest(req, {
+      action: 'roles.bulk_assigned',
+      details: `Bulk assigned ${assignments.length} roles to users`,
+      tenantId: tenantId
+    });
+
+    return createSuccessResponse({
+      assignments: assignments.map(a => ({
+        id: a.id,
+        userId: a.userId,
+        roleId: a.roleId,
+        assignedAt: a.assignedAt,
+        assignedBy: a.assignedBy,
+        user: a.user,
+        role: a.role
+      })),
+      count: assignments.length
+    }, `Successfully assigned ${assignments.length} roles`);
+
+  } catch (error: any) {
+    console.error('Error bulk assigning roles:', error);
+    if (error.name === 'ZodError') {
+      return createErrorResponse('Invalid bulk assignment data', 400, error.errors);
+    }
+    return createErrorResponse(
+      error.message || 'Failed to bulk assign roles',
+      error.status || 500
+    );
+  }
+});
+
+// DELETE /api/tenant/[tenantSlug]/roles/assign - Remove role assignment
+export const DELETE = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
+  const { tenantSlug } = await params;
+  
+  try {
+    const userId = req.user!.id;
+    const tenantId = req.user!.tenantId;
+
+    // Check permissions
+    const hasRemovePermission = await checkTenantPermission(req.user!, tenantId!, 'roles.remove');
+    if (!hasRemovePermission) {
+      return createErrorResponse('Insufficient permissions to remove role assignments', 403);
+    }
+
+    const body = await req.json();
+    const validatedData = bulkRemoveSchema.parse(body);
+
+    // Verify all assignments exist and belong to tenant
+    const assignments = await prisma.userRole.findMany({
+      where: {
+        id: { in: validatedData.assignments.map(a => `${a.userId}-${a.roleId}`) },
+        role: {
+          tenantId: tenantId
+        },
+        user: {
+          tenantId: tenantId
+        }
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        role: {
+          select: {
+            id: true,
+            name: true,
+            description: true
+          }
+        }
+      }
+    });
+
+    if (assignments.length !== validatedData.assignments.length) {
+      return createErrorResponse('Some assignments not found', 404);
+    }
+
+    // Remove assignments
+    await prisma.userRole.deleteMany({
+      where: {
+        id: { in: assignments.map(a => a.id) }
+      }
+    });
+
+    // Create audit log
+    await createAuditLogFromRequest(req, {
+      action: 'roles.bulk_removed',
+      details: `Removed ${assignments.length} role assignments`,
+      tenantId: tenantId
+    });
+
+    return createSuccessResponse({
+      removed: assignments.length,
+      assignments: assignments.map(a => ({
+        userId: a.userId,
+        roleId: a.roleId,
+        user: a.user,
+        role: a.role
+      }))
+    }, `Successfully removed ${assignments.length} role assignments`);
+
+  } catch (error: any) {
+    console.error('Error removing role assignments:', error);
+    if (error.name === 'ZodError') {
+      return createErrorResponse('Invalid removal data', 400, error.errors);
+    }
+    return createErrorResponse(
+      error.message || 'Failed to remove role assignments',
+      error.status || 500
+    );
+  }
+});

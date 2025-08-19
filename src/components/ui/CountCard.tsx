@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { LucideIcon } from 'lucide-react';
-import { AnimatedCounter } from './AnimatedCounter';
 
 interface CountCardProps {
   title: string;
@@ -54,12 +53,7 @@ export const CountCard: React.FC<CountCardProps> = ({
             {title}
           </p>
           <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            <AnimatedCounter
-              value={value}
-              prefix={prefix}
-              suffix={suffix}
-              decimals={decimals}
-            />
+            {prefix}{value.toLocaleString()}{suffix}
           </p>
         </div>
       </div>

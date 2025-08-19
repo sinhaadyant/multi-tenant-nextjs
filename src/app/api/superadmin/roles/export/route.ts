@@ -52,10 +52,10 @@ export const GET = asyncHandler(async (req: NextRequest) => {
           select: { name: true, slug: true }
         },
         permissions: {
-          include: {
-            permission: true
-          }
-        },
+                  include: {
+                    module: true
+                  }
+                },
         _count: {
           select: { userRoles: true }
         }

@@ -45,8 +45,15 @@ export default function InviteSuperadminModal({
     try {
       const result = await createInviteMutation.mutateAsync(formData);
       
-      if (result?.data?.inviteLink) {
-        setInviteLink(result.data.inviteLink);
+      if (result?.data?.invite?.inviteLink) {
+        setInviteLink(result.data.invite.inviteLink);
+        setIsLinkGenerated(true);
+        toast.success('Superadmin invite created successfully!');
+      } else if (result?.data?.invite?.token) {
+        // Construct the invite link using the actual token from API
+        const baseUrl = window.location.origin;
+        const constructedLink = `${baseUrl}/superadmin/signup?token=${result.data.invite.token}&email=${encodeURIComponent(formData.email)}`;
+        setInviteLink(constructedLink);
         setIsLinkGenerated(true);
         toast.success('Superadmin invite created successfully!');
       } else {

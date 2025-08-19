@@ -3,7 +3,7 @@
 import React from 'react';
 import { Users, UserPlus } from 'lucide-react';
 import { useTenantUsers } from '@/hooks/useTenantUsers';
-import { useDynamicPermissions } from '@/context/DynamicPermissionsContext';
+import { useReduxAuth } from '@/hooks/useReduxAuth';
 import Button from '@/components/ui/button/Button';
 import Badge from '@/components/ui/badge/Badge';
 import { toast } from 'react-hot-toast';
@@ -13,7 +13,7 @@ interface UserManagementProps {
 }
 
 const UserManagement: React.FC<UserManagementProps> = ({ tenantSlug }) => {
-  const { hasPermission } = useDynamicPermissions();
+  const { hasPermission } = useReduxAuth();
   
   const {
     users,
@@ -26,7 +26,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ tenantSlug }) => {
     limit: 10
   });
 
-  const canViewUsers = hasPermission('users', 'view');
+  const canViewUsers = hasPermission('users', 'read');
   const canCreateUsers = hasPermission('users', 'create');
 
   if (!canViewUsers) {

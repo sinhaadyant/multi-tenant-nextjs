@@ -86,22 +86,22 @@ const fetchTenantRoles = async (
     if (params.filters.type !== 'all') searchParams.append('type', params.filters.type);
   }
 
-  const response = await api.get(`/api/tenant/${tenantSlug}/roles?${searchParams.toString()}`);
+        const response = await api.get(`/tenant/${tenantSlug}/roles?${searchParams.toString()}`);
   return response.data;
 };
 
 const createTenantRole = async (tenantSlug: string, data: CreateRoleData): Promise<{ role: TenantRole }> => {
-  const response = await api.post(`/api/tenant/${tenantSlug}/roles`, data);
+      const response = await api.post(`/tenant/${tenantSlug}/roles`, data);
   return response.data;
 };
 
 const updateTenantRole = async (tenantSlug: string, roleId: string, data: UpdateRoleData): Promise<{ role: TenantRole }> => {
-  const response = await api.put(`/api/tenant/${tenantSlug}/roles/${roleId}`, data);
+      const response = await api.put(`/tenant/${tenantSlug}/roles/${roleId}`, data);
   return response.data;
 };
 
 const deleteTenantRole = async (tenantSlug: string, roleId: string): Promise<void> => {
-  await api.delete(`/api/tenant/${tenantSlug}/roles/${roleId}`);
+      await api.delete(`/tenant/${tenantSlug}/roles/${roleId}`);
 };
 
 const toggleTenantRoleStatus = async (tenantSlug: string, data: ToggleRoleStatusData): Promise<{ role: TenantRole }> => {
@@ -112,7 +112,7 @@ const toggleTenantRoleStatus = async (tenantSlug: string, data: ToggleRoleStatus
 };
 
 const fetchTenantRole = async (tenantSlug: string, roleId: string): Promise<{ role: TenantRole }> => {
-  const response = await api.get(`/api/tenant/${tenantSlug}/roles/${roleId}`);
+      const response = await api.get(`/tenant/${tenantSlug}/roles/${roleId}`);
   return response.data;
 };
 
@@ -132,7 +132,7 @@ const fetchTenantPermissions = async (tenantSlug: string): Promise<{
   totalPermissions: number;
   totalModules: number;
 }> => {
-  const response = await api.get(`/api/tenant/${tenantSlug}/permissions`);
+      const response = await api.get(`/tenant/${tenantSlug}/permissions`);
   return response.data;
 };
 

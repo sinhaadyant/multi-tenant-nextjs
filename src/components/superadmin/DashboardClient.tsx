@@ -79,7 +79,6 @@ export const DashboardClient: React.FC = () => {
 
   const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useRealTimeStats();
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-
   // Debug logging
   if (process.env.NODE_ENV === 'development') {
     console.log('🔍 DashboardClient Debug:', {
@@ -230,10 +229,16 @@ export const DashboardClient: React.FC = () => {
       <div className="text-sm text-gray-500 dark:text-gray-400">
         Last updated: {lastUpdated.toLocaleString()}
       </div>
-
       {/* Overview Cards */}
       <DashboardOverviewCards 
-        summary={data.summary || { totalTenants: 0, activeTenants: 0, totalUsers: 0, activeUsers: 0 }} 
+        summary={{
+          totalTenants: data.summary?.totalTenants || 0,
+          activeTenants: data.summary?.activeTenants || 0,
+          totalUsers: data.summary?.totalUsers || 0,
+          activeUsers: (data.summary as any)?.activeUsers || data.summary?.totalUsers || 0,
+          tenantGrowth: data.summary?.growthMetrics?.tenantGrowth,
+          userGrowth: data.summary?.growthMetrics?.userGrowth
+        }} 
         selectedRange={selectedRange} 
         isLoading={isLoading}
       />

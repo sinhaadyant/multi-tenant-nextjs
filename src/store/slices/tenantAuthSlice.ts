@@ -14,6 +14,36 @@ export interface TenantUser {
   hasAccess?: boolean;
 }
 
+export interface Module {
+  id: string;
+  moduleKey: string;
+  moduleName: string;
+  path?: string;
+  icon?: string;
+  description?: string;
+  version?: string;
+  minVersion?: string;
+  maxVersion?: string;
+  releaseNotes?: string;
+  isVisible: boolean;
+  orderIndex: number;
+  permissions: any[];
+  childModules: Module[];
+  // Tenant-specific settings
+  isEnabled: boolean;
+  isVisibleInTenant: boolean;
+  tenantVersion?: string;
+  tenantSettings?: any;
+  enabledAt?: string;
+  disabledAt?: string;
+  enabledBy?: string;
+  disabledBy?: string;
+  analytics?: {
+    lastAccessedAt?: string;
+    accessCount: number;
+  };
+}
+
 export interface TenantAuthState {
   isLoggedIn: boolean;
   user: TenantUser | null;
@@ -31,6 +61,9 @@ export interface TenantAuthState {
     accessibleModules: string[];
     menuItems: any[];
   } | null;
+  modules: Module[] | null;
+  modulesLoading: boolean;
+  modulesError: string | null;
 }
 
 const initialState: TenantAuthState = {
@@ -45,6 +78,9 @@ const initialState: TenantAuthState = {
   sessionExpiresAt: null,
   isInitialized: false,
   permissions: null,
+  modules: null,
+  modulesLoading: false,
+  modulesError: null,
 };
 
 export interface TenantLoginPayload {
@@ -67,6 +103,10 @@ export interface TenantPermissionsPayload {
   modulePermissions: Record<string, string[]>;
   accessibleModules: string[];
   menuItems: any[];
+}
+
+export interface TenantModulesPayload {
+  modules: Module[];
 }
 
 // Tenant Auth slice
@@ -99,6 +139,9 @@ const tenantAuthSlice = createSlice({
       state.isInitialized = true;
       state.isHydrated = false; // Reset hydration state on logout
       state.permissions = null;
+      state.modules = null;
+      state.modulesLoading = false;
+      state.modulesError = null;
     },
     setTenantUser: (state, action: PayloadAction<TenantUser>) => {
       state.user = action.payload;
@@ -136,6 +179,18 @@ const tenantAuthSlice = createSlice({
     setTenantPermissions: (state, action: PayloadAction<TenantPermissionsPayload>) => {
       state.permissions = action.payload;
     },
+    setTenantModules: (state, action: PayloadAction<TenantModulesPayload>) => {
+      state.modules = action.payload.modules;
+      state.modulesLoading = false;
+      state.modulesError = null;
+    },
+    setTenantModulesLoading: (state, action: PayloadAction<boolean>) => {
+      state.modulesLoading = action.payload;
+    },
+    setTenantModulesError: (state, action: PayloadAction<string | null>) => {
+      state.modulesError = action.payload;
+      state.modulesLoading = false;
+    },
     clearTenantAuth: (state) => {
       state.user = null;
       state.token = null;
@@ -144,6 +199,9 @@ const tenantAuthSlice = createSlice({
       state.tenantSlug = null;
       state.isLoggedIn = false;
       state.permissions = null;
+      state.modules = null;
+      state.modulesLoading = false;
+      state.modulesError = null;
     },
   },
 });
@@ -161,6 +219,9 @@ export const {
   refreshTenantTokens,
   updateTenantLastValidated,
   setTenantPermissions,
+  setTenantModules,
+  setTenantModulesLoading,
+  setTenantModulesError,
   clearTenantAuth,
 } = tenantAuthSlice.actions;
 
@@ -177,5 +238,8 @@ export const selectTenantIsInitialized = (state: { tenantAuth: TenantAuthState }
 export const selectTenantLastValidatedAt = (state: { tenantAuth: TenantAuthState }) => state.tenantAuth.lastValidatedAt;
 export const selectTenantSessionExpiresAt = (state: { tenantAuth: TenantAuthState }) => state.tenantAuth.sessionExpiresAt;
 export const selectTenantPermissions = (state: { tenantAuth: TenantAuthState }) => state.tenantAuth.permissions;
+export const selectTenantModules = (state: { tenantAuth: TenantAuthState }) => state.tenantAuth.modules;
+export const selectTenantModulesLoading = (state: { tenantAuth: TenantAuthState }) => state.tenantAuth.modulesLoading;
+export const selectTenantModulesError = (state: { tenantAuth: TenantAuthState }) => state.tenantAuth.modulesError;
 
 export default tenantAuthSlice.reducer; 

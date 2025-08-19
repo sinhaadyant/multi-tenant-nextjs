@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 
 const JWT_SECRET = (process.env.JWT_SECRET || 'your-secret-key') as string;
-const JWT_ACCESS_EXPIRES_IN = (process.env.JWT_ACCESS_EXPIRES_IN || '15m') as string; // 15 minutes access token
+const JWT_ACCESS_EXPIRES_IN = (process.env.JWT_ACCESS_EXPIRES_IN || '1h') as string; // 1 hour access token for better UX
 const JWT_REFRESH_EXPIRES_IN = (process.env.JWT_REFRESH_EXPIRES_IN || '7d') as string; // 7 days default refresh token
 const JWT_REFRESH_EXPIRES_IN_REMEMBER = (process.env.JWT_REFRESH_EXPIRES_IN_REMEMBER || '30d') as string; // 30 days for "Remember Me"
 const REFRESH_TOKEN_SECRET = (process.env.REFRESH_TOKEN_SECRET || 'your-refresh-secret-key') as string;

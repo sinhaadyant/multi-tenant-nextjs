@@ -37,6 +37,7 @@ const RoleList: React.FC<RoleListProps> = ({
   const { confirm } = useConfirmModalContext();
   const [searchTerm, setSearchTerm] = useState(currentFilters.search || '');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>(currentFilters.status || 'all');
+  const [roleTypeFilter, setRoleTypeFilter] = useState<'all' | 'global' | 'tenant'>('all');
   const [sortBy, setSortBy] = useState<keyof Role>(currentFilters.sortBy || 'name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(currentFilters.sortOrder || 'asc');
   const [currentPage, setCurrentPage] = useState(currentFilters.page || 1);
@@ -45,34 +46,50 @@ const RoleList: React.FC<RoleListProps> = ({
   // Filter and sort roles
   const filteredRoles = useMemo(() => {
     let filtered = roles.filter((role) => {
-      const matchesSearch = role.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           (role.description && role.description.toLowerCase().includes(searchTerm.toLowerCase()));
+      // Add null checks for role properties
+      if (!role) return false;
+      
+      const roleName = role.name || '';
+      const roleDescription = role.description || '';
+      
+      const matchesSearch = roleName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           roleDescription.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'all' || 
                            (statusFilter === 'active' && role.isActive) ||
                            (statusFilter === 'inactive' && !role.isActive);
-      return matchesSearch && matchesStatus;
+      const matchesRoleType = roleTypeFilter === 'all' ||
+                             (roleTypeFilter === 'global' && role.isGlobal) ||
+                             (roleTypeFilter === 'tenant' && !role.isGlobal);
+      return matchesSearch && matchesStatus && matchesRoleType;
     });
 
-    // Sort roles
+    // Sort roles (global roles first, then by specified field)
     filtered.sort((a, b) => {
+      // Add null checks for sorting
+      if (!a || !b) return 0;
+      
+      // Global roles come first
+      if (a.isGlobal && !b.isGlobal) return -1;
+      if (!a.isGlobal && b.isGlobal) return 1;
+      
       let aValue: any, bValue: any;
       
       switch (sortBy) {
         case 'name':
-          aValue = a.name.toLowerCase();
-          bValue = b.name.toLowerCase();
+          aValue = (a.name || '').toLowerCase();
+          bValue = (b.name || '').toLowerCase();
           break;
         case 'createdAt':
-          aValue = new Date(a.createdAt);
-          bValue = new Date(b.createdAt);
+          aValue = new Date(a.createdAt || new Date());
+          bValue = new Date(b.createdAt || new Date());
           break;
         case 'userCount':
-          aValue = a.userCount;
-          bValue = b.userCount;
+          aValue = a.userCount || 0;
+          bValue = b.userCount || 0;
           break;
         default:
-          aValue = a.name.toLowerCase();
-          bValue = b.name.toLowerCase();
+          aValue = (a.name || '').toLowerCase();
+          bValue = (b.name || '').toLowerCase();
       }
 
       if (sortOrder === 'asc') {
@@ -83,7 +100,7 @@ const RoleList: React.FC<RoleListProps> = ({
     });
 
     return filtered;
-  }, [roles, searchTerm, statusFilter, sortBy, sortOrder]);
+  }, [roles, searchTerm, statusFilter, roleTypeFilter, sortBy, sortOrder]);
 
   // Pagination
   const totalPages = Math.ceil(filteredRoles.length / itemsPerPage);
@@ -125,7 +142,7 @@ const RoleList: React.FC<RoleListProps> = ({
   const handleDeleteRole = (role: Role) => {
     confirm({
       title: 'Delete Role',
-      message: `Are you sure you want to delete role "${role.name}"? This action cannot be undone and will affect all users assigned to this role.`,
+      message: `Are you sure you want to delete role "${role.name || 'Unnamed Role'}"? This action cannot be undone and will affect all users assigned to this role.`,
       confirmText: 'Delete Role',
       variant: 'danger',
       onConfirm: () => {
@@ -156,8 +173,10 @@ const RoleList: React.FC<RoleListProps> = ({
       {/* Filters and Search */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
         <div className="p-6">
+          {/* Filters */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              {/* Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
@@ -168,15 +187,64 @@ const RoleList: React.FC<RoleListProps> = ({
                   className="pl-10 w-full sm:w-64"
                 />
               </div>
+
+              {/* Status Filter */}
               <select
                 value={statusFilter}
-                onChange={(e) => handleStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
+                onChange={(e) => {
+                  const value = e.target.value as 'all' | 'active' | 'inactive';
+                  setStatusFilter(value);
+                  onFilter({ ...currentFilters, status: value, page: 1 });
+                  setCurrentPage(1);
+                }}
                 className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-300 dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:focus:ring-brand-400 dark:focus:border-brand-400"
               >
                 <option value="all">All Status</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </select>
+
+              {/* Role Type Filter */}
+              <select
+                value={roleTypeFilter}
+                onChange={(e) => {
+                  const value = e.target.value as 'all' | 'global' | 'tenant';
+                  setRoleTypeFilter(value);
+                  setCurrentPage(1);
+                }}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-300 dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:focus:ring-brand-400 dark:focus:border-brand-400"
+              >
+                <option value="all">All Roles</option>
+                <option value="global">Global Roles</option>
+                <option value="tenant">Tenant Roles</option>
+              </select>
+
+              {/* Sort By */}
+              <select
+                value={sortBy}
+                onChange={(e) => {
+                  const value = e.target.value as keyof Role;
+                  setSortBy(value);
+                  onSort(value, sortOrder);
+                }}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-300 dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:focus:ring-brand-400 dark:focus:border-brand-400"
+              >
+                <option value="name">Sort by Name</option>
+                <option value="createdAt">Sort by Created Date</option>
+                <option value="userCount">Sort by User Count</option>
+              </select>
+
+              {/* Sort Order */}
+              <button
+                onClick={() => {
+                  const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+                  setSortOrder(newOrder);
+                  onSort(sortBy, newOrder);
+                }}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:hover:bg-gray-700 focus:ring-2 focus:ring-brand-500 focus:border-brand-300 dark:focus:ring-brand-400 dark:focus:border-brand-400"
+              >
+                {sortOrder === 'asc' ? '↑' : '↓'}
+              </button>
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
               <Filter className="w-4 h-4" />
@@ -263,24 +331,39 @@ const RoleList: React.FC<RoleListProps> = ({
                       </td>
                     </tr>
                   ) : (
-                    paginatedRoles.map((role) => (
+                    paginatedRoles.filter(role => role && role.id).map((role) => (
                       <tr key={role.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="flex-shrink-0 h-10 w-10">
-                              <div className="h-10 w-10 rounded-full bg-brand-100 dark:bg-brand-900 flex items-center justify-center">
-                                <Shield className="w-5 h-5 text-brand-600 dark:text-brand-400" />
+                              <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                                role.isGlobal 
+                                  ? 'bg-purple-100 dark:bg-purple-900' 
+                                  : 'bg-brand-100 dark:bg-brand-900'
+                              }`}>
+                                <Shield className={`w-5 h-5 ${
+                                  role.isGlobal 
+                                    ? 'text-purple-600 dark:text-purple-400' 
+                                    : 'text-brand-600 dark:text-brand-400'
+                                }`} />
                               </div>
                             </div>
                             <div className="ml-4">
                               <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                {role.name}
+                                {role.name || 'Unnamed Role'}
                               </div>
-                              {role.isGlobal && (
-                                <span className="inline-flex items-center px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full mt-1">
-                                  Global
-                                </span>
-                              )}
+                              <div className="flex items-center gap-2 mt-1">
+                                {role.isGlobal && (
+                                  <span className="inline-flex items-center px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full dark:bg-purple-900 dark:text-purple-300">
+                                    Global
+                                  </span>
+                                )}
+                                {!role.isGlobal && (
+                                  <span className="inline-flex items-center px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full dark:bg-gray-700 dark:text-gray-300">
+                                    Tenant
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -292,13 +375,13 @@ const RoleList: React.FC<RoleListProps> = ({
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center text-sm text-gray-900 dark:text-white">
                             <Users className="w-4 h-4 mr-1 text-gray-400" />
-                            {role.userCount}
+                            {role.userCount || 0}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center text-sm text-gray-900 dark:text-white">
                             <Calendar className="w-4 h-4 mr-1 text-gray-400" />
-                            {new Date(role.createdAt).toLocaleDateString()}
+                            {new Date(role.createdAt || new Date()).toLocaleDateString()}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

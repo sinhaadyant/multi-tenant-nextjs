@@ -1,143 +1,213 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation } from '@tanstack/react-query';
-import { useRouter, useParams } from 'next/navigation';
-import Link from 'next/link';
-import Image from 'next/image';
-import { z } from 'zod';
-import toast from 'react-hot-toast';
-import { Eye, EyeOff, Mail, Lock, Building2 } from 'lucide-react';
-import { useAuthRedirect } from '@/hooks/useAuthRedirect';
+import React, { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { useReduxAuth } from "@/hooks/useReduxAuth";
+import { useDispatch } from "react-redux";
+import { setTenantLogin, setTenantPermissions, setTenantModules, setTenantModulesLoading, setTenantModulesError } from "@/store/slices/tenantAuthSlice";
+import { setPermissions } from "@/store/slices/permissionsSlice";
+import TenantLogin from "@/components/auth/TenantLogin";
+import { Loader2 } from "lucide-react";
+import axios from "axios";
 
-// Validation schema
-const loginSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-  password: z.string().min(1, 'Password is required'),
-});
-
-type LoginFormData = z.infer<typeof loginSchema>;
-
-// Login API function
-const loginUser = async (data: LoginFormData & { tenantSlug: string }) => {
-  const response = await fetch('/api/tenant/auth/login', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.message || 'Login failed');
-  }
-
-  return response.json();
-};
-
-export default function TenantLoginPage() {
-  const params = useParams();
+const TenantLoginPage: React.FC = () => {
   const router = useRouter();
+  const params = useParams();
+  const dispatch = useDispatch();
   const tenantSlug = params.tenantSlug as string;
-  
-  // Check if user is already authenticated and redirect if needed
-  const { shouldRedirect, isLoading: authLoading } = useAuthRedirect({
-    redirectTo: `/${tenantSlug}/dashboard`
-  });
-  
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [tenantInfo, setTenantInfo] = useState<any>(null);
+  const { isLoggedIn, isLoading } = useReduxAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-  });
-
-  // Fetch tenant info
   useEffect(() => {
-    const fetchTenantInfo = async () => {
-      try {
-        const response = await fetch(`/api/tenant/${tenantSlug}/info`);
-        if (response.ok) {
-          const data = await response.json();
-          setTenantInfo(data.data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch tenant info:', error);
-      }
-    };
-
-    if (tenantSlug) {
-      fetchTenantInfo();
+    // If user is already logged in, redirect to dashboard
+    if (isLoggedIn && !isLoading) {
+      console.log('🔍 User already logged in, redirecting to dashboard');
+      router.replace(`/${tenantSlug}/dashboard`);
     }
-  }, [tenantSlug]);
+  }, [isLoggedIn, isLoading, router, tenantSlug]);
 
-  // Set page title dynamically
-  useEffect(() => {
-    const tenantName = tenantInfo?.name || tenantSlug.charAt(0).toUpperCase() + tenantSlug.slice(1);
-    document.title = `${tenantName} - Login | Multi-Tenant Admin Panel`;
-  }, [tenantInfo, tenantSlug]);
+  // Function to fetch user permissions and modules
+  const fetchUserData = async (authToken: string) => {
+    try {
+      console.log('🔍 Fetching user permissions and modules...');
+      
+      // Fetch user profile with permissions
+      const userResponse = await axios.get(`/api/tenant/${tenantSlug}/me`, {
+        headers: {
+          Authorization: `Bearer ${authToken}`
+        }
+      });
 
-  // Login mutation
-  const loginMutation = useMutation({
-    mutationFn: (data: LoginFormData) => loginUser({ ...data, tenantSlug }),
-    onSuccess: (response) => {
-      if (response.success && response.data) {
-        console.log('🔍 Login successful, storing tokens...');
-        console.log('Token preview:', response.data.token.substring(0, 50) + '...');
-        
-        // Store auth data using unified auth
-        localStorage.setItem('tenant_auth_token', response.data.token);
-        localStorage.setItem('tenant_refresh_token', response.data.refreshToken);
-        localStorage.setItem('tenant_user_data', JSON.stringify(response.data.user));
-        
-        console.log('🔍 Tokens stored in localStorage');
-        console.log('tenant_auth_token exists:', !!localStorage.getItem('tenant_auth_token'));
-        
-        toast.success('Login successful!');
-        
-        // Redirect to tenant dashboard
-        router.push(`/${tenantSlug}/dashboard`);
+      if (!userResponse.data.success) {
+        throw new Error('Failed to fetch user profile');
       }
-    },
-    onError: (error: any) => {
-      const errorMessage = error.message || 'Login failed';
-      toast.error(errorMessage);
-    },
-  });
 
-  const onSubmit = (data: LoginFormData) => {
-    loginMutation.mutate(data);
+      const userData = userResponse.data.data;
+      console.log('🔍 User data fetched:', {
+        userId: userData.id,
+        permissionsCount: userData.permissions?.length || 0,
+        rolesCount: userData.roles?.length || 0
+      });
+
+      // Create module permissions mapping
+      const modulePermissions: { [key: string]: string[] } = {};
+      if (userData.permissions && Array.isArray(userData.permissions)) {
+        userData.permissions.forEach((permission: any) => {
+          const actions = [];
+          if (permission.canRead) actions.push('read');
+          if (permission.canCreate) actions.push('create');
+          if (permission.canUpdate) actions.push('update');
+          if (permission.canDelete) actions.push('delete');
+          if (permission.canViewAll) actions.push('viewall');
+          modulePermissions[permission.moduleKey] = actions;
+        });
+      }
+
+      // Fetch modules
+      dispatch(setTenantModulesLoading(true));
+      const modulesResponse = await axios.get(`/api/tenant/${tenantSlug}/modules`, {
+        headers: {
+          Authorization: `Bearer ${authToken}`
+        }
+      });
+
+      if (!modulesResponse.data.success) {
+        throw new Error('Failed to fetch modules');
+      }
+
+      const modulesData = modulesResponse.data.data;
+      console.log('🔍 Modules data fetched:', {
+        modulesCount: modulesData.modules?.length || 0
+      });
+
+      // Update permissions state
+      dispatch(setTenantPermissions({
+        allPermissions: userData.permissions?.map((p: any) => p.moduleKey) || [],
+        modulePermissions,
+        accessibleModules: userData.permissions?.map((p: any) => p.moduleKey) || [],
+        menuItems: []
+      }));
+
+      // Update modules state
+      dispatch(setTenantModules({
+        modules: modulesData.modules || []
+      }));
+
+      // Update global permissions state
+      dispatch(setPermissions({
+        user: userData,
+        permissions: userData.permissions || [],
+        modulePermissions,
+        accessibleModules: userData.permissions?.map((p: any) => p.moduleKey) || [],
+        menuItems: [],
+        hasAccess: true,
+        totalPermissions: userData.permissions?.length || 0,
+        totalModules: userData.permissions?.length || 0
+      }));
+
+      console.log('🔍 User data, permissions, and modules loaded successfully');
+
+    } catch (error) {
+      console.error('❌ Error fetching user data:', error);
+      dispatch(setTenantModulesError(error instanceof Error ? error.message : 'Failed to fetch user data'));
+      throw error;
+    }
   };
 
-  const tenantName = tenantInfo?.name || tenantSlug.charAt(0).toUpperCase() + tenantSlug.slice(1);
+  const handleLoginSuccess = async (result: any) => {
+    try {
+      setIsSubmitting(true);
+      console.log('🔍 Login successful, setting up Redux state...');
 
-  // Show loading state while checking authentication
-  if (authLoading) {
+      // Clear any existing tokens first
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('tenant_auth_token');
+      sessionStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+
+      // Store access token in localStorage (primary location for API)
+      localStorage.setItem('auth_token', result.data.token);
+      localStorage.setItem('tenant_auth_token', result.data.token);
+
+      // Store access token in sessionStorage (backup)
+      sessionStorage.setItem('access_token', result.data.token);
+
+      // Store refresh token in localStorage
+      if (result.data.refreshToken) {
+        localStorage.setItem('refresh_token', result.data.refreshToken);
+      }
+
+      // Update Redux state with basic user info
+      dispatch(setTenantLogin({
+        user: {
+          id: result.data.user.id,
+          email: result.data.user.email,
+          name: result.data.user.name,
+          role: result.data.user.roles?.[0]?.name || 'user',
+          tenantId: result.data.user.tenant?.id || '',
+          tenantSlug: result.data.user.tenant?.slug || '',
+          avatar: result.data.user.avatar,
+          permissions: result.data.user.permissions?.map((p: any) => p.moduleKey) || [],
+          accessibleModules: result.data.user.permissions?.map((p: any) => p.moduleKey) || [],
+          hasAccess: true
+        },
+        token: result.data.token,
+        refreshToken: result.data.refreshToken || '',
+        email: result.data.user.email,
+        tenantSlug: result.data.user.tenant?.slug || '',
+        expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
+      }));
+
+      // Fetch complete user data including permissions and modules
+      await fetchUserData(result.data.token);
+
+      // Add a small delay to ensure tokens are stored
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Redirect immediately after successful login
+      try {
+        console.log('🔄 Redirecting to dashboard...');
+        const dashboardPath = `/${tenantSlug}/dashboard`;
+        router.replace(dashboardPath);
+
+        // Fallback redirect after a short delay
+        setTimeout(() => {
+          if (window.location.pathname !== dashboardPath) {
+            console.log('🔄 Fallback redirect...');
+            window.location.href = dashboardPath;
+          }
+        }, 500);
+
+      } catch (error) {
+        console.error('❌ Router redirect failed:', error);
+        // Fallback to window.location
+        window.location.href = `/${tenantSlug}/dashboard`;
+      }
+
+    } catch (error) {
+      console.error('❌ Error during login success handling:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Checking authentication...</p>
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
         </div>
       </div>
     );
   }
 
-  // Don't render the login form if user should be redirected
-  if (shouldRedirect) {
+  if (isLoggedIn) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Redirecting to dashboard...</p>
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Redirecting to dashboard...</p>
         </div>
       </div>
     );
@@ -145,164 +215,13 @@ export default function TenantLoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <div className="flex justify-center">
-            <Image
-              src="/images/logo/logo.svg"
-              alt="Logo"
-              width={150}
-              height={40}
-              className="dark:hidden w-auto h-auto"
-            />
-            <Image
-              src="/images/logo/logo-dark.svg"
-              alt="Logo"
-              width={150}
-              height={40}
-              className="hidden dark:block w-auto h-auto"
-            />
-          </div>
-          <div className="mt-6 text-center">
-            <div className="flex items-center justify-center space-x-2 mb-2">
-              <Building2 className="w-5 h-5 text-blue-500" />
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {tenantName}
-              </h2>
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-              Sign in to your account
-            </h3>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Enter your credentials to access your workspace
-            </p>
-          </div>
-        </div>
-
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Email address
-              </label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  {...register('email')}
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  className="appearance-none relative block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-800 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                  placeholder="Enter your email"
-                />
-              </div>
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Password
-              </label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  {...register('password')}
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  required
-                  className="appearance-none relative block w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-800 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                  placeholder="Enter your password"
-                />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-500" />
-                  ) : (
-                    <Eye className="h-5 w-5 text-gray-400 hover:text-gray-500" />
-                  )}
-                </button>
-              </div>
-              {errors.password && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.password.message}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                id="remember-me"
-                name="remember-me"
-                type="checkbox"
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900 dark:text-gray-300">
-                Remember me
-              </label>
-            </div>
-
-            <div className="text-sm">
-              <Link
-                href={`/${tenantSlug}/forgot-password`}
-                className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
-              >
-                Forgot your password?
-              </Link>
-            </div>
-          </div>
-
-          <div>
-            <button
-              type="submit"
-              disabled={loginMutation.isPending}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loginMutation.isPending ? (
-                <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Signing in...
-                </div>
-              ) : (
-                'Sign in'
-              )}
-            </button>
-          </div>
-
-          <div className="text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Don't have an account?{' '}
-              <Link
-                href={`/${tenantSlug}/signup`}
-                className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
-              >
-                Contact your administrator
-              </Link>
-            </p>
-          </div>
-        </form>
-
-        <div className="text-center">
-          <Link
-            href="/"
-            className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-          >
-            ← Back to main site
-          </Link>
-        </div>
-      </div>
+      <TenantLogin 
+        tenantSlug={tenantSlug} 
+        onLoginSuccess={handleLoginSuccess}
+        isSubmitting={isSubmitting}
+      />
     </div>
   );
-} 
+};
+
+export default TenantLoginPage;

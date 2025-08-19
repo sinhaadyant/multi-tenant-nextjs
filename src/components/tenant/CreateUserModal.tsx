@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'react-hot-toast';
 import { useCreateUser, useTenantRoles } from '@/hooks/useTenantUsers';
-import { useDynamicPermissions } from '@/context/DynamicPermissionsContext';
+import { useReduxAuth } from '@/hooks/useReduxAuth';
 import Button from '@/components/ui/button/Button';
 import Input from '@/components/form/input/Input';
 import Label from '@/components/form/Label';
@@ -38,7 +38,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
   onSuccess,
   tenantSlug
 }) => {
-  const { hasPermission } = useDynamicPermissions();
+  const { hasPermission } = useReduxAuth();
   const createUserMutation = useCreateUser(tenantSlug);
   const { data: rolesData, isLoading: rolesLoading } = useTenantRoles(tenantSlug);
 

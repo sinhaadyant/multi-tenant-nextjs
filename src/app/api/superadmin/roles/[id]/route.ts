@@ -25,10 +25,10 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
           select: { userRoles: true }
         },
         permissions: {
-          include: {
-            permission: true
-          }
-        }
+                  include: {
+                    module: true
+                  }
+                }
       }
     });
 

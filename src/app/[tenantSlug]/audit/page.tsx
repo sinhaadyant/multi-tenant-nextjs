@@ -2,13 +2,12 @@
 
 import React, { useState } from 'react';
 import { Download, AlertTriangle, CheckCircle, XCircle, Activity } from 'lucide-react';
-import { useTenantAuditLogs, AuditLog } from '@/hooks/useTenantAuditLogs';
+import { useAuditLogs, AuditLog } from '@/hooks/useAuditLogs';
 import AuditLogsTable from '@/components/superadmin/AuditLogsTable';
 import AuditLogsFilters from '@/components/superadmin/AuditLogsFilters';
 import AuditLogDetailsModal from '@/components/superadmin/AuditLogDetailsModal';
-import PrivateRoute from '@/components/auth/PrivateRoute';
 
-const AuditPageContent = () => {
+export default function AuditLogsPage() {
   const {
     auditLogs,
     stats,
@@ -20,7 +19,7 @@ const AuditPageContent = () => {
     updateFilters,
     goToPage,
     exportLogs,
-  } = useTenantAuditLogs();
+  } = useAuditLogs();
 
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -47,6 +46,7 @@ const AuditPageContent = () => {
 
   const handleClearFilters = () => {
     updateFilters({
+      tenantName: '',
       userEmail: '',
       actionType: '',
       startDate: '',
@@ -117,7 +117,7 @@ const AuditPageContent = () => {
             Audit Logs
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Monitor user activity and system actions within your tenant
+            Monitor system activity and user actions across all tenants
           </p>
         </div>
         <div className="flex gap-3">
@@ -226,7 +226,6 @@ const AuditPageContent = () => {
         onFiltersChange={handleFiltersChange}
         onClearFilters={handleClearFilters}
         loading={loading}
-        hideTenantFilter={true}
       />
 
       {/* Data Table */}
@@ -250,14 +249,4 @@ const AuditPageContent = () => {
       />
     </div>
   );
-};
-
-const AuditPage = () => {
-  return (
-    <PrivateRoute>
-      <AuditPageContent />
-    </PrivateRoute>
-  );
-};
-
-export default AuditPage; 
+} 

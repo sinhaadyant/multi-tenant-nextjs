@@ -10,6 +10,7 @@ export const GET = asyncHandler(async (req: NextRequest) => {
 
   const { searchParams } = new URL(req.url);
   const token = searchParams.get('token');
+  const email = searchParams.get('email');
 
   if (!token) {
     if (process.env.NODE_ENV === 'development') {
@@ -19,6 +20,17 @@ export const GET = asyncHandler(async (req: NextRequest) => {
       'Token is required',
       400,
       [{ field: 'token', message: 'Token is required' }]
+    );
+  }
+
+  if (!email) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('❌ No email provided');
+    }
+    return createErrorResponse(
+      'Email is required',
+      400,
+      [{ field: 'email', message: 'Email is required' }]
     );
   }
 
@@ -34,7 +46,18 @@ export const GET = asyncHandler(async (req: NextRequest) => {
       }
       return createSuccessResponse({
         isValid: false,
-        message: 'Invalid or used invite token'
+        message: 'Invalid or expired invite token'
+      }, 'Token verification completed');
+    }
+
+    // Check if email matches the token's email
+    if (inviteToken.email !== email) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('❌ Email mismatch:', { tokenEmail: inviteToken.email, providedEmail: email });
+      }
+      return createSuccessResponse({
+        isValid: false,
+        message: 'Invalid or expired invite token'
       }, 'Token verification completed');
     }
 

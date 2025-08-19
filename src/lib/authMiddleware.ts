@@ -9,6 +9,7 @@ export interface AuthenticatedRequest extends NextRequest {
     role: string;
     tenantId?: string;
     tenantSlug?: string;
+    userRoles?: any[];
   };
 }
 
@@ -101,16 +102,83 @@ export const withAuth = (
 
 /**
  * Tenant-specific authentication middleware
- * Ensures user belongs to the specified tenant
+ * Ensures user belongs to the specified tenant and includes user roles
  */
 export const withTenantAuth = (
   handler: (req: AuthenticatedRequest, context: any) => Promise<NextResponse>
 ) => {
-  return withAuth(handler, {
-    requireAuth: true,
-    requireTenant: true,
-    allowPublic: false
-  });
+  return async (req: NextRequest, context: any) => {
+    const {
+      requireAuth = true,
+      requireTenant = true,
+      allowPublic = false
+    } = { requireAuth: true, requireTenant: true, allowPublic: false };
+
+    // If public access is allowed, skip authentication
+    if (allowPublic) {
+      return handler(req as AuthenticatedRequest, context);
+    }
+
+    try {
+      // Get authorization header
+      const authHeader = req.headers.get('authorization');
+      
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return createErrorResponse('Unauthorized - No token provided', 401);
+      }
+
+      const token = authHeader.substring(7);
+      
+      // Verify JWT token
+      const decoded = verifyToken(token);
+      if (!decoded || !decoded.id || !decoded.email) {
+        return createErrorResponse('Invalid or expired token', 401);
+      }
+
+      // Check if tenant is required and provided
+      if (requireTenant && !decoded.tenantId) {
+        return createErrorResponse('Tenant access required', 403);
+      }
+
+      // Fetch user with roles for permission checking
+      const { prisma } = await import('@/lib/prisma');
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.id },
+        include: {
+          userRoles: {
+            include: {
+              role: {
+                include: {
+                  permissions: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+      if (!user) {
+        return createErrorResponse('User not found', 404);
+      }
+
+      // Inject user context into request
+      const authenticatedReq = req as AuthenticatedRequest;
+      authenticatedReq.user = {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        tenantId: user.tenantId,
+        tenantSlug: decoded.tenantSlug,
+        userRoles: user.userRoles
+      };
+
+      return handler(authenticatedReq, context);
+
+    } catch (error: any) {
+      console.error('Tenant authentication middleware error:', error);
+      return createErrorResponse('Authentication failed', 401);
+    }
+  };
 };
 
 /**

@@ -1,37 +1,40 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import { 
-  Users, 
-  Activity, 
-  TrendingUp, 
-  Shield, 
-  Database,
+import { useReduxAuth } from '@/hooks/useReduxAuth';
+import { useTenantDashboard } from '@/hooks/useTenantDashboard';
+import { useDataPermissions } from '@/hooks/usePermissionBasedData';
+import {
+  Users,
+  Shield,
+  Activity,
+  BarChart3,
+  Settings,
+  Plus,
+  Zap,
+  RefreshCw,
   AlertTriangle,
   CheckCircle,
   Clock,
-  DollarSign,
-  Plus,
-  Settings,
-  RefreshCw,
-  Eye,
+  TrendingUp,
   TrendingDown,
-  Bug,
-  Building2
+  Loader2,
+  AlertCircle,
+  Building2,
+  Eye,
+  Bug
 } from 'lucide-react';
-
-import { TenantDashboardOverviewCards } from './TenantDashboardOverviewCards';
-import { TenantDashboardAnalyticsChart } from './TenantDashboardAnalyticsChart';
-import { RecentActivity } from './RecentActivity';
-import { QuickActions } from './QuickActions';
-import { ErrorComponent, NoDataComponent } from './ErrorComponent';
-import { TenantDashboardSkeleton } from './TenantDashboardSkeleton';
-import DateFilterDropdown from './DateFilterDropdown';
-import { useTenantDashboard } from '@/hooks/useTenantDashboard';
+import Button from '@/components/ui/button/Button';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import api from '@/lib/api';
+import { TenantDashboardOverviewCards } from './TenantDashboardOverviewCards';
+import { TenantDashboardAnalyticsChart } from './TenantDashboardAnalyticsChart';
+import { TenantRecentActivity } from './TenantRecentActivity';
+import { TenantQuickActions } from './TenantQuickActions';
+import { TenantDashboardSkeleton } from './TenantDashboardSkeleton';
+import { TenantErrorComponent, TenantNoDataComponent } from './TenantErrorComponent';
+import DateFilterDropdown from '../superadmin/DateFilterDropdown';
+import api, { debugToken } from '@/lib/api';
 
 // Real-time stats hook for tenant
 const useTenantRealTimeStats = (tenantSlug: string) => {
@@ -42,7 +45,7 @@ const useTenantRealTimeStats = (tenantSlug: string) => {
   const fetchStats = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/tenant/${tenantSlug}/dashboard/stats`);
+      const response = await api.get(`/api/tenant/${tenantSlug}/dashboard/stats`);
       if (response.data.success) {
         setStats(response.data);
       } else {
@@ -56,84 +59,98 @@ const useTenantRealTimeStats = (tenantSlug: string) => {
   };
 
   useEffect(() => {
-    fetchStats();
-    const interval = setInterval(fetchStats, 30000); // Update every 30 seconds
-    return () => clearInterval(interval);
+    if (tenantSlug) {
+      fetchStats();
+      const interval = setInterval(fetchStats, 30000); // Update every 30 seconds
+      return () => clearInterval(interval);
+    }
   }, [tenantSlug]);
 
   return { stats, loading, error, refetch: fetchStats };
 };
 
-export const TenantDashboardClient: React.FC = () => {
+const TenantDashboardClient: React.FC = () => {
+  const { user, tenant } = useReduxAuth();
   const router = useRouter();
-  const params = useParams();
-  const tenantSlug = params.tenantSlug as string;
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   
+  // Use the tenant dashboard hook
   const {
-    data,
+    stats,
+    systemHealth,
+    recentActivity,
     isLoading,
+    isError,
     error,
     selectedRange,
     setSelectedRange,
-    refetch
-  } = useTenantDashboard(tenantSlug);
+    refreshDashboard
+  } = useTenantDashboard();
 
-  const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useTenantRealTimeStats(tenantSlug);
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  // Real-time stats
+  const { stats: realTimeStats, loading: statsLoading, error: statsError, refetch: refetchStats } = useTenantRealTimeStats(tenant?.slug || '');
 
-  // Debug logging
-  if (process.env.NODE_ENV === 'development') {
-    console.log('🔍 TenantDashboardClient Debug:', {
-      tenantSlug,
-      data: data,
-      isLoading,
-      error,
-      selectedRange
-    });
-  }
+  const usersPermissions = useDataPermissions('users');
+  const rolesPermissions = useDataPermissions('roles');
+  const auditPermissions = useDataPermissions('audit');
+  const reportsPermissions = useDataPermissions('reports');
 
   // Update last updated time when data changes
   useEffect(() => {
-    if (data || stats) {
+    if (stats || realTimeStats) {
       setLastUpdated(new Date());
     }
-  }, [data, stats]);
+  }, [stats, realTimeStats]);
+
+  // Handle refresh
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([refreshDashboard(), refetchStats()]);
+      toast.success('Dashboard refreshed successfully!');
+    } catch (error) {
+      toast.error('Failed to refresh dashboard');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Handle authentication errors
   useEffect(() => {
-    if (error && error.message.includes('Authentication required')) {
+    if (error && error.message?.includes('Authentication required')) {
       toast.error('Please log in to access the dashboard');
-      router.push(`/${tenantSlug}/login`);
+      router.push(`/${tenant?.slug}/login`);
     }
-  }, [error, router, tenantSlug]);
+  }, [error, router, tenant?.slug]);
 
-  // Handle loading state
+  // Loading state
   if (isLoading) {
     return <TenantDashboardSkeleton />;
   }
 
-  // Handle error state
-  if (error) {
+  // Error state
+  if (isError) {
     return (
       <div className="space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Tenant Dashboard
+              {tenant?.name || 'Tenant'} Dashboard
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Manage your tenant-specific data and operations
+              Manage your organization data and monitor activities
             </p>
           </div>
         </div>
         
-        <ErrorComponent 
-          error={error.message} 
+        <TenantErrorComponent 
+          error={error?.message || 'Unknown error'} 
           onRetry={() => {
-            if (error.message.includes('Authentication required')) {
-              router.push(`/${tenantSlug}/login`);
+            if (error?.message?.includes('Authentication required')) {
+              router.push(`/${tenant?.slug}/login`);
             } else {
-              refetch();
+              refreshDashboard();
             }
           }}
         />
@@ -141,22 +158,22 @@ export const TenantDashboardClient: React.FC = () => {
     );
   }
 
-  // Handle no data state
-  if (!data) {
+  // No data state
+  if (!stats) {
     return (
       <div className="space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Tenant Dashboard
+              {tenant?.name || 'Tenant'} Dashboard
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Manage your tenant-specific data and operations
+              Manage your organization data and monitor activities
             </p>
           </div>
         </div>
         
-        <NoDataComponent 
+        <TenantNoDataComponent 
           title="No Dashboard Data"
           message="Unable to load dashboard data. Please try again or contact support."
         />
@@ -169,142 +186,100 @@ export const TenantDashboardClient: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <div className="flex items-center gap-3">
-            <Building2 className="h-8 w-8 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              {data.tenant?.name || 'Tenant'} Dashboard
-            </h1>
-          </div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            {tenant?.name || 'Tenant'} Dashboard
+          </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Welcome back! Here's what's happening in your tenant.
+            Welcome back, {user?.name || 'User'}! Here's what's happening with {tenant?.name || 'your organization'} today.
           </p>
         </div>
         
         <div className="flex items-center gap-3">
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            Last updated: {lastUpdated.toLocaleTimeString()}
+          </div>
           <DateFilterDropdown 
             selectedRange={selectedRange}
             onRangeChange={setSelectedRange}
           />
           <button
-            onClick={() => refetch()}
-            className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
+            <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
           </button>
+          {process.env.NODE_ENV === 'development' && (
+            <button
+              onClick={() => {
+                debugToken();
+                toast.success('Token debug info logged to console');
+              }}
+              className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+            >
+              <Bug className="w-4 h-4 mr-2" />
+              Debug Token
+            </button>
+          )}
         </div>
+      </div>
+
+      {/* Last Updated */}
+      <div className="text-sm text-gray-500 dark:text-gray-400">
+        Last updated: {lastUpdated.toLocaleString()}
       </div>
 
       {/* Overview Cards */}
       <TenantDashboardOverviewCards 
-        summary={data.summary}
-        stats={stats}
-        loading={statsLoading}
+        summary={{
+          totalUsers: stats?.summary?.totalUsers || 0,
+          activeUsers: stats?.summary?.activeUsers || 0,
+          totalRoles: stats?.summary?.totalRoles || 0,
+          totalAuditEvents: stats?.summary?.totalAuditEvents || 0,
+          userGrowth: stats?.summary?.userGrowth || 0,
+          auditGrowth: stats?.summary?.auditGrowth || 0
+        }} 
+        selectedRange={selectedRange} 
+        isLoading={isLoading}
+        permissions={{
+          canViewUsers: usersPermissions.canView,
+          canViewRoles: rolesPermissions.canView,
+          canViewAudit: auditPermissions.canView,
+          canViewReports: reportsPermissions.canView
+        }}
       />
 
-      {/* Analytics Chart */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-            Activity Overview
-          </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            User activity and system usage over time
-          </p>
-        </div>
-        <div className="p-6">
-          <TenantDashboardAnalyticsChart 
-            charts={data.charts}
-            selectedRange={selectedRange}
-          />
-        </div>
-      </div>
+      {/* Quick Actions */}
+      <TenantQuickActions 
+        permissions={{
+          canCreateUsers: usersPermissions.canCreate,
+          canViewAudit: auditPermissions.canView,
+          canCreateReports: reportsPermissions.canCreate,
+          canUpdateRoles: rolesPermissions.canUpdate
+        }}
+        tenantSlug={tenant?.slug}
+      />
 
-      {/* Recent Activity and Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Activity */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-              Recent Activity
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Latest activities in your tenant
-            </p>
-          </div>
-          <div className="p-6">
-            <RecentActivity 
-              activities={data.recentActivity}
-              tenantSlug={tenantSlug}
-            />
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-              Quick Actions
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Common tasks and shortcuts
-            </p>
-          </div>
-          <div className="p-6">
-            <QuickActions 
-              tenantSlug={tenantSlug}
-              userPermissions={data.userPermissions}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* System Health */}
-      {data.systemHealth && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-              System Health
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Current system status and performance
-            </p>
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">
-                  {data.systemHealth.uptime}%
-                </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Uptime</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">
-                  {data.systemHealth.activeSessions}
-                </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Active Sessions</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-yellow-600">
-                  {data.systemHealth.cpuUsage}%
-                </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">CPU Usage</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">
-                  {data.systemHealth.memoryUsage}%
-                </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Memory Usage</div>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Charts Section */}
+      {stats?.charts && (
+        <TenantDashboardAnalyticsChart 
+          chartData={stats.charts}
+          tenantSlug={tenant?.slug}
+        />
       )}
 
-      {/* Last Updated */}
-      <div className="text-center text-sm text-gray-500 dark:text-gray-400">
-        Last updated: {lastUpdated.toLocaleString()}
+      {/* Recent Activity */}
+      <div className="grid gap-6 lg:grid-cols-1">
+        {recentActivity?.activities && (
+          <TenantRecentActivity 
+            activities={recentActivity.activities} 
+            tenantSlug={tenant?.slug}
+          />
+        )}
       </div>
     </div>
   );
-}; 
+};
+
+export default TenantDashboardClient; 

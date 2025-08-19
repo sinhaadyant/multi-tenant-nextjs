@@ -259,12 +259,19 @@ export const useTenants = (filters: any = {}) => {
   });
 };
 
-// Fetch roles for user creation
-export const useRoles = () => {
+// Fetch roles for user creation (including global roles)
+export const useRoles = (tenantId?: string) => {
   return useQuery({
-    queryKey: ['roles'],
+    queryKey: ['roles', tenantId],
     queryFn: async () => {
-      const response = await api.get('/superadmin/roles');
+      const params = new URLSearchParams();
+      if (tenantId) {
+        params.append('tenantId', tenantId);
+      }
+      // Always include global roles
+      params.append('includeGlobal', 'true');
+      
+      const response = await api.get(`/superadmin/roles?${params.toString()}`);
       return response.data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes

@@ -1,151 +1,253 @@
 import { NextRequest } from 'next/server';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-import { verifyToken } from '@/lib/jwt';
+import { requireTenantAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { createAuditLogFromRequest } from '@/lib/audit';
+import { asyncHandler } from '@/lib/errorHandler';
+import { z } from 'zod';
 
-export async function GET(req: NextRequest) {
-  try {
-    return createSuccessResponse({ message: 'API endpoint working' }, 'Success');
-  } catch (error: any) {
-    console.error('Error:', error);
-    return createErrorResponse('Internal server error', 500);
+// Validation schemas
+const commentSchema = z.object({
+  text: z.string().min(1, 'Comment text is required').max(5000, 'Comment must be less than 5000 characters'),
+  attachments: z.array(z.object({
+    filename: z.string(),
+    originalName: z.string(),
+    mimeType: z.string(),
+    size: z.number().max(10 * 1024 * 1024), // 10MB max
+    path: z.string()
+  })).optional().default([])
+});
+
+export const GET = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+  const { searchParams } = new URL(req.url);
+  const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
+  const ticketId = params.id;
+  
+  if (!tenantSlug || !ticketId) {
+    return createErrorResponse('Tenant slug and ticket ID are required', 400);
   }
-}
 
-export async function POST(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
-    const ticketId = req.nextUrl.pathname.split('/')[5];
-    
-    if (!tenantSlug || !ticketId) {
-      return createErrorResponse('Tenant slug and ticket ID are required', 400);
-    }
+  // Authenticate user and verify tenant access
+  const authResult = await requireTenantAuth(req);
+  if (authResult instanceof Response) {
+    return authResult;
+  }
 
-    // Verify authentication token
-    const token = req.headers.get('authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return createErrorResponse('No authentication token found', 401);
-    }
+  const user = authResult as any;
+  
+  // Get tenant
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: { id: true, name: true, slug: true, isActive: true }
+  });
 
-    const decoded = await verifyToken(token);
-    if (!decoded || !decoded.id) {
-      return createErrorResponse('Invalid authentication token', 401);
-    }
+  if (!tenant) {
+    return createErrorResponse('Tenant not found', 404);
+  }
 
-    // Get tenant
-    const tenant = await prisma.tenant.findUnique({
-      where: { slug: tenantSlug },
-      select: { id: true, name: true, slug: true, isActive: true }
-    });
+  if (!tenant.isActive) {
+    return createErrorResponse('Tenant is inactive', 403);
+  }
 
-    if (!tenant) {
-      return createErrorResponse('Tenant not found', 404);
-    }
+  // Verify user belongs to this tenant
+  if (user.tenantId !== tenant.id) {
+    return createErrorResponse('Access denied', 403);
+  }
 
-    if (!tenant.isActive) {
-      return createErrorResponse('Tenant is inactive', 403);
-    }
-
-    // Verify user belongs to this tenant
-    const user = await prisma.user.findFirst({
-      where: {
-        id: decoded.id,
-        tenantId: tenant.id,
-        isActive: true
-      }
-    });
-
-    if (!user) {
-      return createErrorResponse('User not found or not authorized for this tenant', 404);
-    }
-
-    // Verify ticket exists and belongs to this tenant
-    const ticket = await prisma.supportTicket.findFirst({
-      where: {
-        id: ticketId,
-        tenantId: tenant.id
-      }
-    });
-
-    if (!ticket) {
-      return createErrorResponse('Support ticket not found', 404);
-    }
-
-    // Parse form data
-    const formData = await req.formData();
-    const text = formData.get('text') as string;
-    const attachments = formData.getAll('attachments') as File[];
-
-    if (!text || text.trim().length === 0) {
-      return createErrorResponse('Comment text is required', 400);
-    }
-
-    // Create comment
-    const comment = await prisma.supportTicketComment.create({
-      data: {
-        text: text.trim(),
-        ticketId: ticketId,
-        commentedBy: user.id,
-        commenterType: 'user'
-      },
-      include: {
-        attachments: true
-      }
-    });
-
-    // Handle file uploads if any
-    if (attachments && attachments.length > 0) {
-      const attachmentPromises = attachments.map(async (file) => {
-        // In a real implementation, you would upload the file to a storage service
-        // For now, we'll just create a placeholder record
-        const filename = `${Date.now()}-${file.name}`;
-        const path = `/uploads/support/${filename}`;
-        
-        return prisma.supportTicketCommentAttachment.create({
-          data: {
-            filename,
-            originalName: file.name,
-            mimeType: file.type,
-            size: file.size,
-            path,
-            commentId: comment.id
+  // Check if user has permission to read support tickets
+  const userRoles = await prisma.userRole.findMany({
+    where: { userId: user.id },
+    include: {
+      role: {
+        include: {
+          permissions: {
+            where: { moduleKey: 'support' }
           }
-        });
-      });
-
-      await Promise.all(attachmentPromises);
+        }
+      }
     }
+  });
 
-    // Get the comment with attachments
-    const commentWithAttachments = await prisma.supportTicketComment.findUnique({
-      where: { id: comment.id },
-      include: {
-        attachments: true
+  const hasReadPermission = userRoles.some(userRole => 
+    userRole.role.permissions.some(permission => permission.canRead)
+  );
+
+  if (!hasReadPermission) {
+    return createErrorResponse('You do not have permission to view support tickets', 403);
+  }
+
+  const hasViewAllPermission = userRoles.some(userRole => 
+    userRole.role.permissions.some(permission => permission.canViewAll)
+  );
+
+  // Verify ticket exists and user has access
+  const ticket = await prisma.supportTicket.findFirst({
+    where: {
+      id: ticketId,
+      tenantId: tenant.id,
+      // If user doesn't have viewAll permission, only show their own tickets
+      ...(hasViewAllPermission ? {} : { userId: user.id })
+    }
+  });
+
+  if (!ticket) {
+    return createErrorResponse('Support ticket not found', 404);
+  }
+
+  // Get comments with attachments
+  const comments = await prisma.supportTicketComment.findMany({
+    where: {
+      ticketId: ticketId
+    },
+    include: {
+      attachments: true
+    },
+    orderBy: {
+      createdAt: 'asc'
+    }
+  });
+
+  return createSuccessResponse({ comments }, 'Comments retrieved successfully');
+});
+
+export const POST = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+  const { searchParams } = new URL(req.url);
+  const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
+  const ticketId = params.id;
+  
+  if (!tenantSlug || !ticketId) {
+    return createErrorResponse('Tenant slug and ticket ID are required', 400);
+  }
+
+  // Authenticate user and verify tenant access
+  const authResult = await requireTenantAuth(req);
+  if (authResult instanceof Response) {
+    return authResult;
+  }
+
+  const user = authResult as any;
+  
+  // Get tenant
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: { id: true, name: true, slug: true, isActive: true }
+  });
+
+  if (!tenant) {
+    return createErrorResponse('Tenant not found', 404);
+  }
+
+  if (!tenant.isActive) {
+    return createErrorResponse('Tenant is inactive', 403);
+  }
+
+  // Verify user belongs to this tenant
+  if (user.tenantId !== tenant.id) {
+    return createErrorResponse('Access denied', 403);
+  }
+
+  // Check if user has permission to update support tickets (for adding comments)
+  const userRoles = await prisma.userRole.findMany({
+    where: { userId: user.id },
+    include: {
+      role: {
+        include: {
+          permissions: {
+            where: { moduleKey: 'support' }
+          }
+        }
       }
-    });
+    }
+  });
 
-    // Create audit log
-    await createAuditLogFromRequest(
-      req,
-      { id: user.id, email: user.email, role: 'user' },
-      'support.comment.create',
-      { 
-        tenantId: tenant.id,
-        tenantSlug: tenant.slug,
-        ticketId: ticketId,
-        commentId: comment.id
-      }
-    );
+  const hasUpdatePermission = userRoles.some(userRole => 
+    userRole.role.permissions.some(permission => permission.canUpdate)
+  );
 
-    return createSuccessResponse({ comment: commentWithAttachments }, 'Comment added successfully');
+  if (!hasUpdatePermission) {
+    return createErrorResponse('You do not have permission to add comments to support tickets', 403);
+  }
 
-  } catch (error: any) {
-    console.error('Error adding comment:', error);
+  const hasViewAllPermission = userRoles.some(userRole => 
+    userRole.role.permissions.some(permission => permission.canViewAll)
+  );
+
+  // Verify ticket exists and user has access
+  const ticket = await prisma.supportTicket.findFirst({
+    where: {
+      id: ticketId,
+      tenantId: tenant.id,
+      // If user doesn't have viewAll permission, only allow comments on their own tickets
+      ...(hasViewAllPermission ? {} : { userId: user.id })
+    }
+  });
+
+  if (!ticket) {
+    return createErrorResponse('Support ticket not found', 404);
+  }
+
+  // Prevent comments on closed tickets
+  if (ticket.status === 'closed') {
+    return createErrorResponse('Cannot add comments to closed tickets', 400);
+  }
+
+  const body = await req.json();
+  
+  // Validate request body
+  const validationResult = commentSchema.safeParse(body);
+  if (!validationResult.success) {
     return createErrorResponse(
-      error.message || 'Internal server error',
-      error.status || 500
+      'Validation failed',
+      400,
+      validationResult.error.issues.map((err: any) => ({
+        field: err.path.join('.'),
+        message: err.message
+      }))
     );
   }
-}
+
+  const { text, attachments } = validationResult.data;
+
+  // Create comment
+  const comment = await prisma.supportTicketComment.create({
+    data: {
+      text,
+      ticketId: ticketId,
+      commentedBy: user.id,
+      commenterType: 'user',
+      attachments: {
+        create: attachments.map(attachment => ({
+          filename: attachment.filename,
+          originalName: attachment.originalName,
+          mimeType: attachment.mimeType,
+          size: attachment.size,
+          path: attachment.path
+        }))
+      }
+    },
+    include: {
+      attachments: true
+    }
+  });
+
+  // Update ticket's updatedAt timestamp
+  await prisma.supportTicket.update({
+    where: { id: ticketId },
+    data: { updatedAt: new Date() }
+  });
+
+  // Create audit log
+  await createAuditLogFromRequest(
+    req,
+    { id: user.id, email: user.email, role: 'user' },
+    'support.ticket.comment.add',
+    { 
+      tenantId: tenant.id,
+      tenantSlug: tenant.slug,
+      ticketId: ticketId,
+      commentId: comment.id
+    }
+  );
+
+  return createSuccessResponse({ comment }, 'Comment added successfully', 201);
+});

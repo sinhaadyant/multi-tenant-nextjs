@@ -6,24 +6,16 @@ import {
   Users, 
   Activity, 
   CheckCircle, 
-  Clock,
-  TrendingUp,
-  AlertCircle,
   RefreshCw,
   UserCheck,
-  Shield,
-  Building2
 } from 'lucide-react';
-import { useDynamicPermissions } from '@/context/DynamicPermissionsContext';
+import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useTenantDashboard } from '@/hooks/useTenantDashboard';
 import { useTenantAuditLogs } from '@/hooks/useTenantAuditLogs';
-import { useTenantCharts } from '@/hooks/useTenantCharts';
-import { CountCard } from './CountCard';
+
+import { CountCard } from '@/components/ui/CountCard';
 import { QuickActionBar } from './QuickActionBar';
 import { AuditLogList } from './AuditLogList';
-import { RoleDistributionChart } from './charts/RoleDistributionChart';
-import { UserActivityChart } from './charts/UserActivityChart';
-import { LoginTrendsChart } from './charts/LoginTrendsChart';
 import { WelcomeMessage } from './WelcomeMessage';
 import { DashboardSkeleton } from './DashboardSkeleton';
 import { ErrorComponent } from './ErrorComponent';
@@ -37,16 +29,15 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ className = ''
   const params = useParams();
   const tenantSlug = params.tenantSlug as string;
   
-  const { userPermissions, hasPermission, hasRole, isLoading: permissionsLoading } = useDynamicPermissions();
+  const { user, permissions, hasPermission, hasRole, isLoading: permissionsLoading } = useReduxAuth();
   const { data: dashboardData, isLoading: dashboardLoading, error: dashboardError, refetch } = useTenantDashboard(tenantSlug);
   const { auditLogs, loading: auditLoading } = useTenantAuditLogs();
-  // const { data: chartData, isLoading: chartsLoading } = useTenantCharts(tenantSlug);
   
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Determine user role and access level
-  const isManager = hasRole('Tenant Admin') || hasRole('Tenant Manager') || hasPermission('dashboard', 'view');
+  const isManager = hasRole('Tenant Admin') || hasRole('Tenant Manager') || hasPermission('dashboard', 'read');
   const isAdmin = hasRole('Tenant Admin');
   const hasDashboardAccess = isManager || isAdmin;
 
@@ -92,8 +83,8 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ className = ''
   if (!hasDashboardAccess) {
     return (
       <WelcomeMessage 
-        userName={userPermissions?.user?.name || 'User'}
-        tenantName={userPermissions?.user?.tenant?.name || 'Tenant'}
+        userName={user?.name || 'User'}
+        tenantName={user?.tenantSlug || 'Tenant'}
       />
     );
   }
@@ -108,7 +99,7 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ className = ''
             Tenant Dashboard
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Welcome back, {userPermissions?.user?.name}! Here's what's happening in {userPermissions?.user?.tenant?.name}.
+            Welcome back, {user?.name}! Here&apos;s what&apos;s happening in {user?.tenantSlug}.
           </p>
         </div>
         
@@ -167,8 +158,8 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ className = ''
       {/* Quick Actions */}
       <QuickActionBar 
         isAdmin={isAdmin}
-        hasUserAccess={hasPermission('users', 'view')}
-        hasRoleAccess={hasPermission('roles', 'view')}
+        hasUserAccess={hasPermission('users', 'read')}
+        hasRoleAccess={hasPermission('roles', 'read')}
       />
 
       {/* Charts Section - Temporarily disabled due to data structure mismatch */}

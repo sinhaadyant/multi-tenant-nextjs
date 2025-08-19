@@ -105,7 +105,8 @@ const AuditLogsTable: React.FC<AuditLogsTableProps> = ({
     );
   }
 
-  if (logs.length === 0) {
+  // Add null check for logs
+  if (!logs || logs.length === 0) {
     return (
       <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg overflow-hidden">
         <div className="px-6 py-12 text-center">
@@ -231,9 +232,10 @@ const AuditLogsTable: React.FC<AuditLogsTableProps> = ({
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <button
                       onClick={() => onViewLog(log)}
-                      className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 hover:text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/30 dark:hover:text-blue-300 transition-colors"
                     >
-                      <Eye className="w-4 h-4" />
+                      <Eye className="w-3 h-3 mr-1" />
+                      Details
                     </button>
                   </td>
                 </tr>

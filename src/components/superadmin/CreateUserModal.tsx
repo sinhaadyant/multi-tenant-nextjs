@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { toast } from 'react-hot-toast';
 import { useCreateUser, useTenants, useRoles } from '@/hooks/useUsers';
 import Button from '@/components/ui/button/Button';
-import Input from '@/components/form/input/Input';
+import Input from '@/components/form/input/InputField';
 import Label from '@/components/form/Label';
 import { createUserSchema, CreateUserData } from '@/lib/validations/superadmin';
 
@@ -25,7 +25,6 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
 }) => {
   const createUserMutation = useCreateUser();
   const { data: tenantsData } = useTenants({ limit: 100 });
-  const { data: rolesData } = useRoles();
 
   const [showPassword, setShowPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState({ score: 0, label: '', color: '' });
@@ -51,6 +50,10 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
       location: ''
     }
   });
+
+  // Watch the selected tenant to fetch appropriate roles
+  const watchedTenantId = watch('tenantId');
+  const { data: rolesData } = useRoles(watchedTenantId);
 
   const watchedPassword = watch('password');
 
@@ -285,12 +288,15 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
                       <option value="">Select role (optional)</option>
                       {rolesData?.data?.roles?.map((role: any) => (
                         <option key={role.id} value={role.id}>
-                          {role.name}
+                          {role.name} {role.isGlobal ? '(Global)' : '(Tenant)'}
                         </option>
                       ))}
                     </select>
                   )}
                 />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Global roles are available across all tenants, while tenant roles are specific to the selected tenant.
+                </p>
               </div>
 
               {/* Department */}
@@ -327,10 +333,10 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
             </div>
 
             {/* Actions */}
-            <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
               <Button
                 type="button"
-                variant="secondary"
+                variant="outline"
                 onClick={onClose}
                 disabled={isSubmitting}
               >
@@ -338,11 +344,9 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting || createUserMutation.isPending}
-                loading={isSubmitting || createUserMutation.isPending}
+                disabled={isSubmitting}
               >
-                <UserPlus className="w-4 h-4 mr-2" />
-                Create User
+                {isSubmitting ? 'Creating...' : 'Create User'}
               </Button>
             </div>
           </form>

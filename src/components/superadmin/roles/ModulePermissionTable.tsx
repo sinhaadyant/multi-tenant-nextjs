@@ -37,8 +37,8 @@ const ModulePermissionTable: React.FC<ModulePermissionTableProps> = ({
   useMemo(() => {
     const initialPermissions: ModulePermissionState = {};
     
-    modules.forEach(module => {
-      const modulePermissions = rolePermissions.filter(p => p.moduleKey === module.moduleKey);
+    (modules || []).forEach(module => {
+      const modulePermissions = (rolePermissions || []).filter(p => p.moduleKey === module.moduleKey);
       
       initialPermissions[module.id] = {
         view: modulePermissions.some(p => p.action === 'view'),
@@ -54,7 +54,7 @@ const ModulePermissionTable: React.FC<ModulePermissionTableProps> = ({
 
   // Get all available actions for a module
   const getModuleActions = (module: Module): string[] => {
-    return module.permissions.map(p => p.action);
+    return module.permissions?.map(p => p.action) || [];
   };
 
   // Handle permission toggle
@@ -63,7 +63,7 @@ const ModulePermissionTable: React.FC<ModulePermissionTableProps> = ({
       ...prev,
       [moduleId]: {
         ...prev[moduleId],
-        [action]: !prev[moduleId]?.[action]
+        [action]: !(prev[moduleId] as any)?.[action]
       }
     }));
     setHasChanges(true);
@@ -86,7 +86,7 @@ const ModulePermissionTable: React.FC<ModulePermissionTableProps> = ({
   // Handle select all globally
   const handleSelectAllGlobal = (checked: boolean) => {
     const newPermissions: ModulePermissionState = {};
-    modules.forEach(module => {
+    (modules || []).forEach(module => {
       newPermissions[module.id] = {
         view: checked,
         create: checked,
@@ -112,19 +112,19 @@ const ModulePermissionTable: React.FC<ModulePermissionTableProps> = ({
 
   // Check if all modules have all permissions selected
   const isGlobalAllSelected = (): boolean => {
-    return modules.every(module => isModuleAllSelected(module.id));
+    return (modules || []).every(module => isModuleAllSelected(module.id));
   };
 
   // Check if any modules have any permissions selected
   const isGlobalAnySelected = (): boolean => {
-    return modules.some(module => isModuleAnySelected(module.id));
+    return (modules || []).some(module => isModuleAnySelected(module.id));
   };
 
   // Handle save permissions
   const handleSavePermissions = async () => {
     setIsSaving(true);
     try {
-      const permissionsToSave = modules.map(module => {
+      const permissionsToSave = (modules || []).map(module => {
         const modulePerms = permissions[module.id];
         const actions = [];
         
@@ -271,7 +271,7 @@ const ModulePermissionTable: React.FC<ModulePermissionTableProps> = ({
                   </td>
                 </tr>
               ) : (
-                modules.map((module) => {
+                (modules || []).map((module) => {
                   const modulePerms = permissions[module.id];
                   const availableActions = getModuleActions(module);
                   const permissionCount = getPermissionCount(module.id);

@@ -28,6 +28,51 @@ export interface UserPermissions {
 }
 
 /**
+ * Check if user has a specific permission for a tenant
+ * This function checks if the user has any permission for the given module
+ */
+export async function checkTenantPermission(
+  user: any,
+  tenantId: string,
+  permissionKey: string
+): Promise<boolean> {
+  try {
+    // For modules endpoint, allow access if user has any permissions at all
+    if (permissionKey === 'modules.view') {
+      // Check if user has any permissions
+      for (const userRole of user.userRoles) {
+        const role = userRole.role;
+        
+        if (role.permissions && role.permissions.length > 0) {
+          return true;
+        }
+      }
+      return false;
+    }
+    
+    // For other permissions, check specific module
+    const [moduleKey, action] = permissionKey.split('.');
+    
+    // Check if user has any permission for this module
+    for (const userRole of user.userRoles) {
+      const role = userRole.role;
+      
+      for (const rolePermission of role.permissions) {
+        if (rolePermission.moduleKey === moduleKey) {
+          // If user has any permission for this module, allow access
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error checking tenant permission:', error);
+    return false;
+  }
+}
+
+/**
  * Get effective permissions for a user across all their roles (global + tenant)
  * Uses union logic where explicit deny (false) overrides grant (true)
  */
@@ -41,7 +86,11 @@ export async function getEffectivePermissions(userId: string, moduleKey: string)
           include: {
             role: {
               include: {
-                permissions: true
+                permissions: {
+                  include: {
+                    module: true
+                  }
+                }
               }
             }
           }
@@ -132,7 +181,11 @@ export async function getUserPermissions(userId: string): Promise<UserPermission
           include: {
             role: {
               include: {
-                permissions: true
+                permissions: {
+                  include: {
+                    module: true
+                  }
+                }
               }
             }
           }

@@ -55,7 +55,13 @@
     "test:tenant-fix-errors": "node scripts/fix-tenant-console-errors.js",
     "test:tenant-e2e": "node scripts/run-tenant-e2e-tests.js",
     "test:tenant-setup": "npm run test:tenant-add-ids && npm run test:tenant-module-comprehensive",
-    "test:tenant-full": "npm run test:tenant-fix-errors && npm run test:tenant-add-ids && npm run test:tenant-module-comprehensive"
+    "test:tenant-full": "npm run test:tenant-fix-errors && npm run test:tenant-add-ids && npm run test:tenant-module-comprehensive",
+    "test:tenant-login-permissions": "node scripts/test-tenant-login-permissions.js",
+    "test:tenant-dashboard": "node scripts/test-tenant-dashboard-apis.js",
+    "test:tenant-modules": "node scripts/test-tenant-modules-apis.js",
+    "test:tenant-simple": "node scripts/simple-api-test.js",
+    "test:user-crud": "node scripts/test-user-crud.js",
+    "test:roles-permissions": "node scripts/test-roles-permissions.js"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.30.0",
@@ -109,7 +115,7 @@
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",
     "react-dom": "^19.0.0",
-    "react-dropzone": "^14.3.5",
+    "react-dropzone": "^14.3.8",
     "react-hook-form": "^7.62.0",
     "react-hot-toast": "^2.5.2",
     "react-redux": "^9.2.0",

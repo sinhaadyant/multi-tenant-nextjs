@@ -76,7 +76,7 @@ const rootReducer = combineReducers({
 const persistConfig = {
   key: 'superadmin-root',
   storage: customStorage,
-  whitelist: ['auth', 'tenantAuth'], // Only persist auth states, not permissions
+  whitelist: ['auth', 'tenantAuth', 'permissions'], // Persist auth states and permissions
   migrate: (state: any) => {
     // Migration function to handle any state format changes
     if (state && typeof state === 'object') {

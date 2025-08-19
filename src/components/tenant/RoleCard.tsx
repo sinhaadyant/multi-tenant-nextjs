@@ -18,7 +18,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { Role } from '@/hooks/useTenantRoles';
-import { useDynamicPermissions } from '@/context/DynamicPermissionsContext';
+import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { formatDistanceToNow } from 'date-fns';
 
 interface RoleCardProps {
@@ -48,7 +48,7 @@ const RoleCard: React.FC<RoleCardProps> = ({
   showSelection = false,
   viewMode = 'grid'
 }) => {
-  const { hasPermission } = useDynamicPermissions();
+  const { hasPermission } = useReduxAuth();
 
   const canEdit = hasPermission('roles', 'update');
   const canDelete = hasPermission('roles', 'delete');

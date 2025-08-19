@@ -12,6 +12,7 @@ import Button from '@/components/ui/button/Button';
 import TenantSkeleton from '@/components/superadmin/TenantSkeleton';
 
 import { CountCard } from '@/components/ui/CountCard';
+import { CountCardsGridSkeleton } from '@/components/ui/CountCardSkeleton';
 import { CheckCircle, XCircle, Building2, Users } from 'lucide-react';
 
 // Memoized stats cards component for better performance

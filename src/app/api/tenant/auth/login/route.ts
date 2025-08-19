@@ -74,7 +74,7 @@ export const POST = asyncHandler(async (req: NextRequest) => {
               include: {
                 permissions: {
                   include: {
-                    permission: true
+                    module: true
                   }
                 }
               }
@@ -176,11 +176,14 @@ export const POST = asyncHandler(async (req: NextRequest) => {
         name: userRole.role.name,
         description: userRole.role.description,
         permissions: userRole.role.permissions.map(rp => ({
-          id: rp.permission.id,
-          name: rp.permission.name,
-          module: rp.permission.module,
-          submodule: rp.permission.submodule,
-          action: rp.permission.action
+          id: rp.id,
+          moduleKey: rp.moduleKey,
+          moduleName: rp.module.moduleName,
+          canCreate: rp.canCreate,
+          canRead: rp.canRead,
+          canUpdate: rp.canUpdate,
+          canDelete: rp.canDelete,
+          canViewAll: rp.canViewAll
         }))
       }))
     };

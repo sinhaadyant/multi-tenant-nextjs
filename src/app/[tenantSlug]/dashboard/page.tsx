@@ -1,10 +1,12 @@
-"use client";
+import type { Metadata } from "next";
+import React from "react";
+import TenantDashboardClient from "@/components/tenant/TenantDashboardClient";
 
-import React from 'react';
-import { TenantDashboard } from '@/components/tenant/TenantDashboard';
-
-const DashboardPage = () => {
-  return <TenantDashboard />;
+export const metadata: Metadata = {
+  title: "Tenant Dashboard | Multi-Tenant Management",
+  description: "Tenant dashboard for managing organization data",
 };
 
-export default DashboardPage; 
+export default function TenantDashboard() {
+  return <TenantDashboardClient />;
+} 

@@ -215,8 +215,11 @@ export const useToggleTenantStatus = () => {
     onSuccess: (data, variables) => {
       const status = variables.isActive ? 'activated' : 'suspended';
       toast.success(`Tenant ${status} successfully!`);
+      // Invalidate all tenant-related queries
       queryClient.invalidateQueries({ queryKey: ['tenants'] });
       queryClient.invalidateQueries({ queryKey: ['tenant', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-users'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-activity'] });
     },
     onError: (error: any) => {
       const message = error.response?.data?.message || 'Failed to update tenant status';
@@ -275,7 +278,10 @@ export const useToggleUserStatus = () => {
     onSuccess: (data, variables) => {
       const status = variables.isActive ? 'activated' : 'suspended';
       toast.success(`User ${status} successfully!`);
+      // Invalidate tenant users and tenant data to update user count
       queryClient.invalidateQueries({ queryKey: ['tenant-users', variables.tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['tenant', variables.tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['tenants'] });
     },
     onError: (error: any) => {
       const message = error.response?.data?.message || 'Failed to update user status';
