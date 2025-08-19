@@ -7,7 +7,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   return withSuperAdminAuth(async (req: NextRequest, user: any) => {
     try {
       const { searchParams } = new URL(req.url);
-      const tenantId = params.id;
+      const { id: tenantId } = await params;
 
       // Extract query parameters
       const page = parseInt(searchParams.get('page') || '1');

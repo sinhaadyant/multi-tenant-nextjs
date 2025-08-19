@@ -31,7 +31,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
       return createErrorResponse('Role not found', 404);
     }
 
-    // Transform the data
+    // Transform the data to match frontend expectations
     const transformedRole = {
       id: role.id,
       name: role.name,
@@ -40,14 +40,14 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
       isActive: role.isActive,
       createdAt: role.createdAt.toISOString(),
       updatedAt: role.updatedAt.toISOString(),
-      permissions: role.permissions.map(rp => ({
-        id: rp.permission.id,
-        name: rp.permission.name,
-        description: rp.permission.description,
-        module: rp.permission.moduleKey,
-        action: rp.permission.action,
-        moduleName: rp.permission.module.name
-      }))
+      permissions: role.permissions.flatMap(rp => {
+        const permissions = [];
+        if (rp.canCreate) permissions.push({ id: `${rp.id}-create`, moduleKey: rp.moduleKey, action: 'create' });
+        if (rp.canRead) permissions.push({ id: `${rp.id}-read`, moduleKey: rp.moduleKey, action: 'view' });
+        if (rp.canUpdate) permissions.push({ id: `${rp.id}-update`, moduleKey: rp.moduleKey, action: 'edit' });
+        if (rp.canDelete) permissions.push({ id: `${rp.id}-delete`, moduleKey: rp.moduleKey, action: 'delete' });
+        return permissions;
+      })
     };
 
     return createSuccessResponse({ role: transformedRole }, 'Role permissions retrieved successfully');
@@ -74,6 +74,12 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
     permissions,
     requestBody
   });
+
+  // Log the moduleKeys being sent
+  if (permissions && Array.isArray(permissions)) {
+    const moduleKeys = permissions.map((p: any) => p.moduleId).filter(Boolean);
+    console.log('🔍 ModuleKeys being sent:', moduleKeys);
+  }
 
   // Validation
   if (!permissions || !Array.isArray(permissions)) {
@@ -106,22 +112,43 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
 
       // Add new permissions
       if (permissions.length > 0) {
+        // First, validate that all moduleKeys exist
+        const moduleKeys = permissions.map((p: any) => p.moduleId).filter(Boolean);
+        const existingModules = await tx.module.findMany({
+          where: { moduleKey: { in: moduleKeys } },
+          select: { moduleKey: true }
+        });
+        
+        const existingModuleKeys = existingModules.map(m => m.moduleKey);
+        const invalidModuleKeys = moduleKeys.filter(key => !existingModuleKeys.includes(key));
+        
+        console.log('🔍 Validation Debug:', {
+          requestedModuleKeys: moduleKeys,
+          existingModuleKeys,
+          invalidModuleKeys
+        });
+        
+        if (invalidModuleKeys.length > 0) {
+          throw new Error(`Invalid module keys: ${invalidModuleKeys.join(', ')}`);
+        }
+
         const rolePermissions = permissions.map((modulePerm: any) => {
           if (!modulePerm.moduleId || !modulePerm.actions || !Array.isArray(modulePerm.actions)) {
             return null;
           }
 
-          // Create role permission with the correct structure
+          // Map actions to boolean fields
+          const actions = modulePerm.actions;
           return {
             roleId,
-            moduleKey: modulePerm.moduleId,
-            canCreate: modulePerm.actions.includes('create'),
-            canRead: modulePerm.actions.includes('view'),
-            canUpdate: modulePerm.actions.includes('edit'),
-            canDelete: modulePerm.actions.includes('delete'),
-            canViewAll: modulePerm.actions.includes('view')
+            moduleKey: modulePerm.moduleId, // moduleId in request is actually the moduleKey
+            canCreate: actions.includes('create'),
+            canRead: actions.includes('view'),
+            canUpdate: actions.includes('edit'),
+            canDelete: actions.includes('delete'),
+            canViewAll: actions.includes('view')
           };
-        }).filter((item): item is NonNullable<typeof item> => item !== null); // Remove null entries
+        }).filter((item): item is NonNullable<typeof item> => item !== null);
 
         if (rolePermissions.length > 0) {
           await tx.rolePermission.createMany({
@@ -147,7 +174,7 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
       throw new Error('Failed to fetch updated role');
     }
 
-    // Transform the data to match the expected format
+    // Transform the data to match frontend expectations
     const transformedRole = {
       id: updatedRole.id,
       name: updatedRole.name,
@@ -156,16 +183,14 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
       isActive: updatedRole.isActive,
       createdAt: updatedRole.createdAt.toISOString(),
       updatedAt: updatedRole.updatedAt.toISOString(),
-      permissions: updatedRole.permissions.map(rp => ({
-        id: rp.id,
-        moduleKey: rp.moduleKey,
-        moduleName: rp.module.moduleName,
-        canCreate: rp.canCreate,
-        canRead: rp.canRead,
-        canUpdate: rp.canUpdate,
-        canDelete: rp.canDelete,
-        canViewAll: rp.canViewAll
-      }))
+      permissions: updatedRole.permissions.flatMap(rp => {
+        const permissions = [];
+        if (rp.canCreate) permissions.push({ id: `${rp.id}-create`, moduleKey: rp.moduleKey, action: 'create' });
+        if (rp.canRead) permissions.push({ id: `${rp.id}-read`, moduleKey: rp.moduleKey, action: 'view' });
+        if (rp.canUpdate) permissions.push({ id: `${rp.id}-update`, moduleKey: rp.moduleKey, action: 'edit' });
+        if (rp.canDelete) permissions.push({ id: `${rp.id}-delete`, moduleKey: rp.moduleKey, action: 'delete' });
+        return permissions;
+      })
     };
 
     await createAuditLogFromRequest(req, authResult, 'role.permissions.update', {

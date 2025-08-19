@@ -8,7 +8,7 @@ import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 // PATCH /api/superadmin/tenants/[id]/status - Toggle tenant status
 export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('🏢 Toggling tenant status:', params.id);
+    console.log('🏢 Toggling tenant status:', id);
   }
 
   // Authenticate SuperAdmin
@@ -32,12 +32,12 @@ export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params:
   try {
     // Check if tenant exists
     const existingTenant = await prisma.tenant.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!existingTenant) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Tenant not found:', params.id);
+        console.log('❌ Tenant not found:', id);
       }
       return createErrorResponse(
         'Tenant not found',
@@ -47,7 +47,7 @@ export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params:
 
     // Update tenant status
     const updatedTenant = await prisma.tenant.update({
-      where: { id: params.id },
+      where: { id: id },
       data: { isActive }
     });
 
@@ -57,7 +57,7 @@ export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params:
       authResult.user,
       'tenant.status_update',
       {
-        tenantId: params.id,
+        tenantId: id,
         tenantName: existingTenant.name,
         previousStatus: existingTenant.isActive,
         newStatus: isActive

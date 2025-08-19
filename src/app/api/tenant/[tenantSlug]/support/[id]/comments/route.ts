@@ -21,7 +21,7 @@ const commentSchema = z.object({
 export const GET = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   const { searchParams } = new URL(req.url);
   const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
-  const ticketId = params.id;
+  const { id: ticketId } = await params;
   
   if (!tenantSlug || !ticketId) {
     return createErrorResponse('Tenant slug and ticket ID are required', 400);
@@ -113,7 +113,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
 export const POST = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   const { searchParams } = new URL(req.url);
   const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
-  const ticketId = params.id;
+  const { id: ticketId } = await params;
   
   if (!tenantSlug || !ticketId) {
     return createErrorResponse('Tenant slug and ticket ID are required', 400);

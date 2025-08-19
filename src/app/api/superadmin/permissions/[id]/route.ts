@@ -8,7 +8,7 @@ import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 // GET /api/superadmin/permissions/[id] - Get a single permission
 export const GET = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('🔑 Fetching permission:', params.id);
+    console.log('🔑 Fetching permission:', id);
   }
 
   // Authenticate SuperAdmin
@@ -19,12 +19,12 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
 
   try {
     const permission = await prisma.permission.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!permission) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Permission not found:', params.id);
+        console.log('❌ Permission not found:', id);
       }
       return createErrorResponse('Permission not found', 404);
     }
@@ -55,7 +55,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
 // PUT /api/superadmin/permissions/[id] - Update a permission
 export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('🔑 Updating permission:', params.id);
+    console.log('🔑 Updating permission:', id);
   }
 
   // Authenticate SuperAdmin
@@ -69,12 +69,12 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: {
   try {
     // Check if permission exists
     const existingPermission = await prisma.permission.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!existingPermission) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Permission not found:', params.id);
+        console.log('❌ Permission not found:', id);
       }
       return createErrorResponse('Permission not found', 404);
     }
@@ -84,7 +84,7 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: {
       const nameConflict = await prisma.permission.findFirst({
         where: { 
           name,
-          id: { not: params.id }
+          id: { not: id }
         }
       });
 
@@ -102,7 +102,7 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: {
 
     // Update permission
     const updatedPermission = await prisma.permission.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         name: name || existingPermission.name,
         description: description !== undefined ? description : existingPermission.description,
@@ -150,7 +150,7 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: {
 // DELETE /api/superadmin/permissions/[id] - Delete a permission
 export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('🔑 Deleting permission:', params.id);
+    console.log('🔑 Deleting permission:', id);
   }
 
   // Authenticate SuperAdmin
@@ -162,7 +162,7 @@ export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params
   try {
     // Check if permission exists
     const existingPermission = await prisma.permission.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         rolePermissions: true
       }
@@ -170,7 +170,7 @@ export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params
 
     if (!existingPermission) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Permission not found:', params.id);
+        console.log('❌ Permission not found:', id);
       }
       return createErrorResponse('Permission not found', 404);
     }
@@ -178,7 +178,7 @@ export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params
     // Check if permission is assigned to any roles
     if (existingPermission.rolePermissions.length > 0) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Permission is assigned to roles, cannot delete:', params.id);
+        console.log('❌ Permission is assigned to roles, cannot delete:', id);
       }
       return createErrorResponse(
         'Cannot delete permission that is assigned to roles. Please remove all role assignments first.',
@@ -188,7 +188,7 @@ export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params
 
     // Delete permission
     await prisma.permission.delete({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     // Create audit log

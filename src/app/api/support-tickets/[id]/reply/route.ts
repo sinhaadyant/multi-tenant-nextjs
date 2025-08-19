@@ -12,7 +12,7 @@ export const POST = asyncHandler(async (request: NextRequest, { params }: { para
   }
 
   const user = authResult;
-  const ticketId = params.id;
+  const { id: ticketId } = await params;
 
   try {
     const body = await request.json();

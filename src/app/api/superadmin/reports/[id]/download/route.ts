@@ -7,7 +7,7 @@ import { createErrorResponse } from '@/lib/apiResponse';
 // GET /api/superadmin/reports/[id]/download - Download report
 export const GET = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('📊 Downloading report:', params.id);
+    console.log('📊 Downloading report:', id);
   }
 
   // Authenticate SuperAdmin
@@ -17,7 +17,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
   }
 
   const superAdmin = authResult as any;
-  const reportId = params.id;
+  const { id: reportId } = await params;
 
   try {
     // Find the report

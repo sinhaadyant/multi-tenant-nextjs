@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { authenticateJWT } from '@/middleware/auth';
 import { asyncHandler } from '@/lib/errorHandler';
 
-export const GET = asyncHandler(async (request: NextRequest, { params }: { params: { id: string } }) => {
+export const GET = asyncHandler(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   // Authenticate user
   const authResult = await authenticateJWT(request);
   if (authResult instanceof NextResponse) {
@@ -12,7 +12,7 @@ export const GET = asyncHandler(async (request: NextRequest, { params }: { param
   }
 
   const user = authResult;
-  const ticketId = params.id;
+  const { id: ticketId } = await params;
 
   try {
     // Build where clause based on user role
@@ -69,7 +69,7 @@ export const GET = asyncHandler(async (request: NextRequest, { params }: { param
   }
 });
 
-export const PUT = asyncHandler(async (request: NextRequest, { params }: { params: { id: string } }) => {
+export const PUT = asyncHandler(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   // Authenticate user
   const authResult = await authenticateJWT(request);
   if (authResult instanceof NextResponse) {
@@ -77,7 +77,7 @@ export const PUT = asyncHandler(async (request: NextRequest, { params }: { param
   }
 
   const user = authResult;
-  const ticketId = params.id;
+  const { id: ticketId } = await params;
 
   try {
     const body = await request.json();
@@ -138,7 +138,7 @@ export const PUT = asyncHandler(async (request: NextRequest, { params }: { param
   }
 });
 
-export const DELETE = asyncHandler(async (request: NextRequest, { params }: { params: { id: string } }) => {
+export const DELETE = asyncHandler(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   // Authenticate user
   const authResult = await authenticateJWT(request);
   if (authResult instanceof NextResponse) {
@@ -146,7 +146,7 @@ export const DELETE = asyncHandler(async (request: NextRequest, { params }: { pa
   }
 
   const user = authResult;
-  const ticketId = params.id;
+  const { id: ticketId } = await params;
 
   try {
     // Build where clause based on user role

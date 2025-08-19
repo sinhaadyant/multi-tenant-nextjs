@@ -8,7 +8,7 @@ import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 // PATCH /api/superadmin/support-tickets/[id]/status - Update ticket status
 export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('🎫 Updating support ticket status:', params.id);
+    console.log('🎫 Updating support ticket status:', id);
   }
 
   // Authenticate SuperAdmin
@@ -26,7 +26,7 @@ export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params:
   try {
     // Check if ticket exists
     const existingTicket = await prisma.supportTicket.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         tenant: {
           select: { name: true }
@@ -39,7 +39,7 @@ export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params:
 
     if (!existingTicket) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Support ticket not found:', params.id);
+        console.log('❌ Support ticket not found:', id);
       }
       return createErrorResponse('Support ticket not found', 404);
     }
@@ -50,7 +50,7 @@ export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params:
     if (priority) updateData.priority = priority;
 
     const ticket = await prisma.supportTicket.update({
-      where: { id: params.id },
+      where: { id: id },
       data: updateData,
       include: {
         tenant: {

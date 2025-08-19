@@ -24,15 +24,30 @@ export const GET = asyncHandler(async (req: NextRequest) => {
   const offset = (page - 1) * limit;
 
   try {
+    // Debug logging
+    console.log('🔍 Roles API Debug:', {
+      tenantId,
+      roleType,
+      search,
+      status,
+      sortBy,
+      sortOrder,
+      page,
+      limit
+    });
+
     // Build where clause
     const where: any = {};
     
     if (tenantId) {
       where.tenantId = tenantId;
+      console.log('🔍 Filtering by tenantId:', tenantId);
     } else if (roleType === 'global') {
       where.isGlobal = true;
+      console.log('🔍 Filtering for global roles only');
     } else if (roleType === 'tenant') {
       where.isGlobal = false;
+      console.log('🔍 Filtering for tenant roles only');
     }
     
     if (search) {
@@ -91,15 +106,14 @@ export const GET = asyncHandler(async (req: NextRequest) => {
       createdAt: role.createdAt.toISOString(),
       updatedAt: role.updatedAt.toISOString(),
       userCount: role._count.userRoles,
-      permissions: role.permissions.map(rp => ({
-        moduleKey: rp.moduleKey,
-        moduleName: rp.module.moduleName,
-        canCreate: rp.canCreate,
-        canRead: rp.canRead,
-        canUpdate: rp.canUpdate,
-        canDelete: rp.canDelete,
-        canViewAll: rp.canViewAll,
-      }))
+      permissions: role.permissions.flatMap(rp => {
+        const permissions = [];
+        if (rp.canCreate) permissions.push({ id: `${rp.id}-create`, moduleKey: rp.moduleKey, action: 'create' });
+        if (rp.canRead) permissions.push({ id: `${rp.id}-read`, moduleKey: rp.moduleKey, action: 'view' });
+        if (rp.canUpdate) permissions.push({ id: `${rp.id}-update`, moduleKey: rp.moduleKey, action: 'edit' });
+        if (rp.canDelete) permissions.push({ id: `${rp.id}-delete`, moduleKey: rp.moduleKey, action: 'delete' });
+        return permissions;
+      })
     }));
 
     await createAuditLogFromRequest(req, authResult, 'role.list', {

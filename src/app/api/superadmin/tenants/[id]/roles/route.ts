@@ -6,7 +6,7 @@ import { withSuperAdminAuth } from '@/lib/authMiddleware';
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   return withSuperAdminAuth(async (req: NextRequest, user: any) => {
     try {
-      const tenantId = params.id;
+      const { id: tenantId } = await params;
 
       // Validate tenant exists
       const tenant = await prisma.tenant.findUnique({

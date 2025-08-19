@@ -6,7 +6,7 @@ import { asyncHandler } from '@/lib/errorHandler';
 // GET /api/superadmin/tenants/[id]/users/export - Export users to CSV
 export const GET = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('👥 Exporting users for tenant:', params.id);
+    console.log('👥 Exporting users for tenant:', id);
   }
 
   // Authenticate SuperAdmin
@@ -16,7 +16,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
   }
 
   const { searchParams } = new URL(req.url);
-  const tenantId = params.id;
+  const { id: tenantId } = await params;
 
   // Extract query parameters
   const search = searchParams.get('search') || '';

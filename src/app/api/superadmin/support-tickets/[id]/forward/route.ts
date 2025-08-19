@@ -14,7 +14,7 @@ export async function POST(
 
     // Check if ticket exists
     const existingTicket = await prisma.supportTicket.findUnique({
-      where: { id: params.id },
+      where: { id: id },
     });
 
     if (!existingTicket) {
@@ -34,7 +34,7 @@ export async function POST(
 
     // Forward ticket
     const updatedTicket = await prisma.supportTicket.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         isForwarded: true,
         status: 'in_progress',

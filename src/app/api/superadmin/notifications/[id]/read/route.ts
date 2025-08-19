@@ -12,7 +12,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
     }
 
-    const notificationId = params.id;
+    const { id: notificationId } = await params;
 
     // Check if notification exists
     const notification = await prisma.notification.findUnique({

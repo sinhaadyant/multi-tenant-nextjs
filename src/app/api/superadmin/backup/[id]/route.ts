@@ -16,7 +16,7 @@ export async function GET(
     }
 
     const backup = await prisma.backup.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         createdBy: {
           select: {
@@ -70,7 +70,7 @@ export async function DELETE(
     }
 
     const backup = await prisma.backup.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!backup) {
@@ -81,7 +81,7 @@ export async function DELETE(
     // from storage (S3, local filesystem, etc.)
 
     await prisma.backup.delete({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     // Create audit log
@@ -119,7 +119,7 @@ export async function PUT(
     const { description, status } = body;
 
     const backup = await prisma.backup.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!backup) {
@@ -127,7 +127,7 @@ export async function PUT(
     }
 
     const updatedBackup = await prisma.backup.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         ...(description && { description }),
         ...(status && { status }),

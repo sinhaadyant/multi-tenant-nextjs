@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Check, X, Save, Cog, Eye, Plus, Edit, Trash2 } from 'lucide-react';
 import { Module, Permission } from '@/hooks/useRolesPermissionsAPI';
 import Button from '@/components/ui/button/Button';
 import { useToast } from '@/context/ToastContext';
+import Checkbox from '@/components/form/input/Checkbox';
 
 interface ModulePermissionTableProps {
   modules: Module[];
@@ -33,11 +34,25 @@ const ModulePermissionTable: React.FC<ModulePermissionTableProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Initialize permissions from role permissions
-  useMemo(() => {
+  // Debug logging
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 ModulePermissionTable Debug:', {
+        modulesCount: modules?.length || 0,
+        rolePermissionsCount: rolePermissions?.length || 0,
+        modules: modules?.map(m => ({ id: m.id, moduleKey: m.moduleKey, moduleName: m.moduleName })),
+        rolePermissions: rolePermissions?.map(p => ({ moduleKey: p.moduleKey, action: p.action })),
+        currentPermissions: permissions
+      });
+    }
+  }, [modules, rolePermissions, permissions]);
+
+  // Initialize permissions from role permissions - Fixed to properly map data
+  useEffect(() => {
     const initialPermissions: ModulePermissionState = {};
     
     (modules || []).forEach(module => {
+      // Find permissions for this module by matching moduleKey
       const modulePermissions = (rolePermissions || []).filter(p => p.moduleKey === module.moduleKey);
       
       initialPermissions[module.id] = {
@@ -48,28 +63,43 @@ const ModulePermissionTable: React.FC<ModulePermissionTableProps> = ({
       };
     });
     
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 Initialized permissions:', initialPermissions);
+    }
+    
     setPermissions(initialPermissions);
     setHasChanges(false);
   }, [modules, rolePermissions]);
 
   // Get all available actions for a module
   const getModuleActions = (module: Module): string[] => {
-    return module.permissions?.map(p => p.action) || [];
+    return module.permissions?.map(p => p.action) || ['view', 'create', 'edit', 'delete'];
   };
 
-  // Handle permission toggle
+  // Handle permission toggle - Fixed to properly update state
   const handlePermissionToggle = (moduleId: string, action: string) => {
-    setPermissions(prev => ({
-      ...prev,
-      [moduleId]: {
-        ...prev[moduleId],
-        [action]: !(prev[moduleId] as any)?.[action]
+    setPermissions(prev => {
+      const currentModulePerms = prev[moduleId] || { view: false, create: false, edit: false, delete: false };
+      const newModulePerms = {
+        ...currentModulePerms,
+        [action]: !currentModulePerms[action as keyof typeof currentModulePerms]
+      };
+      
+      const newPermissions = {
+        ...prev,
+        [moduleId]: newModulePerms
+      };
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 Permission toggle:', { moduleId, action, newModulePerms });
       }
-    }));
+      
+      return newPermissions;
+    });
     setHasChanges(true);
   };
 
-  // Handle select all for a module
+  // Handle select all for a module - Fixed to properly update state
   const handleSelectAllModule = (moduleId: string, checked: boolean) => {
     setPermissions(prev => ({
       ...prev,
@@ -83,7 +113,7 @@ const ModulePermissionTable: React.FC<ModulePermissionTableProps> = ({
     setHasChanges(true);
   };
 
-  // Handle select all globally
+  // Handle select all globally - Fixed to properly update state
   const handleSelectAllGlobal = (checked: boolean) => {
     const newPermissions: ModulePermissionState = {};
     (modules || []).forEach(module => {
@@ -101,13 +131,15 @@ const ModulePermissionTable: React.FC<ModulePermissionTableProps> = ({
   // Check if all permissions are selected for a module
   const isModuleAllSelected = (moduleId: string): boolean => {
     const modulePerms = permissions[moduleId];
-    return modulePerms && Object.values(modulePerms).every(Boolean);
+    if (!modulePerms) return false;
+    return Object.values(modulePerms).every(Boolean);
   };
 
   // Check if any permissions are selected for a module
   const isModuleAnySelected = (moduleId: string): boolean => {
     const modulePerms = permissions[moduleId];
-    return modulePerms && Object.values(modulePerms).some(Boolean);
+    if (!modulePerms) return false;
+    return Object.values(modulePerms).some(Boolean);
   };
 
   // Check if all modules have all permissions selected
@@ -120,7 +152,7 @@ const ModulePermissionTable: React.FC<ModulePermissionTableProps> = ({
     return (modules || []).some(module => isModuleAnySelected(module.id));
   };
 
-  // Handle save permissions
+  // Handle save permissions - Fixed to properly format data
   const handleSavePermissions = async () => {
     setIsSaving(true);
     try {
@@ -134,10 +166,16 @@ const ModulePermissionTable: React.FC<ModulePermissionTableProps> = ({
         if (modulePerms?.delete) actions.push('delete');
         
         return {
-          moduleId: module.id,
+          moduleId: module.moduleKey, // Use moduleKey instead of module.id
           actions
         };
       }).filter(p => p.actions.length > 0);
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 Saving permissions:', permissionsToSave);
+        console.log('🔍 Modules data:', modules.map(m => ({ id: m.id, moduleKey: m.moduleKey, moduleName: m.moduleName })));
+        console.log('🔍 ModuleKeys being sent:', permissionsToSave.map(p => p.moduleId));
+      }
 
       await onSavePermissions(permissionsToSave);
       setHasChanges(false);
@@ -152,7 +190,8 @@ const ModulePermissionTable: React.FC<ModulePermissionTableProps> = ({
   // Get permission count for a module
   const getPermissionCount = (moduleId: string): number => {
     const modulePerms = permissions[moduleId];
-    return modulePerms ? Object.values(modulePerms).filter(Boolean).length : 0;
+    if (!modulePerms) return 0;
+    return Object.values(modulePerms).filter(Boolean).length;
   };
 
   return (
@@ -215,17 +254,11 @@ const ModulePermissionTable: React.FC<ModulePermissionTableProps> = ({
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={isGlobalAllSelected()}
-                      ref={(input) => {
-                        if (input) {
-                          input.indeterminate = isGlobalAnySelected() && !isGlobalAllSelected();
-                        }
-                      }}
-                      onChange={(e) => handleSelectAllGlobal(e.target.checked)}
+                      onChange={handleSelectAllGlobal}
                       disabled={loading || isSaving}
-                      className="rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-700"
+                      className="w-4 h-4"
                     />
                     Module
                   </div>
@@ -272,7 +305,7 @@ const ModulePermissionTable: React.FC<ModulePermissionTableProps> = ({
                 </tr>
               ) : (
                 (modules || []).map((module) => {
-                  const modulePerms = permissions[module.id];
+                  const modulePerms = permissions[module.id] || { view: false, create: false, edit: false, delete: false };
                   const availableActions = getModuleActions(module);
                   const permissionCount = getPermissionCount(module.id);
                   
@@ -280,17 +313,11 @@ const ModulePermissionTable: React.FC<ModulePermissionTableProps> = ({
                     <tr key={module.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={isModuleAllSelected(module.id)}
-                            ref={(input) => {
-                              if (input) {
-                                input.indeterminate = isModuleAnySelected(module.id) && !isModuleAllSelected(module.id);
-                              }
-                            }}
-                            onChange={(e) => handleSelectAllModule(module.id, e.target.checked)}
+                            onChange={(checked) => handleSelectAllModule(module.id, checked)}
                             disabled={loading || isSaving}
-                            className="rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-700"
+                            className="w-4 h-4"
                           />
                           <div>
                             <div className="text-sm font-medium text-gray-900 dark:text-white">
@@ -308,46 +335,50 @@ const ModulePermissionTable: React.FC<ModulePermissionTableProps> = ({
                       
                       {/* View Permission */}
                       <td className="px-6 py-4 text-center">
-                        <input
-                          type="checkbox"
-                          checked={modulePerms?.view || false}
-                          onChange={() => handlePermissionToggle(module.id, 'view')}
-                          disabled={loading || isSaving || !availableActions.includes('view')}
-                          className="rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-700 disabled:opacity-50"
-                        />
+                        <div className="flex justify-center">
+                          <Checkbox
+                            checked={modulePerms.view || false}
+                            onChange={() => handlePermissionToggle(module.id, 'view')}
+                            disabled={loading || isSaving || !availableActions.includes('view')}
+                            className="w-4 h-4"
+                          />
+                        </div>
                       </td>
                       
                       {/* Create Permission */}
                       <td className="px-6 py-4 text-center">
-                        <input
-                          type="checkbox"
-                          checked={modulePerms?.create || false}
-                          onChange={() => handlePermissionToggle(module.id, 'create')}
-                          disabled={loading || isSaving || !availableActions.includes('create')}
-                          className="rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-700 disabled:opacity-50"
-                        />
+                        <div className="flex justify-center">
+                          <Checkbox
+                            checked={modulePerms.create || false}
+                            onChange={() => handlePermissionToggle(module.id, 'create')}
+                            disabled={loading || isSaving || !availableActions.includes('create')}
+                            className="w-4 h-4"
+                          />
+                        </div>
                       </td>
                       
                       {/* Edit Permission */}
                       <td className="px-6 py-4 text-center">
-                        <input
-                          type="checkbox"
-                          checked={modulePerms?.edit || false}
-                          onChange={() => handlePermissionToggle(module.id, 'edit')}
-                          disabled={loading || isSaving || !availableActions.includes('edit')}
-                          className="rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-700 disabled:opacity-50"
-                        />
+                        <div className="flex justify-center">
+                          <Checkbox
+                            checked={modulePerms.edit || false}
+                            onChange={() => handlePermissionToggle(module.id, 'edit')}
+                            disabled={loading || isSaving || !availableActions.includes('edit')}
+                            className="w-4 h-4"
+                          />
+                        </div>
                       </td>
                       
                       {/* Delete Permission */}
                       <td className="px-6 py-4 text-center">
-                        <input
-                          type="checkbox"
-                          checked={modulePerms?.delete || false}
-                          onChange={() => handlePermissionToggle(module.id, 'delete')}
-                          disabled={loading || isSaving || !availableActions.includes('delete')}
-                          className="rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-700 disabled:opacity-50"
-                        />
+                        <div className="flex justify-center">
+                          <Checkbox
+                            checked={modulePerms.delete || false}
+                            onChange={() => handlePermissionToggle(module.id, 'delete')}
+                            disabled={loading || isSaving || !availableActions.includes('delete')}
+                            className="w-4 h-4"
+                          />
+                        </div>
                       </td>
                       
                       {/* Module Actions */}

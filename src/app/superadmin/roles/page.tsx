@@ -295,32 +295,88 @@ const RolesPage = () => {
         </div>
       ) : (
         <ErrorBoundary>
+          {/* Debug Info */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
+                <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                  Debug Information
+                </h4>
+              </div>
+              <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                <p>Selected Tenant: {selectedTenant?.name} (ID: {selectedTenant?.id})</p>
+                <p>Roles Count: {roles?.length || 0}</p>
+                <p>Modules Count: {modules?.length || 0}</p>
+                <p>Users Count: {users?.length || 0}</p>
+                <p>Selected Role: {selectedRole?.name || 'None'}</p>
+                <p>Active Tab: {activeTab}</p>
+                {roles?.length > 0 && (
+                  <div className="mt-2">
+                    <p className="font-medium">Available Roles:</p>
+                    {roles.map(role => (
+                      <p key={role.id} className="ml-2">• {role.name} ({role.isGlobal ? 'Global' : 'Tenant'}) - Tenant ID: {role.tenantId || 'N/A'}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Roles Management Tab */}
           {activeTab === 'roles' && (
-            <RoleList
-              roles={roles}
-              loading={loading}
-              onSearch={(search) => {
-                if (selectedTenant) {
-                  fetchRoles(selectedTenant.id, { search });
-                }
-              }}
-              onFilter={(filters) => {
-                if (selectedTenant) {
-                  fetchRoles(selectedTenant.id, filters);
-                }
-              }}
-              onSort={(field, order) => {
-                if (selectedTenant) {
-                  fetchRoles(selectedTenant.id, { sortBy: field as any, sortOrder: order });
-                }
-              }}
-              onCreateRole={() => openModal('create')}
-              onEditRole={(role) => openModal('edit', role)}
-              onViewRole={(role) => handleRoleSelect(role)}
-              onDeleteRole={handleDeleteRole}
-              currentFilters={{}}
-            />
+            <div className="space-y-6">
+              {roles.length === 0 ? (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 p-12 text-center">
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                      <Shield className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                        No Roles Available
+                      </h3>
+                      <p className="text-gray-600 dark:text-gray-400 mt-1">
+                        This tenant doesn't have any roles yet. Create the first role to get started.
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => openModal('create')}
+                      variant="primary"
+                      size="sm"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create First Role
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <RoleList
+                  roles={roles}
+                  loading={loading}
+                  onSearch={(search) => {
+                    if (selectedTenant) {
+                      fetchRoles(selectedTenant.id, { search });
+                    }
+                  }}
+                  onFilter={(filters) => {
+                    if (selectedTenant) {
+                      fetchRoles(selectedTenant.id, filters);
+                    }
+                  }}
+                  onSort={(field, order) => {
+                    if (selectedTenant) {
+                      fetchRoles(selectedTenant.id, { sortBy: field as any, sortOrder: order });
+                    }
+                  }}
+                  onCreateRole={() => openModal('create')}
+                  onEditRole={(role) => openModal('edit', role)}
+                  onViewRole={(role) => handleRoleSelect(role)}
+                  onDeleteRole={handleDeleteRole}
+                  currentFilters={{}}
+                />
+              )}
+            </div>
           )}
 
           {/* Module Permissions Tab */}

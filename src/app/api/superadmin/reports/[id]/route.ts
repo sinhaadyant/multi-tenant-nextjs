@@ -8,7 +8,7 @@ import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 // GET /api/superadmin/reports/[id] - Get single report
 export const GET = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('📊 Fetching report details:', params.id);
+    console.log('📊 Fetching report details:', id);
   }
 
   // Authenticate SuperAdmin
@@ -19,7 +19,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
 
   try {
     const report = await prisma.report.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         superAdmin: {
           select: { name: true, email: true }
@@ -32,7 +32,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
 
     if (!report) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Report not found:', params.id);
+        console.log('❌ Report not found:', id);
       }
       return createErrorResponse('Report not found', 404);
     }
@@ -68,7 +68,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
 // PUT /api/superadmin/reports/[id] - Update report
 export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('📊 Updating report:', params.id);
+    console.log('📊 Updating report:', id);
   }
 
   // Authenticate SuperAdmin
@@ -82,19 +82,19 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: {
   try {
     // Check if report exists
     const existingReport = await prisma.report.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!existingReport) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Report not found:', params.id);
+        console.log('❌ Report not found:', id);
       }
       return createErrorResponse('Report not found', 404);
     }
 
     // Update report
     const report = await prisma.report.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         name: name || undefined
       },
@@ -151,7 +151,7 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: {
 // DELETE /api/superadmin/reports/[id] - Delete report
 export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('📊 Deleting report:', params.id);
+    console.log('📊 Deleting report:', id);
   }
 
   // Authenticate SuperAdmin
@@ -163,7 +163,7 @@ export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params
   try {
     // Check if report exists
     const existingReport = await prisma.report.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         superAdmin: {
           select: { name: true }
@@ -176,14 +176,14 @@ export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params
 
     if (!existingReport) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Report not found:', params.id);
+        console.log('❌ Report not found:', id);
       }
       return createErrorResponse('Report not found', 404);
     }
 
     // Delete report
     await prisma.report.delete({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     // Create audit log

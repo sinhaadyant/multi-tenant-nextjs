@@ -131,3 +131,14 @@ Tenant Management, will only visible to superadmin so remove from tenant sidebar
 update the new modules in database and seed new proper data
 and update in credentils
 create multiple types of users with different custom roles and permissions
+=====
+
+Profile
+Support
+All Tickets
+Create Ticket
+User Management
+Roles & Permissions
+Reports & Analytics
+Audit Logs
+Notifications

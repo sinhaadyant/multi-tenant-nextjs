@@ -26,10 +26,10 @@ const replySchema = z.object({
   })).optional().default([])
 });
 
-export const GET = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+export const GET = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   const { searchParams } = new URL(req.url);
   const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
-  const ticketId = params.id;
+  const { id: ticketId } = await params;
   
   if (!tenantSlug || !ticketId) {
     return createErrorResponse('Tenant slug and ticket ID are required', 400);
@@ -135,10 +135,10 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
   return createSuccessResponse({ ticket }, 'Support ticket retrieved successfully');
 });
 
-export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   const { searchParams } = new URL(req.url);
   const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
-  const ticketId = params.id;
+  const { id: ticketId } = await params;
   
   if (!tenantSlug || !ticketId) {
     return createErrorResponse('Tenant slug and ticket ID are required', 400);
@@ -273,10 +273,10 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: {
   return createSuccessResponse({ ticket: updatedTicket }, 'Support ticket updated successfully');
 });
 
-export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   const { searchParams } = new URL(req.url);
   const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
-  const ticketId = params.id;
+  const { id: ticketId } = await params;
   
   if (!tenantSlug || !ticketId) {
     return createErrorResponse('Tenant slug and ticket ID are required', 400);

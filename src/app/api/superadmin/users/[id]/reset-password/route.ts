@@ -10,7 +10,7 @@ import crypto from 'crypto';
 // POST /api/superadmin/users/[id]/reset-password - Reset user password
 export const POST = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('👥 Resetting password for user:', params.id);
+    console.log('👥 Resetting password for user:', id);
   }
 
   // Authenticate SuperAdmin
@@ -22,7 +22,7 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
   try {
     // Check if user exists
     const existingUser = await prisma.user.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         tenant: {
           select: { name: true }
@@ -32,7 +32,7 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
 
     if (!existingUser) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ User not found:', params.id);
+        console.log('❌ User not found:', id);
       }
       return createErrorResponse('User not found', 404);
     }
@@ -43,7 +43,7 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
 
     // Update user password
     const user = await prisma.user.update({
-      where: { id: params.id },
+      where: { id: id },
       data: { password: hashedPassword },
       include: {
         tenant: {

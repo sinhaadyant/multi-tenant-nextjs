@@ -29,7 +29,7 @@ const commentSchema = z.object({
 
 export const GET = asyncHandler(async (request: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('🎫 Fetching support ticket details:', params.id);
+    console.log('🎫 Fetching support ticket details:', id);
   }
 
   // Authenticate SuperAdmin
@@ -39,7 +39,7 @@ export const GET = asyncHandler(async (request: NextRequest, { params }: { param
   }
 
   const ticket = await prisma.supportTicket.findUnique({
-    where: { id: params.id },
+    where: { id: id },
     include: {
       tenant: {
         select: {
@@ -81,7 +81,7 @@ export const GET = asyncHandler(async (request: NextRequest, { params }: { param
 
 export const PUT = asyncHandler(async (request: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('🎫 Updating support ticket:', params.id);
+    console.log('🎫 Updating support ticket:', id);
   }
 
   // Authenticate SuperAdmin
@@ -92,7 +92,7 @@ export const PUT = asyncHandler(async (request: NextRequest, { params }: { param
 
   // Check if ticket exists
   const existingTicket = await prisma.supportTicket.findUnique({
-    where: { id: params.id },
+    where: { id: id },
     include: {
       tenant: {
         select: {
@@ -142,7 +142,7 @@ export const PUT = asyncHandler(async (request: NextRequest, { params }: { param
 
   // Update ticket
   const updatedTicket = await prisma.supportTicket.update({
-    where: { id: params.id },
+    where: { id: id },
     data: updateData,
     include: {
       tenant: {
@@ -181,7 +181,7 @@ export const PUT = asyncHandler(async (request: NextRequest, { params }: { param
 
 export const DELETE = asyncHandler(async (request: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('🎫 Deleting support ticket:', params.id);
+    console.log('🎫 Deleting support ticket:', id);
   }
 
   // Authenticate SuperAdmin
@@ -192,7 +192,7 @@ export const DELETE = asyncHandler(async (request: NextRequest, { params }: { pa
 
   // Check if ticket exists
   const existingTicket = await prisma.supportTicket.findUnique({
-    where: { id: params.id },
+    where: { id: id },
   });
 
   if (!existingTicket) {
@@ -201,7 +201,7 @@ export const DELETE = asyncHandler(async (request: NextRequest, { params }: { pa
 
   // Delete ticket (cascade will handle comments and attachments)
   await prisma.supportTicket.delete({
-    where: { id: params.id }
+    where: { id: id }
   });
 
   if (process.env.NODE_ENV === 'development') {
@@ -214,7 +214,7 @@ export const DELETE = asyncHandler(async (request: NextRequest, { params }: { pa
 // Add comment to ticket
 export const PATCH = asyncHandler(async (request: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('🎫 Adding comment to support ticket:', params.id);
+    console.log('🎫 Adding comment to support ticket:', id);
   }
 
   // Authenticate SuperAdmin
@@ -225,7 +225,7 @@ export const PATCH = asyncHandler(async (request: NextRequest, { params }: { par
 
   // Check if ticket exists
   const existingTicket = await prisma.supportTicket.findUnique({
-    where: { id: params.id },
+    where: { id: id },
     include: {
       tenant: {
         select: {
@@ -267,7 +267,7 @@ export const PATCH = asyncHandler(async (request: NextRequest, { params }: { par
   const comment = await prisma.supportTicketComment.create({
     data: {
       text,
-      ticketId: params.id,
+      ticketId: id,
       commentedBy: authResult.id, // SuperAdmin ID
       commenterType: 'admin',
       attachments: {
@@ -287,7 +287,7 @@ export const PATCH = asyncHandler(async (request: NextRequest, { params }: { par
 
   // Update ticket's updatedAt timestamp
   await prisma.supportTicket.update({
-    where: { id: params.id },
+    where: { id: id },
     data: { updatedAt: new Date() }
   });
 

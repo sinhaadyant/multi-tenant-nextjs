@@ -8,7 +8,7 @@ import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 // PATCH /api/superadmin/users/[id]/status - Toggle user status
 export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('👥 Toggling user status:', params.id);
+    console.log('👥 Toggling user status:', id);
   }
 
   // Authenticate SuperAdmin
@@ -26,7 +26,7 @@ export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params:
   try {
     // Check if user exists
     const existingUser = await prisma.user.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         tenant: {
           select: { name: true }
@@ -36,14 +36,14 @@ export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params:
 
     if (!existingUser) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ User not found:', params.id);
+        console.log('❌ User not found:', id);
       }
       return createErrorResponse('User not found', 404);
     }
 
     // Update user status
     const user = await prisma.user.update({
-      where: { id: params.id },
+      where: { id: id },
       data: { isActive },
       include: {
         tenant: {

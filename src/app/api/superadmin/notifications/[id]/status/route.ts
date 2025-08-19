@@ -8,7 +8,7 @@ import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 // PATCH /api/superadmin/notifications/[id]/status - Toggle notification status
 export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('📢 Toggling notification status:', params.id);
+    console.log('📢 Toggling notification status:', id);
   }
 
   // Authenticate SuperAdmin
@@ -29,7 +29,7 @@ export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params:
   try {
     // Check if notification exists
     const existingNotification = await prisma.notification.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         super_admins: {
           select: { name: true }
@@ -42,14 +42,14 @@ export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params:
 
     if (!existingNotification) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Notification not found:', params.id);
+        console.log('❌ Notification not found:', id);
       }
       return createErrorResponse('Notification not found', 404);
     }
 
     // Update notification status
     const notification = await prisma.notification.update({
-      where: { id: params.id },
+      where: { id: id },
       data: { isActive },
       include: {
         super_admins: {

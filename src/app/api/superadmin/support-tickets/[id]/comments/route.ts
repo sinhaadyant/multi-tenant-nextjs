@@ -25,7 +25,7 @@ export async function POST(
 
     // Check if ticket exists
     const existingTicket = await prisma.supportTicket.findUnique({
-      where: { id: params.id },
+      where: { id: id },
     });
 
     if (!existingTicket) {
@@ -39,7 +39,7 @@ export async function POST(
     const comment = await prisma.supportTicketComment.create({
       data: {
         text: text.trim(),
-        ticketId: params.id,
+        ticketId: id,
         commentedBy: authResult.id,
         commenterType: 'superadmin',
       },

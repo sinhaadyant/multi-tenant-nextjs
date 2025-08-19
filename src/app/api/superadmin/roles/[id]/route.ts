@@ -8,7 +8,7 @@ import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 // GET /api/superadmin/roles/[id] - Get a single role
 export const GET = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('👥 Fetching role:', params.id);
+    console.log('👥 Fetching role:', id);
   }
 
   // Authenticate SuperAdmin
@@ -19,7 +19,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
 
   try {
     const role = await prisma.role.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         _count: {
           select: { userRoles: true }
@@ -34,7 +34,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
 
     if (!role) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Role not found:', params.id);
+        console.log('❌ Role not found:', id);
       }
       return createErrorResponse('Role not found', 404);
     }
@@ -73,7 +73,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
 // PUT /api/superadmin/roles/[id] - Update a role
 export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('👥 Updating role:', params.id);
+    console.log('👥 Updating role:', id);
   }
 
   // Authenticate SuperAdmin
@@ -87,12 +87,12 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: {
   try {
     // Check if role exists
     const existingRole = await prisma.role.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!existingRole) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Role not found:', params.id);
+        console.log('❌ Role not found:', id);
       }
       return createErrorResponse('Role not found', 404);
     }
@@ -102,7 +102,7 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: {
       const nameConflict = await prisma.role.findFirst({
         where: { 
           name,
-          id: { not: params.id }
+          id: { not: id }
         }
       });
 
@@ -122,7 +122,7 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: {
     const result = await prisma.$transaction(async (tx) => {
       // Update role
       const updatedRole = await tx.role.update({
-        where: { id: params.id },
+        where: { id: id },
         data: {
           name: name || existingRole.name,
           description: description !== undefined ? description : existingRole.description,
@@ -135,13 +135,13 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: {
       if (permissions !== undefined) {
         // Remove existing permissions
         await tx.rolePermission.deleteMany({
-          where: { roleId: params.id }
+          where: { roleId: id }
         });
 
         // Add new permissions
         if (permissions && permissions.length > 0) {
           const rolePermissions = permissions.map((permissionId: string) => ({
-            roleId: params.id,
+            roleId: id,
             permissionId
           }));
 
@@ -192,7 +192,7 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: {
 // DELETE /api/superadmin/roles/[id] - Delete a role
 export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('👥 Deleting role:', params.id);
+    console.log('👥 Deleting role:', id);
   }
 
   // Authenticate SuperAdmin
@@ -204,7 +204,7 @@ export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params
   try {
     // Check if role exists and get user count
     const existingRole = await prisma.role.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         _count: {
           select: { userRoles: true }
@@ -214,7 +214,7 @@ export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params
 
     if (!existingRole) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Role not found:', params.id);
+        console.log('❌ Role not found:', id);
       }
       return createErrorResponse('Role not found', 404);
     }
@@ -222,7 +222,7 @@ export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params
     // Check if role is assigned to any users
     if (existingRole._count.userRoles > 0) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Role is assigned to users, cannot delete:', params.id);
+        console.log('❌ Role is assigned to users, cannot delete:', id);
       }
       return createErrorResponse(
         `Cannot delete role that is assigned to ${existingRole._count.userRoles} user(s). Please reassign or remove users from this role first.`,
@@ -232,7 +232,7 @@ export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params
 
     // Delete role (permissions will be cascaded due to foreign key constraints)
     await prisma.role.delete({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     // Create audit log

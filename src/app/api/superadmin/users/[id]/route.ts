@@ -9,7 +9,7 @@ import { createAuditLogFromRequest } from '@/lib/audit';
 // GET /api/superadmin/users/[id] - Get user details
 export const GET = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('👤 Fetching user details for ID:', params.id);
+    console.log('👤 Fetching user details for ID:', id);
   }
 
   // Authenticate SuperAdmin
@@ -20,7 +20,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
 
   try {
     const user = await prisma.user.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         tenant: {
           select: {
@@ -64,7 +64,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
 // PUT /api/superadmin/users/[id] - Update user
 export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('👤 Updating user ID:', params.id);
+    console.log('👤 Updating user ID:', id);
   }
 
   // Authenticate SuperAdmin
@@ -81,7 +81,7 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: {
 
     // Check if user exists
     const existingUser = await prisma.user.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!existingUser) {
@@ -90,7 +90,7 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: {
 
     // Update user
     const user = await prisma.user.update({
-      where: { id: params.id },
+      where: { id: id },
       data: validatedData,
       include: {
         tenant: {
@@ -147,7 +147,7 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: {
 // DELETE /api/superadmin/users/[id] - Delete user
 export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('👤 Deleting user ID:', params.id);
+    console.log('👤 Deleting user ID:', id);
   }
 
   // Authenticate SuperAdmin
@@ -159,7 +159,7 @@ export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params
   try {
     // Check if user exists
     const existingUser = await prisma.user.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!existingUser) {
@@ -168,7 +168,7 @@ export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params
 
     // Delete user
     await prisma.user.delete({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     // Create audit log

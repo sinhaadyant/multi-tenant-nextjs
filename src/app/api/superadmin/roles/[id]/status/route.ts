@@ -8,7 +8,7 @@ import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 // PATCH /api/superadmin/roles/[id]/status - Toggle role status
 export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('🛡️ Toggling role status:', params.id);
+    console.log('🛡️ Toggling role status:', id);
   }
 
   // Authenticate SuperAdmin
@@ -26,7 +26,7 @@ export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params:
   try {
     // Check if role exists
     const existingRole = await prisma.role.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         tenant: {
           select: { name: true }
@@ -36,14 +36,14 @@ export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params:
 
     if (!existingRole) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Role not found:', params.id);
+        console.log('❌ Role not found:', id);
       }
       return createErrorResponse('Role not found', 404);
     }
 
     // Update role status
     const role = await prisma.role.update({
-      where: { id: params.id },
+      where: { id: id },
       data: { isActive },
       include: {
         tenant: {

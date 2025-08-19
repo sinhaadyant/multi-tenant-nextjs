@@ -17,7 +17,7 @@ export async function GET(
     }
 
     const notification = await prisma.notification.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         superAdmin: {
           select: {
@@ -68,7 +68,7 @@ export async function PUT(
 
     // Check if notification exists
     const existingNotification = await prisma.notification.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!existingNotification) {
@@ -110,7 +110,7 @@ export async function PUT(
 
     // Update notification
     const notification = await prisma.notification.update({
-      where: { id: params.id },
+      where: { id: id },
       data: updateData,
       include: {
         superAdmin: {
@@ -160,7 +160,7 @@ export async function DELETE(
 
     // Check if notification exists
     const notification = await prisma.notification.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!notification) {
@@ -169,7 +169,7 @@ export async function DELETE(
 
     // Delete notification
     await prisma.notification.delete({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     // Create audit log
@@ -204,7 +204,7 @@ export async function PATCH(
 
     // Check if notification exists
     const notification = await prisma.notification.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!notification) {
@@ -213,7 +213,7 @@ export async function PATCH(
 
     // Update notification status to sent
     const updatedNotification = await prisma.notification.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         status: 'sent',
         sentAt: new Date(),
