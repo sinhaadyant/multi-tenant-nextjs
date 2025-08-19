@@ -11,72 +11,43 @@ import { useConfirmModalContext } from '@/components/common/ConfirmModalProvider
 import Button from '@/components/ui/button/Button';
 import TenantSkeleton from '@/components/superadmin/TenantSkeleton';
 
+import { CountCard } from '@/components/ui/CountCard';
+import { CheckCircle, XCircle, Building2, Users } from 'lucide-react';
+
 // Memoized stats cards component for better performance
 const StatsCards = memo(({ stats, totalUsers }: { stats: any; totalUsers: number }) => (
   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-      <div className="flex items-center">
-        <div className="p-2 bg-green-100 rounded-lg dark:bg-green-900">
-          <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </div>
-        <div className="ml-4">
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Tenants</p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {stats.active}
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-      <div className="flex items-center">
-        <div className="p-2 bg-red-100 rounded-lg dark:bg-red-900">
-          <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </div>
-        <div className="ml-4">
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Suspended Tenants</p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {stats.inactive}
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-      <div className="flex items-center">
-        <div className="p-2 bg-blue-100 rounded-lg dark:bg-blue-900">
-          <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-          </svg>
-        </div>
-        <div className="ml-4">
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Tenants</p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {stats.total}
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-      <div className="flex items-center">
-        <div className="p-2 bg-purple-100 rounded-lg dark:bg-purple-900">
-          <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-          </svg>
-        </div>
-        <div className="ml-4">
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {totalUsers}
-          </p>
-        </div>
-      </div>
-    </div>
+    <CountCard
+      title="Active Tenants"
+      value={stats.active}
+      icon={CheckCircle}
+      bgColor="bg-green-100 dark:bg-green-900"
+      iconColor="text-green-600 dark:text-green-400"
+    />
+    
+    <CountCard
+      title="Suspended Tenants"
+      value={stats.inactive}
+      icon={XCircle}
+      bgColor="bg-red-100 dark:bg-red-900"
+      iconColor="text-red-600 dark:text-red-400"
+    />
+    
+    <CountCard
+      title="Total Tenants"
+      value={stats.total}
+      icon={Building2}
+      bgColor="bg-blue-100 dark:bg-blue-900"
+      iconColor="text-blue-600 dark:text-blue-400"
+    />
+    
+    <CountCard
+      title="Total Users"
+      value={totalUsers}
+      icon={Users}
+      bgColor="bg-purple-100 dark:bg-purple-900"
+      iconColor="text-purple-600 dark:text-purple-400"
+    />
   </div>
 ));
 
@@ -265,7 +236,7 @@ const TenantsPage: React.FC = () => {
 
       {/* Stats Cards */}
       {isLoading ? (
-        <TenantSkeleton type="stats" />
+        <CountCardsGridSkeleton count={4} />
       ) : (
         <StatsCards stats={stats} totalUsers={totalUsers} />
       )}

@@ -1,76 +1,103 @@
 import React from 'react';
+import { CountCardsGridSkeleton } from '@/components/ui/CountCardSkeleton';
 
-interface TenantSkeletonProps {
-  type?: 'table' | 'card' | 'stats';
+interface SkeletonProps {
+  className?: string;
 }
 
-const TenantSkeleton: React.FC<TenantSkeletonProps> = ({ type = 'table' }) => {
-  if (type === 'stats') {
-    return (
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
-              <div className="ml-4 flex-1">
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 mb-2 animate-pulse"></div>
-                <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-16 animate-pulse"></div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
+const Skeleton: React.FC<SkeletonProps> = ({ className = '' }) => (
+  <div className={`animate-pulse bg-gray-200 dark:bg-gray-700 rounded ${className}`} />
+);
 
-  if (type === 'card') {
-    return (
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {[...Array(6)].map((_, i) => (
-          <div key={i} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 animate-pulse"></div>
-            </div>
-            <div className="space-y-2">
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full animate-pulse"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 animate-pulse"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 animate-pulse"></div>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  // Default table skeleton
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-        <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse"></div>
-      </div>
-      <div className="divide-y divide-gray-200 dark:divide-gray-700">
-        {[...Array(5)].map((_, i) => (
-          <div key={i} className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="h-10 w-10 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
-                <div className="space-y-2">
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse"></div>
-                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-24 animate-pulse"></div>
-                </div>
-              </div>
-              <div className="flex items-center space-x-4">
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 animate-pulse"></div>
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20 animate-pulse"></div>
-                <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-              </div>
-            </div>
-          </div>
-        ))}
+export const TenantTableSkeleton: React.FC = () => (
+  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+    {/* Table Header */}
+    <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-6 w-32" />
+        <div className="flex gap-2">
+          <Skeleton className="h-8 w-24" />
+          <Skeleton className="h-8 w-24" />
+        </div>
       </div>
     </div>
-  );
-};
+
+    {/* Table Body */}
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <thead className="bg-gray-50 dark:bg-gray-700">
+          <tr>
+            {[...Array(6)].map((_, index) => (
+              <th key={index} className="px-6 py-3 text-left">
+                <Skeleton className="h-4 w-20" />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+          {[...Array(5)].map((_, rowIndex) => (
+            <tr key={rowIndex}>
+              {[...Array(6)].map((_, colIndex) => (
+                <td key={colIndex} className="px-6 py-4 whitespace-nowrap">
+                  <Skeleton className="h-4 w-24" />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    {/* Pagination */}
+    <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-4 w-32" />
+        <div className="flex gap-2">
+          <Skeleton className="h-8 w-8" />
+          <Skeleton className="h-8 w-8" />
+          <Skeleton className="h-8 w-8" />
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+export const TenantFiltersSkeleton: React.FC = () => (
+  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {[...Array(4)].map((_, index) => (
+        <div key={index}>
+          <Skeleton className="h-4 w-16 mb-2" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const TenantSkeleton: React.FC = () => (
+  <div className="space-y-6">
+    {/* Header */}
+    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div>
+        <Skeleton className="h-8 w-48 mb-2" />
+        <Skeleton className="h-4 w-64" />
+      </div>
+      <div className="flex gap-3">
+        <Skeleton className="h-10 w-32" />
+        <Skeleton className="h-10 w-32" />
+      </div>
+    </div>
+
+    {/* Stats Cards */}
+    <CountCardsGridSkeleton count={4} />
+
+    {/* Filters */}
+    <TenantFiltersSkeleton />
+
+    {/* Table */}
+    <TenantTableSkeleton />
+  </div>
+);
 
 export default TenantSkeleton; 

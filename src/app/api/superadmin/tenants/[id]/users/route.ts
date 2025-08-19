@@ -1,15 +1,15 @@
 import { NextRequest } from 'next/server';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 import { prisma } from '@/lib/prisma';
-import { withSuperAdminAuth } from '@/lib/authMiddleware';
+import { withSuperAdminAuth, AuthenticatedRequest } from '@/lib/authMiddleware';
 import bcrypt from 'bcryptjs';
-import { createAuditLogFromRequest } from '@/lib/audit';
+import { createAuditLogFromRequest, createAuditLog } from '@/lib/audit';
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  return withSuperAdminAuth(async (req: NextRequest, user: any) => {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  return withSuperAdminAuth(async (req: AuthenticatedRequest, context: any) => {
     try {
       const { searchParams } = new URL(req.url);
-      const { id: tenantId } = await params;
+      const tenantId = params.id;
 
       // Extract query parameters
       const page = parseInt(searchParams.get('page') || '1');
@@ -135,10 +135,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   })(req);
 }
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  return withSuperAdminAuth(async (req: NextRequest, user: any) => {
-    try {
-      const { id: tenantId } = await params;
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  return withSuperAdminAuth(async (req: AuthenticatedRequest, context: any) => {
+          try {
+        const tenantId = params.id;
       const body = await req.json();
 
       // Validate required fields
@@ -149,7 +149,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
 
       if (!Array.isArray(roleIds) || roleIds.length === 0) {
-        return createErrorResponse('At least one role must be selected', 400);
+        return createErrorResponse('A role must be selected', 400);
+      }
+
+      if (roleIds.length > 1) {
+        return createErrorResponse('Only one role can be assigned per user', 400);
       }
 
       // Validate email format
@@ -199,72 +203,81 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 12);
 
-      // Create user with role assignments in a transaction
-      const result = await prisma.$transaction(async (tx) => {
-        // Create the user
-        const newUser = await tx.user.create({
+      // Create user first
+      const newUser = await prisma.user.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+          contactNumber: contactNumber || null,
+          isActive,
+          tenantId
+        }
+      });
+
+      // Create single role assignment
+      const roleId = roleIds[0]; // Since we only allow one role
+      
+      try {
+        await prisma.userRole.create({
           data: {
-            name,
-            email,
-            password: hashedPassword,
-            contactNumber: contactNumber || null,
-            isActive,
-            tenantId
-          },
-          include: {
-            userRoles: {
-              include: {
-                role: {
-                  select: {
-                    id: true,
-                    name: true,
-                    description: true
-                  }
+            userId: newUser.id,
+            roleId: roleId,
+            assignedBy: null // assignedBy is optional and can be null
+          }
+        });
+      } catch (roleError) {
+        console.error('Role assignment error:', roleError);
+        throw roleError;
+      }
+
+      // Fetch the user with updated role information
+      const result = await prisma.user.findUnique({
+        where: { id: newUser.id },
+        include: {
+          userRoles: {
+            include: {
+              role: {
+                select: {
+                  id: true,
+                  name: true,
+                  description: true
                 }
               }
             }
           }
-        });
-
-        // Create role assignments
-        const roleAssignments = roleIds.map(roleId => ({
-          userId: newUser.id,
-          roleId: roleId,
-          assignedBy: user.id
-        }));
-
-        await tx.userRole.createMany({
-          data: roleAssignments
-        });
-
-        // Fetch the user with updated role information
-        const userWithRoles = await tx.user.findUnique({
-          where: { id: newUser.id },
-          include: {
-            userRoles: {
-              include: {
-                role: {
-                  select: {
-                    id: true,
-                    name: true,
-                    description: true
-                  }
-                }
-              }
-            }
-          }
-        });
-
-        return userWithRoles;
+        }
       });
 
       // Create audit log
-      await createAuditLogFromRequest(req, user, 'user.create', {
-        userId: result!.id,
-        userEmail: result!.email,
-        tenantId: tenantId,
-        roles: roleIds
-      });
+      try {
+        console.log('🔍 Creating audit log for user creation...');
+        console.log('📝 User object:', req.user);
+        console.log('📝 Request headers:', Object.fromEntries(req.headers.entries()));
+        
+        // Create audit log directly since user object might not match JWTPayload interface
+        await createAuditLog({
+          action: 'user_created',
+          details: {
+            userId: result!.id,
+            userEmail: result!.email,
+            tenantId: tenantId,
+            roles: roleIds
+          },
+          ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
+          userAgent: req.headers.get('user-agent') || 'unknown',
+          superAdminId: req.user!.id,
+          tenantId: tenantId,
+          status: 'success',
+          severity: 'info'
+        });
+        
+        console.log('✅ Audit log created successfully');
+      } catch (auditError: any) {
+        console.error('❌ Audit log error (non-blocking):', auditError);
+        console.error('❌ Audit log error stack:', auditError.stack);
+        // Continue even if audit log fails
+      }
 
       // Transform user to match expected format
       const transformedUser = {
@@ -275,6 +288,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return createSuccessResponse({ user: transformedUser }, 'User created successfully');
     } catch (error: any) {
       console.error('Error creating tenant user:', error);
+      console.error('Error stack:', error.stack);
+      console.error('Error message:', error.message);
+      if (error.code) {
+        console.error('Error code:', error.code);
+      }
       return createErrorResponse('Failed to create user', 500);
     }
   })(req);

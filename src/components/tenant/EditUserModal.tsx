@@ -17,7 +17,7 @@ const editUserSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.string().email('Invalid email address'),
   contactNumber: z.string().optional(),
-  roleIds: z.array(z.string()).min(1, 'At least one role is required'),
+  roleIds: z.array(z.string()).max(1, 'Only one role can be assigned per user').min(1, 'A role is required'),
   isActive: z.boolean().default(true)
 });
 
@@ -90,11 +90,13 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
 
   const handleRoleToggle = (roleId: string) => {
     const currentRoles = watchedRoleIds || [];
-    const newRoles = currentRoles.includes(roleId)
-      ? currentRoles.filter(id => id !== roleId)
-      : [...currentRoles, roleId];
-    
-    setValue('roleIds', newRoles);
+    // If the role is already selected, deselect it
+    if (currentRoles.includes(roleId)) {
+      setValue('roleIds', []);
+    } else {
+      // Otherwise, select only this role (single selection)
+      setValue('roleIds', [roleId]);
+    }
   };
 
   if (!isOpen) return null;
@@ -224,12 +226,15 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
                     onClick={() => handleRoleToggle(role.id)}
                   >
                     <div className="flex items-center space-x-3">
-                      <input
-                        type="checkbox"
-                        checked={watchedRoleIds?.includes(role.id) || false}
-                        onChange={() => handleRoleToggle(role.id)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        watchedRoleIds?.includes(role.id)
+                          ? 'border-blue-500 bg-blue-500'
+                          : 'border-gray-300 dark:border-gray-600'
+                      }`}>
+                        {watchedRoleIds?.includes(role.id) && (
+                          <div className="w-2 h-2 bg-white rounded-full"></div>
+                        )}
+                      </div>
                       <div>
                         <h4 className="font-medium text-gray-900 dark:text-white">
                           {role.name}
@@ -246,6 +251,10 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
               </div>
             )}
 
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Select one role for the user
+            </p>
+            
             {errors.roleIds && (
               <p className="text-sm text-red-600 dark:text-red-400">
                 {errors.roleIds.message}

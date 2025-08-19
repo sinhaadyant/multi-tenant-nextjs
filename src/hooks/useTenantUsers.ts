@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { toast } from 'react-hot-toast';
+import { QUERY_KEYS, useQueryInvalidation } from '@/lib/queryUtils';
 
 // Types
 export interface TenantUser {
@@ -100,32 +101,38 @@ const updateTenantUser = async (tenantSlug: string, userId: string, data: Update
   return response.data;
 };
 
-const deleteTenantUser = async (tenantSlug: string, userId: string): Promise<{ message: string }> => {
-  const response = await api.delete(`/tenant/${tenantSlug}/users/${userId}`);
+const deleteTenantUser = async (tenantSlug: string, userId: string): Promise<void> => {
+  await api.delete(`/tenant/${tenantSlug}/users/${userId}`);
+};
+
+const bulkUserOperations = async (
+  tenantSlug: string,
+  data: { userIds: string[]; action: string; roleIds?: string[] }
+): Promise<any> => {
+  const response = await api.patch(`/tenant/${tenantSlug}/users`, data);
   return response.data;
 };
 
-const toggleUserStatus = async (tenantSlug: string, userId: string, isActive: boolean): Promise<{ user: TenantUser }> => {
-  const response = await api.patch(`/tenant/${tenantSlug}/users/${userId}/status`, { isActive });
+const toggleUserStatus = async (tenantSlug: string, userId: string, isActive: boolean): Promise<any> => {
+  const response = await api.patch(`/tenant/${tenantSlug}/users/${userId}`, { isActive });
+  return response.data;
+};
+
+const fetchTenantRoles = async (tenantSlug: string): Promise<any> => {
+  const response = await api.get(`/tenant/${tenantSlug}/roles`);
   return response.data;
 };
 
 const exportUsers = async (tenantSlug: string, filters: any): Promise<Blob> => {
-  const searchParams = new URLSearchParams();
-  Object.entries(filters).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      searchParams.append(key, value.toString());
-    }
-  });
-  searchParams.append('format', 'csv');
-
-  const response = await api.get(`/tenant/${tenantSlug}/users/export?${searchParams.toString()}`, {
+  const response = await api.get(`/tenant/${tenantSlug}/users/export`, {
+    params: filters,
     responseType: 'blob'
   });
   return response.data;
 };
 
 // React Query hooks
+// Hook for fetching tenant users
 export const useTenantUsers = (
   tenantSlug: string,
   params: {
@@ -137,122 +144,202 @@ export const useTenantUsers = (
     sortOrder?: string;
   } = {}
 ) => {
-  const queryClient = useQueryClient();
-
-  const query = useQuery({
-    queryKey: ['tenant-users', tenantSlug, params],
+  return useQuery({
+    queryKey: [...QUERY_KEYS.TENANT_USERS(tenantSlug), params],
     queryFn: () => fetchTenantUsers(tenantSlug, params),
-    enabled: !!tenantSlug,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
   });
-
-  const setPage = (page: number) => {
-    queryClient.setQueryData(['tenant-users', tenantSlug, params], (old: any) => {
-      if (!old) return old;
-      return {
-        ...old,
-        pagination: { ...old.pagination, page }
-      };
-    });
-  };
-
-  const setPageSize = (limit: number) => {
-    queryClient.setQueryData(['tenant-users', tenantSlug, params], (old: any) => {
-      if (!old) return old;
-      return {
-        ...old,
-        pagination: { ...old.pagination, limit }
-      };
-    });
-  };
-
-  return {
-    users: query.data?.users,
-    stats: query.data?.stats,
-    pagination: query.data?.pagination,
-    isLoading: query.isLoading,
-    error: query.error,
-    refetch: query.refetch,
-    setPage,
-    setPageSize
-  };
 };
 
+// Hook for fetching a single tenant user
 export const useTenantUser = (tenantSlug: string, userId: string) => {
   return useQuery({
-    queryKey: ['tenant-user', tenantSlug, userId],
+    queryKey: QUERY_KEYS.TENANT_USER(tenantSlug, userId),
     queryFn: () => fetchTenantUser(tenantSlug, userId),
-    enabled: !!tenantSlug && !!userId,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    enabled: !!userId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
   });
 };
 
-export const useCreateUser = (tenantSlug: string) => {
+// Hook for creating a tenant user
+export const useCreateTenantUser = (tenantSlug: string) => {
   const queryClient = useQueryClient();
+  const { invalidateUser } = useQueryInvalidation();
 
   return useMutation({
     mutationFn: (data: CreateUserData) => createTenantUser(tenantSlug, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tenant-users', tenantSlug] });
+    onSuccess: (data) => {
+      // Invalidate user lists and stats
+      invalidateUser(tenantSlug);
+      
+      // Optimistically update the user list
+      queryClient.setQueryData(
+        [...QUERY_KEYS.TENANT_USERS(tenantSlug)],
+        (oldData: TenantUserResponse | undefined) => {
+          if (!oldData) return oldData;
+          return {
+            ...oldData,
+            users: [data.user, ...oldData.users],
+            stats: {
+              ...oldData.stats,
+              total: oldData.stats.total + 1,
+              active: data.user.isActive ? oldData.stats.active + 1 : oldData.stats.active,
+            },
+          };
+        }
+      );
+      
       toast.success('User created successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to create user');
-    }
+      toast.error(error.message || 'Failed to create user');
+    },
   });
 };
 
-export const useUpdateUser = (tenantSlug: string) => {
+// Hook for updating a tenant user
+export const useUpdateTenantUser = (tenantSlug: string) => {
   const queryClient = useQueryClient();
+  const { invalidateUser } = useQueryInvalidation();
 
   return useMutation({
     mutationFn: ({ userId, data }: { userId: string; data: UpdateUserData }) =>
       updateTenantUser(tenantSlug, userId, data),
-    onSuccess: (_, { userId }) => {
-      queryClient.invalidateQueries({ queryKey: ['tenant-users', tenantSlug] });
-      queryClient.invalidateQueries({ queryKey: ['tenant-user', tenantSlug, userId] });
+    onSuccess: (data, variables) => {
+      // Invalidate user lists and specific user
+      invalidateUser(tenantSlug, variables.userId);
+      
+      // Optimistically update the user list
+      queryClient.setQueryData(
+        [...QUERY_KEYS.TENANT_USERS(tenantSlug)],
+        (oldData: TenantUserResponse | undefined) => {
+          if (!oldData) return oldData;
+          return {
+            ...oldData,
+            users: oldData.users.map(user =>
+              user.id === variables.userId ? data.user : user
+            ),
+          };
+        }
+      );
+      
+      // Update the specific user cache
+      queryClient.setQueryData(
+        QUERY_KEYS.TENANT_USER(tenantSlug, variables.userId),
+        { user: data.user }
+      );
+      
       toast.success('User updated successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to update user');
-    }
+      toast.error(error.message || 'Failed to update user');
+    },
   });
 };
 
-export const useDeleteUser = (tenantSlug: string) => {
+// Hook for deleting a tenant user
+export const useDeleteTenantUser = (tenantSlug: string) => {
   const queryClient = useQueryClient();
+  const { invalidateUser } = useQueryInvalidation();
 
   return useMutation({
     mutationFn: (userId: string) => deleteTenantUser(tenantSlug, userId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tenant-users', tenantSlug] });
+    onSuccess: (data, userId) => {
+      // Invalidate user lists and stats
+      invalidateUser(tenantSlug);
+      
+      // Optimistically update the user list
+      queryClient.setQueryData(
+        [...QUERY_KEYS.TENANT_USERS(tenantSlug)],
+        (oldData: TenantUserResponse | undefined) => {
+          if (!oldData) return oldData;
+          const deletedUser = oldData.users.find(user => user.id === userId);
+          return {
+            ...oldData,
+            users: oldData.users.filter(user => user.id !== userId),
+            stats: {
+              ...oldData.stats,
+              total: oldData.stats.total - 1,
+              active: deletedUser?.isActive ? oldData.stats.active - 1 : oldData.stats.active,
+            },
+          };
+        }
+      );
+      
+      // Remove the specific user cache
+      queryClient.removeQueries({
+        queryKey: QUERY_KEYS.TENANT_USER(tenantSlug, userId),
+      });
+      
       toast.success('User deleted successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to delete user');
-    }
+      toast.error(error.message || 'Failed to delete user');
+    },
   });
 };
 
+// Hook for bulk user operations
+export const useBulkUserOperations = (tenantSlug: string) => {
+  const queryClient = useQueryClient();
+  const { invalidateBulkUsers } = useQueryInvalidation();
+
+  return useMutation({
+    mutationFn: (data: { userIds: string[]; action: string; roleIds?: string[] }) =>
+      bulkUserOperations(tenantSlug, data),
+    onSuccess: (data, variables) => {
+      // Invalidate user lists and stats
+      invalidateBulkUsers(tenantSlug);
+      
+      toast.success(`Bulk ${variables.action} completed successfully`);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to perform bulk operation');
+    },
+  });
+}; 
+
+// Hook for toggling user status
 export const useToggleUserStatus = (tenantSlug: string) => {
   const queryClient = useQueryClient();
+  const { invalidateUserStatus } = useQueryInvalidation();
 
   return useMutation({
     mutationFn: ({ userId, isActive }: { userId: string; isActive: boolean }) =>
       toggleUserStatus(tenantSlug, userId, isActive),
-    onSuccess: (_, { userId }) => {
-      queryClient.invalidateQueries({ queryKey: ['tenant-users', tenantSlug] });
-      queryClient.invalidateQueries({ queryKey: ['tenant-user', tenantSlug, userId] });
+    onSuccess: (data, variables) => {
+      // Invalidate user lists and stats
+      invalidateUserStatus(tenantSlug);
+      
+      // Optimistically update the user list
+      queryClient.setQueryData(
+        [...QUERY_KEYS.TENANT_USERS(tenantSlug)],
+        (oldData: TenantUserResponse | undefined) => {
+          if (!oldData) return oldData;
+          return {
+            ...oldData,
+            users: oldData.users.map(user =>
+              user.id === variables.userId ? { ...user, isActive: variables.isActive } : user
+            ),
+            stats: {
+              ...oldData.stats,
+              active: variables.isActive ? oldData.stats.active + 1 : oldData.stats.active - 1,
+            },
+          };
+        }
+      );
+      
       toast.success('User status updated successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to update user status');
-    }
+      toast.error(error.message || 'Failed to update user status');
+    },
   });
 };
 
+// Hook for exporting users
 export const useExportUsers = (tenantSlug: string) => {
   return useMutation({
     mutationFn: (filters: any) => exportUsers(tenantSlug, filters),
@@ -268,7 +355,17 @@ export const useExportUsers = (tenantSlug: string) => {
       toast.success('Users exported successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to export users');
-    }
+      toast.error(error.message || 'Failed to export users');
+    },
+  });
+};
+
+// Hook for fetching tenant roles
+export const useTenantRoles = (tenantSlug: string) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.TENANT_ROLES(tenantSlug),
+    queryFn: () => fetchTenantRoles(tenantSlug),
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 15 * 60 * 1000, // 15 minutes
   });
 }; 

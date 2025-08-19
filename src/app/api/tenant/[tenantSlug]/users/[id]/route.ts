@@ -10,7 +10,7 @@ const updateUserSchema = z.object({
   name: z.string().min(1, 'Name is required').optional(),
   email: z.string().email('Invalid email address').optional(),
   contactNumber: z.string().optional(),
-  roleIds: z.array(z.string()).optional(),
+  roleIds: z.array(z.string()).max(1, 'Only one role can be assigned per user').optional(),
   isActive: z.boolean().optional()
 });
 
@@ -196,22 +196,23 @@ export const PUT = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
       }
     });
 
-    // Update roles if provided
+    // Update role if provided (only one role allowed)
     if (roleIds !== undefined) {
       // Remove existing role assignments
       await prisma.userRole.deleteMany({
         where: { userId: id }
       });
 
-      // Assign new roles
+      // Assign new role (only one)
       if (roleIds.length > 0) {
-        const roleAssignments = roleIds.map((roleId: string) => ({
-          userId: id,
-          roleId
-        }));
-
-        await prisma.userRole.createMany({
-          data: roleAssignments
+        const roleId = roleIds[0]; // Take only the first role
+        
+        await prisma.userRole.create({
+          data: {
+            userId: id,
+            roleId: roleId,
+            assignedBy: req.user!.id
+          }
         });
       }
     }

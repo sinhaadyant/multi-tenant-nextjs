@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-import { verifyToken } from '@/lib/auth';
+import { verifyToken } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
 import { createAuditLogFromRequest } from '@/lib/audit';
 import { z } from 'zod';
@@ -18,7 +18,15 @@ const createRoleSchema = z.object({
   isTemplate: z.boolean().default(false),
   color: z.string().regex(/^#[0-9A-F]{6}$/i, 'Color must be a valid hex color').optional().or(z.literal('')),
   priority: z.number().int().min(0).max(100).default(0),
-  permissions: z.array(z.string()).optional(),
+  permissions: z.array(z.object({
+    permissionId: z.string(),
+    canCreate: z.boolean().default(false),
+    canRead: z.boolean().default(false),
+    canUpdate: z.boolean().default(false),
+    canDelete: z.boolean().default(false),
+    canViewAll: z.boolean().default(false),
+  })).optional(),
+  isGlobal: z.boolean().optional(),
   metadata: z.record(z.any()).optional()
 });
 
@@ -82,11 +90,7 @@ export async function GET(req: NextRequest) {
           include: {
             role: {
               include: {
-                permissions: {
-                  include: {
-                    permission: true
-                  }
-                }
+                permissions: true
               }
             }
           }
@@ -101,7 +105,7 @@ export async function GET(req: NextRequest) {
     // Check if user has permission to view roles
     const hasViewPermission = user.userRoles.some(userRole =>
       userRole.role.permissions.some(rp => 
-        rp.permission.moduleKey === 'roles' && rp.permission.action === 'read'
+        rp.moduleKey === 'roles' && rp.canRead
       )
     );
 
@@ -115,163 +119,247 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('search') || '';
     const status = searchParams.get('status') || '';
     const type = searchParams.get('type') || '';
+    const roleType = searchParams.get('roleType') || 'all'; // 'global', 'tenant', 'all'
     const sortBy = searchParams.get('sortBy') || 'createdAt';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
     const includeInactive = searchParams.get('includeInactive') === 'true';
     const includeTemplates = searchParams.get('includeTemplates') === 'true';
     const includeSystem = searchParams.get('includeSystem') === 'true';
 
-    // Build where clause
-    const where: any = {
+    // Build where clause for tenant roles
+    const tenantWhere: any = {
       tenantId: tenant.id,
     };
 
     if (search) {
-      where.OR = [
+      tenantWhere.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } }
       ];
     }
 
     if (status === 'active') {
-      where.isActive = true;
+      tenantWhere.isActive = true;
     } else if (status === 'inactive') {
-      where.isActive = false;
+      tenantWhere.isActive = false;
     }
 
     if (type === 'default') {
-      where.isDefault = true;
+      tenantWhere.isDefault = true;
     } else if (type === 'template') {
-      where.isTemplate = true;
+      tenantWhere.isTemplate = true;
     } else if (type === 'custom') {
-      where.isTemplate = false;
-      where.isDefault = false;
+      tenantWhere.isTemplate = false;
+      tenantWhere.isDefault = false;
     }
 
     if (!includeInactive) {
-      where.isActive = true;
+      tenantWhere.isActive = true;
     }
 
     if (!includeTemplates) {
-      where.isTemplate = false;
+      tenantWhere.isTemplate = false;
     }
 
     if (!includeSystem) {
-      where.isSystem = false;
+      tenantWhere.isSystem = false;
+    }
+
+    // Build where clause for global roles (read-only for tenants)
+    const globalWhere: any = {
+      isGlobal: true,
+      isActive: true, // Only show active global roles
+    };
+
+    if (search) {
+      globalWhere.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } }
+      ];
     }
 
     // Calculate pagination
     const skip = (page - 1) * limit;
 
-    // Get roles with enhanced data
-    const [roles, totalRoles] = await Promise.all([
-      prisma.role.findMany({
-        where,
-        include: {
-          permissions: {
-            include: {
-              permission: {
-                include: {
-                  module: true
+    let roles: any[] = [];
+    let totalRoles = 0;
+
+    if (roleType === 'global' || roleType === 'all') {
+      // Fetch global roles (read-only for tenants)
+      const [globalRoles, globalCount] = await Promise.all([
+        prisma.role.findMany({
+          where: globalWhere,
+          include: {
+            permissions: {
+              include: {
+                module: true
+              }
+            },
+            userRoles: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    isActive: true
+                  }
                 }
               }
             }
           },
-          userRoles: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true,
-                  isActive: true
+          orderBy: {
+            [sortBy]: sortOrder as 'asc' | 'desc'
+          },
+          skip: roleType === 'global' ? skip : 0,
+          take: roleType === 'global' ? limit : 100 // Limit global roles when fetching all
+        }),
+        prisma.role.count({ where: globalWhere })
+      ]);
+
+      // Mark global roles as read-only
+      const globalRolesWithType = globalRoles.map(role => ({
+        ...role,
+        isGlobal: true,
+        isReadOnly: true,
+        canEdit: false
+      }));
+
+      if (roleType === 'global') {
+        roles = globalRolesWithType;
+        totalRoles = globalCount;
+      } else {
+        roles = globalRolesWithType;
+        totalRoles = globalCount;
+      }
+    }
+
+    if (roleType === 'tenant' || roleType === 'all') {
+      // Fetch tenant roles
+      const [tenantRoles, tenantCount] = await Promise.all([
+        prisma.role.findMany({
+          where: tenantWhere,
+          include: {
+            permissions: {
+              include: {
+                module: true
+              }
+            },
+            userRoles: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    isActive: true
+                  }
                 }
               }
             }
-          }
-        },
-        orderBy: {
-          [sortBy]: sortOrder as 'asc' | 'desc'
-        },
-        skip,
-        take: limit
-      }),
-      prisma.role.count({ where })
-    ]);
+          },
+          orderBy: {
+            [sortBy]: sortOrder as 'asc' | 'desc'
+          },
+          skip: roleType === 'tenant' ? skip : 0,
+          take: roleType === 'tenant' ? limit : 100
+        }),
+        prisma.role.count({ where: tenantWhere })
+      ]);
 
-    // Transform data for response
+      // Mark tenant roles as editable
+      const tenantRolesWithType = tenantRoles.map(role => ({
+        ...role,
+        isGlobal: false,
+        isReadOnly: false,
+        canEdit: true
+      }));
+
+      if (roleType === 'tenant') {
+        roles = tenantRolesWithType;
+        totalRoles = tenantCount;
+      } else {
+        roles = [...roles, ...tenantRolesWithType];
+        totalRoles += tenantCount;
+      }
+    }
+
+    // Transform roles to include granular permissions
     const transformedRoles = roles.map(role => ({
       id: role.id,
       name: role.name,
       description: role.description,
+      isActive: role.isActive,
+      isGlobal: role.isGlobal,
+      isReadOnly: role.isReadOnly,
+      canEdit: role.canEdit,
       isDefault: role.isDefault,
       isTemplate: role.isTemplate,
-      isSystem: role.isSystem || false,
-      isActive: role.isActive,
-      color: role.color || null,
-      priority: role.priority || 0,
-      createdAt: role.createdAt,
-      updatedAt: role.updatedAt,
+      isSystem: role.isSystem,
+      color: role.color,
+      priority: role.priority,
+      createdAt: role.createdAt.toISOString(),
+      updatedAt: role.updatedAt.toISOString(),
       userCount: role.userRoles.length,
-      permissions: role.permissions.map(rp => ({
-        id: rp.permission.id,
-        name: rp.permission.name,
-        description: rp.permission.description,
-        moduleKey: rp.permission.moduleKey,
-        moduleName: rp.permission.module.moduleName,
-        action: rp.permission.action,
-        resource: rp.permission.resource || null,
-        category: rp.permission.category || null
+      permissions: role.permissions.map((rp: any) => ({
+        moduleKey: rp.moduleKey,
+        moduleName: rp.module.moduleName,
+        canCreate: rp.canCreate,
+        canRead: rp.canRead,
+        canUpdate: rp.canUpdate,
+        canDelete: rp.canDelete,
+        canViewAll: rp.canViewAll,
       })),
-      assignedUsers: role.userRoles.map(ur => ({
+      users: role.userRoles.map((ur: any) => ({
         id: ur.user.id,
         name: ur.user.name,
         email: ur.user.email,
-        isActive: ur.user.isActive,
-        assignedAt: ur.assignedAt
+        isActive: ur.user.isActive
       }))
     }));
 
-    // Get role statistics
-    const roleStats = await prisma.role.groupBy({
-      by: ['isActive', 'isTemplate', 'isDefault'],
-      where: { tenantId: tenant.id },
-      _count: true
-    });
+    // Sort combined results if fetching all
+    if (roleType === 'all') {
+      transformedRoles.sort((a: any, b: any) => {
+        const aValue = a[sortBy];
+        const bValue = b[sortBy];
+        
+        if (sortOrder === 'asc') {
+          return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+        } else {
+          return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+        }
+      });
 
-    const stats = {
-      total: totalRoles,
-      active: roleStats.find(s => s.isActive && !s.isTemplate)?._count || 0,
-      inactive: roleStats.find(s => !s.isActive && !s.isTemplate)?._count || 0,
-      templates: roleStats.find(s => s.isTemplate)?._count || 0,
-      default: roleStats.find(s => s.isDefault)?._count || 0
-    };
+      // Apply pagination to combined results
+      const startIndex = skip;
+      const endIndex = startIndex + limit;
+      const paginatedRoles = transformedRoles.slice(startIndex, endIndex);
 
-    // Create audit log
-    await createAuditLogFromRequest(req, {
-      id: user.id,
-      email: user.email,
-      role: 'user',
-      tenantId: tenant.id
-    }, 'VIEW_ROLES', `Viewed roles for tenant ${tenant.name}`);
+      return createSuccessResponse({
+        roles: paginatedRoles,
+        pagination: {
+          page,
+          limit,
+          totalRoles,
+          totalPages: Math.ceil(totalRoles / limit),
+          hasNext: endIndex < totalRoles,
+          hasPrev: page > 1
+        }
+      }, 'Roles retrieved successfully');
+    }
 
     return createSuccessResponse({
       roles: transformedRoles,
       pagination: {
         page,
         limit,
-        total: totalRoles,
-        totalPages: Math.ceil(totalRoles / limit)
-      },
-      stats,
-      filters: {
-        search,
-        status,
-        type,
-        sortBy,
-        sortOrder
+        totalRoles,
+        totalPages: Math.ceil(totalRoles / limit),
+        hasNext: page * limit < totalRoles,
+        hasPrev: page > 1
       }
-    });
+    }, 'Roles retrieved successfully');
 
   } catch (error) {
     console.error('Error fetching roles:', error);
@@ -344,7 +432,7 @@ export async function POST(req: NextRequest) {
     // Check if user has permission to create roles
     const hasCreatePermission = user.userRoles.some(userRole =>
       userRole.role.permissions.some(rp => 
-        rp.permission.moduleKey === 'roles' && rp.permission.action === 'create'
+        rp.permission.moduleKey === 'roles' && rp.canCreate
       )
     );
 
@@ -369,6 +457,11 @@ export async function POST(req: NextRequest) {
 
     // Default: Create role
     const roleData = createRoleSchema.parse(body);
+
+    // Ensure tenants can only create tenant roles (not global roles)
+    if (roleData.isGlobal !== undefined && roleData.isGlobal) {
+      return createErrorResponse('Tenants cannot create global roles', 403);
+    }
 
     // Check if role name already exists for this tenant
     const existingRole = await prisma.role.findFirst({
@@ -402,37 +495,106 @@ export async function POST(req: NextRequest) {
       isDefault: roleData.isDefault,
       isTemplate: roleData.isTemplate,
       priority: roleData.priority,
-      tenantId: tenant.id,
+      tenantId: tenant.id, // Always set tenant ID for tenant roles
+      color: roleData.color,
+      isActive: true,
       createdBy: user.id
     };
 
-    if (roleData.color) {
-      roleDataToCreate.color = roleData.color;
-    }
-
-    const role = await prisma.role.create({
-      data: roleDataToCreate
-    });
-
-    // Assign permissions if provided
-    if (roleData.permissions && roleData.permissions.length > 0) {
-      const permissionIds = await prisma.permission.findMany({
-        where: {
-          id: { in: roleData.permissions },
-          isActive: true
-        },
-        select: { id: true }
+    // Create role and permissions in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      const role = await tx.role.create({
+        data: roleDataToCreate
       });
 
-      if (permissionIds.length > 0) {
-        await prisma.rolePermission.createMany({
-          data: permissionIds.map(p => ({
-            roleId: role.id,
-            permissionId: p.id
-          }))
+      // Assign permissions if provided
+      if (roleData.permissions && roleData.permissions.length > 0) {
+        const rolePermissions = roleData.permissions.map((permissionData: any) => ({
+          roleId: role.id,
+          permissionId: permissionData.permissionId || permissionData.id,
+          canCreate: permissionData.canCreate || false,
+          canRead: permissionData.canRead || false,
+          canUpdate: permissionData.canUpdate || false,
+          canDelete: permissionData.canDelete || false,
+          canViewAll: permissionData.canViewAll || false,
+        }));
+
+        await tx.rolePermission.createMany({
+          data: rolePermissions
         });
       }
+
+      return role;
+    });
+
+    // Fetch the created role with permissions
+    const createdRole = await prisma.role.findUnique({
+      where: { id: result.id },
+      include: {
+        permissions: {
+          include: {
+            permission: {
+              include: {
+                module: true
+              }
+            }
+          }
+        },
+        userRoles: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                isActive: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!createdRole) {
+      throw new Error('Failed to fetch created role');
     }
+
+    // Transform the data
+    const transformedRole = {
+      id: createdRole.id,
+      name: createdRole.name,
+      description: createdRole.description,
+      isActive: createdRole.isActive,
+      isGlobal: false, // Tenant roles are never global
+      isReadOnly: false,
+      canEdit: true,
+      isDefault: createdRole.isDefault,
+      isTemplate: createdRole.isTemplate,
+      isSystem: createdRole.isSystem,
+      color: createdRole.color,
+      priority: createdRole.priority,
+      createdAt: createdRole.createdAt.toISOString(),
+      updatedAt: createdRole.updatedAt.toISOString(),
+      userCount: createdRole.userRoles.length,
+      permissions: createdRole.permissions.map((rp: any) => ({
+        id: rp.permission.id,
+        name: rp.permission.name,
+        description: rp.permission.description,
+        moduleKey: rp.permission.moduleKey,
+        action: rp.permission.action,
+        canCreate: rp.canCreate,
+        canRead: rp.canRead,
+        canUpdate: rp.canUpdate,
+        canDelete: rp.canDelete,
+        canViewAll: rp.canViewAll,
+      })),
+      users: createdRole.userRoles.map((ur: any) => ({
+        id: ur.user.id,
+        name: ur.user.name,
+        email: ur.user.email,
+        isActive: ur.user.isActive
+      }))
+    };
 
     // Create audit log
     await createAuditLogFromRequest(req, {
@@ -442,29 +604,9 @@ export async function POST(req: NextRequest) {
       tenantId: tenant.id
     }, 'CREATE_ROLE', `Created role "${roleData.name}" for tenant ${tenant.name}`);
 
-    return createSuccessResponse({
-      role: {
-        id: role.id,
-        name: role.name,
-        description: role.description,
-        isDefault: role.isDefault,
-        isTemplate: role.isTemplate,
-        isSystem: role.isSystem,
-        isActive: role.isActive,
-        color: role.color,
-        priority: role.priority,
-        createdAt: role.createdAt,
-        updatedAt: role.updatedAt,
-        userCount: 0,
-        permissions: [],
-        assignedUsers: []
-      }
-    }, 'Role created successfully');
+    return createSuccessResponse({ role: transformedRole }, 'Role created successfully', 201);
 
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return createErrorResponse('Validation error', 400, error.errors);
-    }
     console.error('Error creating role:', error);
     return createErrorResponse('Failed to create role', 500);
   }

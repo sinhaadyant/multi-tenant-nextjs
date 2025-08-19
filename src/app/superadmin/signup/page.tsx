@@ -15,10 +15,7 @@ const signupSchema = z.object({
     .min(8, 'Password must be at least 8 characters')
     .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain at least one uppercase letter, one lowercase letter, and one number'),
   confirmPassword: z.string(),
-  contactNumber: z.string()
-    .min(10, 'Please enter a valid contact number (minimum 10 digits)')
-    .max(15, 'Contact number is too long (maximum 15 digits)')
-    .regex(/^\d+$/, 'Contact number must contain only numbers'),
+  contactNumber: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Password does not match",
   path: ["confirmPassword"],

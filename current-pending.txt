@@ -1,0 +1,119 @@
+Superadmin - 
+
+
+Notification - http://localhost:3000/api/superadmin/notifications/cme63jrh1008oukmoa3b3lbqm/read
+
+Getting - Failed to mark notification as read for superadmin 
+
+===
+
+Superadmin 
+Tenant Management List - 
+http://localhost:3000/api/superadmin/tenants?page=1&limit=10&sortBy=name&sortOrder=asc
+http://localhost:3000/api/superadmin/tenants?page=1&limit=10&sortBy=status&sortOrder=asc
+http://localhost:3000/api/superadmin/tenants?page=1&limit=10&sortBy=userCount&sortOrder=asc
+
+Check ALL api's and fix issues and make sure they are giving proper results 
+
+----- 
+
+Tenant Management  -  
+Add User  - /superadmin/tenants/cme63jpac0001ukmof66twwc2/users/new
+Not able to add user
+Error: Cannot read properties of undefined (reading 'includes')
+
+src/app/superadmin/tenants/[id]/users/new/page.tsx (420:38) @ eval
+
+
+  418 |                   key={role.id}
+  419 |                   className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+> 420 |                     formData.roleIds.includes(role.id)
+
+---- 
+
+Tenant Management - Users -
+All Filters test  
+
+Role List is not there 
+ 
+
+ Add User Check
+ ===
+
+ Points to check - Not able to Access pages without login
+ Login Page - if user logged in then redirect to dashboard 
+
+ ==== 
+ Create dynamic navigation menu system in superadmin (add in sidebar of superadmin):
+1. fetch menu data from /api/menu endpoint
+2. NavigationMenu component that renders hierarchical menu structure
+ 5. Support for icons (using Lucide React) and badges
+6. Expandable/collapsible submenus with smooth animations
+ 8. Loading state while menu data is being fetched
+
+ Generate Module Add / List page is there where we can drag and update menu as per that 
+ don't update superadmin sidebar for now we'll work on that later
+ just do cru operation
+ After dragging we can update it .
+ ====
+
+ Create a Superadmin module  -  (Add in superadmin menu sidebar)
+ Superadmin List count will be there 
+ We can active / deactive superadmin 
+ Invite button is there we can generate invite link 
+ Basic search option is there
+
+ No Update / Delete option will be there
+ 
+ 
+ ======
+ Finishing - 
+
+ Superadmin - 
+
+Non auth Element - Login, Forgot, Invite, - test after login / before login pages
+
+Improvelemts - 
+    Social Login 
+
+==
+Dashboard - Counts / Notification / Refreshing - Updated Data - Charts / ALL 
+Tenant management - 
+    CRUD 
+    Detail Page
+    User List- CRUD 
+    Audit Logs 
+    Settings 
+    
+
+User List - List , Search, Sort, Export 
+
+Roles -  Global Roles - LIst CRU Disable 
+        Tenant Roles- 
+        Role & Permission Module
+    
+
+Backup - Download, List
+
+Support
+ - Create Support with Attachments 
+  - List Page - Update Status 
+  - Detail Pages - with all reply Details  - Update Status 
+  - Reply Option with Attachment 
+
+Modules -   List- DND 
+            Update 
+            Active / Inative
+
+Notification -
+ Create a notification with all possibilities - To all superadmin, To all tenants, to multiple tenants, to multiple user 
+ Selection for all items can be there 
+ with multiple selection and mail id list which are selected in realtime 
+ 
+ draft / send option will be proper 
+ push notification with bell 
+ read Notification
+ View all notification page for every user 
+
+Superadmin - 
+    List - Active Deactive , Invite

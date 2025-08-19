@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireSuperAdmin } from '@/middleware/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import { createAuditLogFromRequest } from '@/lib/audit';
 import { asyncHandler } from '@/lib/errorHandler';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
@@ -14,8 +14,11 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
 
   // Authenticate SuperAdmin
   const authResult = await requireSuperAdmin(req);
-  if (authResult instanceof NextResponse) {
-    return authResult;
+  if (!authResult.success) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('❌ Authentication failed for tenant details API:', authResult.error);
+    }
+    return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
   }
 
   try {
@@ -87,8 +90,11 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: P
 
   // Authenticate SuperAdmin
   const authResult = await requireSuperAdmin(req);
-  if (authResult instanceof NextResponse) {
-    return authResult;
+  if (!authResult.success) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('❌ Authentication failed for tenant update API:', authResult.error);
+    }
+    return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
   }
 
   const updateData = await req.json();
@@ -148,7 +154,7 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: P
     // Create audit log
     await createAuditLogFromRequest(
       req,
-      authResult,
+      authResult.user,
       'tenant.updated',
       {
         tenantId: id,

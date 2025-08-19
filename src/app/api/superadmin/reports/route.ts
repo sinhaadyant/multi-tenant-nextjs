@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { asyncHandler } from '@/lib/errorHandler';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-import { withSuperAdminAuth, AuthenticatedRequest } from '@/lib/authMiddleware';
-import { requireSuperAdmin } from '@/middleware/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import { z } from 'zod';
 
 // Validation schemas
@@ -36,11 +35,11 @@ export const GET = asyncHandler(async (req: NextRequest) => {
 
   // Authenticate SuperAdmin
   const authResult = await requireSuperAdmin(req);
-  if (authResult instanceof NextResponse) {
-    return authResult;
+  if (!authResult.success) {
+    return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
   }
 
-  const superAdmin = authResult as any;
+  const superAdmin = authResult.user;
   const { searchParams } = new URL(req.url);
 
   // Validate query parameters
@@ -66,9 +65,9 @@ export const GET = asyncHandler(async (req: NextRequest) => {
 
   if (search) {
     where.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { type: { contains: search, mode: 'insensitive' } },
-      { superAdmin: { name: { contains: search, mode: 'insensitive' } } }
+      { name: { contains: search } },
+      { type: { contains: search } },
+      { superAdmin: { name: { contains: search } } }
     ];
   }
 
@@ -153,11 +152,11 @@ export const POST = asyncHandler(async (req: NextRequest) => {
 
   // Authenticate SuperAdmin
   const authResult = await requireSuperAdmin(req);
-  if (authResult instanceof NextResponse) {
-    return authResult;
+  if (!authResult.success) {
+    return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
   }
 
-  const superAdmin = authResult as any;
+  const superAdmin = authResult.user;
   const body = await req.json();
 
   // Validate request body

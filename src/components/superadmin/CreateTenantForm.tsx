@@ -70,6 +70,7 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
   const [emailChecking, setEmailChecking] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [subdomainSuggestions, setSubdomainSuggestions] = useState<string[]>([]);
 
   // Memoize form default values to prevent re-creation
   const defaultValues = useMemo(() => ({
@@ -116,8 +117,10 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
     }
   }, [formError]);
 
+  // Clear form error when user starts typing in relevant fields
   useEffect(() => {
     clearFormError();
+    setSubdomainSuggestions([]); // Clear suggestions when user types
   }, [watchedSubdomain, watchedEmail, clearFormError]);
 
   // Clear email validation state when email changes
@@ -125,6 +128,21 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
     setEmailError(null);
     clearErrors('adminEmail');
   }, [watchedEmail, clearErrors]);
+
+  // Generate alternative subdomain suggestions
+  const generateSubdomainSuggestions = useCallback((baseSubdomain: string) => {
+    const suggestions = [];
+    const timestamp = Date.now().toString().slice(-4); // Last 4 digits of timestamp
+    const randomSuffix = Math.random().toString(36).substring(2, 6); // Random 4-char string
+    
+    suggestions.push(`${baseSubdomain}-${timestamp}`);
+    suggestions.push(`${baseSubdomain}-${randomSuffix}`);
+    suggestions.push(`${baseSubdomain}-2024`);
+    suggestions.push(`${baseSubdomain}-dev`);
+    suggestions.push(`${baseSubdomain}-new`);
+    
+    return suggestions;
+  }, []);
 
   // Check subdomain availability - memoized callback
   const checkSubdomain = useCallback(async () => {
@@ -235,6 +253,7 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
 
   const handleMutationSuccess = useCallback((data: any) => {
     setFormError(null); // Clear any previous form errors
+    setSubdomainSuggestions([]); // Clear suggestions
     toast.success('Tenant and Admin User created successfully!');
     onSuccess(data);
   }, [onSuccess]);
@@ -248,11 +267,32 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
     
     // Show user-friendly error message in form
     let errorMessage = 'Failed to create tenant. Please try again.';
+    let fieldError = null;
     
     if (error.response?.data?.message) {
       errorMessage = error.response.data.message;
+      
+      // Check for specific conflict types and set field-specific errors
+      if (error.response.status === 409) {
+        if (errorMessage.toLowerCase().includes('subdomain') || errorMessage.toLowerCase().includes('slug')) {
+          errorMessage = 'This subdomain is already taken. Please choose a different one.';
+          fieldError = { field: 'subdomain', message: 'This subdomain is already taken' };
+          // Generate alternative suggestions
+          const suggestions = generateSubdomainSuggestions(watchedSubdomain || '');
+          setSubdomainSuggestions(suggestions);
+        } else if (errorMessage.toLowerCase().includes('email')) {
+          errorMessage = 'This admin email is already registered. Please use a different email address.';
+          fieldError = { field: 'adminEmail', message: 'This email is already registered' };
+          setSubdomainSuggestions([]); // Clear suggestions for email conflicts
+        } else {
+          errorMessage = 'A conflict occurred. Please check your input and try again.';
+          setSubdomainSuggestions([]);
+        }
+      } else {
+        setSubdomainSuggestions([]); // Clear suggestions for other errors
+      }
     } else if (error.response?.status === 409) {
-      errorMessage = 'A tenant with this subdomain already exists.';
+      errorMessage = 'A conflict occurred. Please check your input and try again.';
     } else if (error.response?.status === 400) {
       errorMessage = 'Please check your input and try again.';
     } else if (error.response?.status >= 500) {
@@ -260,7 +300,12 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
     }
     
     setFormError(errorMessage);
-  }, []);
+    
+    // Set field-specific error if available
+    if (fieldError) {
+      setError(fieldError.field as any, { message: fieldError.message });
+    }
+  }, [setError, generateSubdomainSuggestions, watchedSubdomain]);
 
   const createTenantMutation = useMutation({
     mutationFn,
@@ -376,9 +421,47 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
         {/* Form Error Display */}
         {formError && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-            <div className="flex items-center">
-              <X className="w-5 h-5 text-red-500 mr-2" />
-              <p className="text-sm text-red-700 dark:text-red-300" data-testid="validation-error">{formError}</p>
+            <div className="flex items-start">
+              <X className="w-5 h-5 text-red-500 mr-2 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-red-700 dark:text-red-300" data-testid="validation-error">
+                  {formError}
+                </p>
+                {formError.includes('subdomain') && (
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                    💡 Try adding numbers or using a different name (e.g., "mycompany-2024", "mycompany-dev")
+                  </p>
+                )}
+                {formError.includes('email') && (
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                    💡 Try using a different email address or contact the existing user to transfer ownership
+                  </p>
+                )}
+                {subdomainSuggestions.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-red-600 dark:text-red-400 mb-1">
+                      💡 Suggested alternatives:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {subdomainSuggestions.map((suggestion, index) => (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={() => {
+                            setValue('subdomain', suggestion);
+                            setSubdomainSuggestions([]);
+                            setFormError(null);
+                            clearErrors('subdomain');
+                          }}
+                          className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded border border-blue-200 dark:border-blue-800 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -734,7 +817,7 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
             {/* Mobile Number */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Mobile Number <span className="text-red-500">*</span>
+                Mobile Number
               </label>
               <Controller
                 name="adminMobile"
@@ -747,8 +830,7 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
                       errors.adminMobile ? 'border-red-500' : 'border-gray-300'
                     }`}
-                    placeholder="Enter 10-digit mobile number"
-                    maxLength={10}
+                    placeholder="Enter mobile number (optional)"
                   />
                 )}
               />

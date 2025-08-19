@@ -24,6 +24,8 @@ model SuperAdmin {
   passwordResetTokens PasswordResetToken[]
   refreshTokens       RefreshToken[]
   reports             Report[]
+  createdMenuItems    MenuItem[]        @relation("MenuItemCreatedBy")
+  updatedMenuItems    MenuItem[]        @relation("MenuItemUpdatedBy")
 
   @@map("super_admins")
 }
@@ -85,6 +87,7 @@ model Role {
   isDefault   Boolean          @default(false)
   isTemplate  Boolean          @default(false)
   tenantId    String?
+  isGlobal    Boolean          @default(false)
   color       String?
   createdBy   String?
   isSystem    Boolean          @default(false)
@@ -93,8 +96,9 @@ model Role {
   tenant      Tenant?          @relation(fields: [tenantId], references: [id])
   userRoles   UserRole[]
 
-  @@unique([name, tenantId])
+  @@unique([name, isGlobal])
   @@index([tenantId], map: "roles_tenantId_fkey")
+  @@index([isGlobal], map: "roles_isGlobal_fkey")
   @@index([isActive])
   @@index([isTemplate])
   @@map("roles")
@@ -119,7 +123,7 @@ model Module {
   version         String?
   parentModule    Module?        @relation("ModuleHierarchy", fields: [parentModuleKey], references: [moduleKey])
   childModules    Module[]       @relation("ModuleHierarchy")
-  permissions     Permission[]
+  rolePermissions RolePermission[]
   tenantModules   TenantModule[]
 
   @@index([parentModuleKey], map: "modules_parentModuleKey_fkey")
@@ -152,37 +156,22 @@ model TenantModule {
   @@map("tenant_modules")
 }
 
-model Permission {
-  id              String           @id @default(cuid())
-  name            String           @unique
-  description     String?
-  action          String
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  isActive        Boolean          @default(true)
-  submodule       String?
-  moduleKey       String
-  category        String?
-  isSystem        Boolean          @default(false)
-  resource        String?
-  module          Module           @relation(fields: [moduleKey], references: [moduleKey])
-  rolePermissions RolePermission[]
 
-  @@unique([moduleKey, action, resource])
-  @@index([action])
-  @@index([isActive])
-  @@map("permissions")
-}
 
 model RolePermission {
   id           String     @id @default(cuid())
   roleId       String
-  permissionId String
-  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  moduleKey    String
+  canCreate    Boolean    @default(false)
+  canRead      Boolean    @default(false)
+  canUpdate    Boolean    @default(false)
+  canDelete    Boolean    @default(false)
+  canViewAll   Boolean    @default(false)
+  module       Module     @relation(fields: [moduleKey], references: [moduleKey], onDelete: Cascade)
   role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
-  @@unique([roleId, permissionId])
-  @@index([permissionId], map: "role_permissions_permissionId_fkey")
+  @@unique([roleId, moduleKey])
+  @@index([moduleKey], map: "role_permissions_moduleKey_fkey")
   @@map("role_permissions")
 }
 
@@ -467,4 +456,33 @@ model Backup {
   @@index([status])
   @@index([createdAt])
   @@map("backups")
+}
+
+model MenuItem {
+  id          String      @id @default(cuid())
+  label       String
+  path        String?
+  icon        String?
+  order       Int         @default(0)
+  isActive    Boolean     @default(true)
+  parentId    String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  createdBy   String?
+  updatedBy   String?
+  
+  // Self-referencing relationship for hierarchical menu
+  parent      MenuItem?   @relation("MenuItemHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children    MenuItem[]  @relation("MenuItemHierarchy")
+  
+  // SuperAdmin relationships
+  createdBySuperAdmin SuperAdmin? @relation("MenuItemCreatedBy", fields: [createdBy], references: [id])
+  updatedBySuperAdmin SuperAdmin? @relation("MenuItemUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@index([parentId], map: "menu_items_parentId_fkey")
+  @@index([order])
+  @@index([isActive])
+  @@index([createdBy], map: "menu_items_createdBy_fkey")
+  @@index([updatedBy], map: "menu_items_updatedBy_fkey")
+  @@map("menu_items")
 }

@@ -32,8 +32,7 @@ export const createTenantSchema = z.object({
     .min(1, 'Full name is required'),
   adminEmail: z.string()
     .email('Please enter a valid email address'),
-  adminMobile: z.string()
-    .regex(/^\d{10}$/, 'Mobile number must be exactly 10 digits'),
+  adminMobile: z.string().optional(),
   adminPassword: z.string()
     .min(8, 'Password must be at least 8 characters')
     .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')

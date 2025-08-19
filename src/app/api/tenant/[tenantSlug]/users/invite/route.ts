@@ -10,7 +10,7 @@ import { randomBytes } from 'crypto';
 const inviteUserSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.string().email('Invalid email address'),
-  roleIds: z.array(z.string()).optional(),
+  roleIds: z.array(z.string()).max(1, 'Only one role can be assigned per user').optional(),
   expiresIn: z.number().optional().default(7 * 24 * 60 * 60 * 1000) // 7 days in milliseconds
 });
 

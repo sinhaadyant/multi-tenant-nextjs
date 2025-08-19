@@ -381,34 +381,34 @@ export default function NotificationsPage() {
                         <div className="flex-1 min-w-0 max-w-xs">
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[200px]">
-                              {notification.title.length > 20 ? notification.title.slice(0, 20) + '...' : notification.title || 'No title'}
+                              {notification.title ? (notification.title.length > 20 ? notification.title.slice(0, 20) + '...' : notification.title) : 'No title'}
                             </p>
                             {!notification.isRead && (
                               <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
                             )}
                           </div>
                           <p className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
-                            {notification.message.length > 20 ? notification.message.slice(0, 20) + '...' : notification.message || 'No message'}
+                            {notification.message ? (notification.message.length > 20 ? notification.message.slice(0, 20) + '...' : notification.message) : 'No message'}
                           </p>
                         </div>
                       </div>
                     </td>
                     <td className="px-3 sm:px-6 py-4">
                       <div className="flex items-center space-x-2">
-                        <NotificationTypeIcon type={notification.type} />
+                        <NotificationTypeIcon type={notification.type || 'info'} />
                         <span className="text-sm text-gray-900 dark:text-white">
-                          {notification.type.charAt(0).toUpperCase() + notification.type.slice(1)}
+                          {notification.type ? notification.type.charAt(0).toUpperCase() + notification.type.slice(1) : 'Unknown'}
                         </span>
                       </div>
                     </td>
                     <td className="px-3 sm:px-6 py-4">
-                      <PriorityBadge priority={notification.priority} />
+                      <PriorityBadge priority={notification.priority || 'low'} />
                     </td>
                     <td className="px-3 sm:px-6 py-4">
-                      <StatusBadge status={notification.status} />
+                      <StatusBadge status={notification.status || 'draft'} />
                     </td>
                     <td className="px-3 sm:px-6 py-4">
-                      <TargetTypeBadge targetType={notification.targetType} />
+                      <TargetTypeBadge targetType={notification.targetType || 'superadmin'} />
                     </td>
                     <td className="px-3 sm:px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                       {formatDate(notification.createdAt)}

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireSuperAdmin } from '@/middleware/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import { asyncHandler } from '@/lib/errorHandler';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 import { createUserSchema, updateUserSchema } from '@/lib/validations/superadmin';
 import bcrypt from 'bcryptjs';
 import { createAuditLogFromRequest } from '@/lib/audit';
+import { JWTPayload } from '@/lib/jwt';
 
 // GET /api/superadmin/users - Get all users with filters and pagination
 export const GET = asyncHandler(async (req: NextRequest) => {
@@ -15,8 +16,8 @@ export const GET = asyncHandler(async (req: NextRequest) => {
 
   // Authenticate SuperAdmin
   const authResult = await requireSuperAdmin(req);
-  if (authResult instanceof NextResponse) {
-    return authResult;
+  if (!authResult.success) {
+    return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
   }
 
   const { searchParams } = new URL(req.url);
@@ -37,10 +38,8 @@ export const GET = asyncHandler(async (req: NextRequest) => {
   // Search filter
   if (search) {
     where.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { email: { contains: search, mode: 'insensitive' } },
-      { tenant: { name: { contains: search, mode: 'insensitive' } } },
-      { userRoles: { role: { name: { contains: search, mode: 'insensitive' } } } }
+      { name: { contains: search } },
+      { email: { contains: search } }
     ];
   }
 
@@ -230,8 +229,8 @@ export const POST = asyncHandler(async (req: NextRequest) => {
     // Create audit log
     await createAuditLogFromRequest(
       req,
-      authResult,
-      'user.create',
+      authResult as JWTPayload,
+      'user_created',
       {
         userId: user.id,
         userEmail: user.email,

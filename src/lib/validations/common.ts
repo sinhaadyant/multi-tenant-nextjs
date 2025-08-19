@@ -168,7 +168,7 @@ export const signupSchema = z.object({
   email: baseSchemas.email,
   password: baseSchemas.password,
   confirmPassword: z.string().min(1, 'Please confirm your password'),
-  contactNumber: baseSchemas.phone,
+  contactNumber: baseSchemas.phone.optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],

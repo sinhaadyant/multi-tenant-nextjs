@@ -55,6 +55,10 @@ export const useBackupData = () => {
       return response.data;
     },
     onSuccess: (data) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 useBackupData: Backup created successfully, invalidating cache...');
+      }
+      
       // Create download link for the backup file
       const blob = new Blob([data], { type: 'application/sql' });
       const url = window.URL.createObjectURL(blob);
@@ -69,6 +73,10 @@ export const useBackupData = () => {
       toast.success('Backup created and downloaded successfully');
       // Invalidate backup history cache
       queryClient.invalidateQueries({ queryKey: ['backupHistory'] });
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 useBackupData: Cache invalidation completed');
+      }
     },
     onError: (error: any) => {
       const errorMessage = error.response?.data?.message || 'Failed to create backup';
@@ -83,7 +91,15 @@ export const useBackupHistory = () => {
     queryKey: ['backupHistory'],
     queryFn: async (): Promise<BackupHistoryResponse> => {
       try {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 useBackupHistory: Making API call...');
+        }
+        
         const response = await api.get('/superadmin/backup/history');
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 useBackupHistory: API Response:', response.data);
+        }
         
         // Check if response and response.data exist
         if (!response || !response.data) {
@@ -96,7 +112,13 @@ export const useBackupHistory = () => {
         }
         
         // Return the data property from the success response
-        return response.data;
+        const result = response.data.data || response.data;
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 useBackupHistory: Returning data:', result);
+        }
+        
+        return result;
       } catch (error: any) {
         // Handle axios errors
         if (error.response) {

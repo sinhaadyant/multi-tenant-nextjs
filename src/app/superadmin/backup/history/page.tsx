@@ -11,6 +11,16 @@ export default function BackupHistoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
+  // Debug logging
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔍 BackupHistoryPage Debug:', {
+      backupHistory,
+      isLoading,
+      error,
+      backupsCount: backupHistory?.backups?.length || 0
+    });
+  }
+
   const backups = backupHistory?.backups || [];
 
   const formatFileSize = (bytes: number) => {

@@ -12,7 +12,7 @@ const createUserSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   contactNumber: z.string().optional(),
-  roleIds: z.array(z.string()).optional(),
+  roleIds: z.array(z.string()).max(1, 'Only one role can be assigned per user').optional(),
   sendInvitation: z.boolean().optional().default(false)
 });
 
@@ -20,14 +20,14 @@ const updateUserSchema = z.object({
   name: z.string().min(1, 'Name is required').optional(),
   email: z.string().email('Invalid email address').optional(),
   contactNumber: z.string().optional(),
-  roleIds: z.array(z.string()).optional(),
+  roleIds: z.array(z.string()).max(1, 'Only one role can be assigned per user').optional(),
   isActive: z.boolean().optional()
 });
 
 const bulkActionSchema = z.object({
   userIds: z.array(z.string()),
   action: z.enum(['activate', 'deactivate', 'delete', 'assignRoles']),
-  roleIds: z.array(z.string()).optional()
+  roleIds: z.array(z.string()).max(1, 'Only one role can be assigned per user').optional()
 });
 
 // GET /api/tenant/[tenantSlug]/users - Get users list with filters and pagination
@@ -231,15 +231,16 @@ export const POST = withTenantAuth(async (req: AuthenticatedRequest, { params }:
       }
     });
 
-    // Assign roles if provided
+    // Assign role if provided (only one role allowed)
     if (roleIds && roleIds.length > 0) {
-      const roleAssignments = roleIds.map((roleId: string) => ({
-        userId: user.id,
-        roleId
-      }));
-
-      await prisma.userRole.createMany({
-        data: roleAssignments
+      const roleId = roleIds[0]; // Take only the first role
+      
+      await prisma.userRole.create({
+        data: {
+          userId: user.id,
+          roleId: roleId,
+          assignedBy: req.user!.id
+        }
       });
     }
 
@@ -249,7 +250,7 @@ export const POST = withTenantAuth(async (req: AuthenticatedRequest, { params }:
       email: req.user!.email,
       role: req.user!.role as 'user' | 'superadmin',
       tenantId: req.user!.tenantId
-    }, 'users.create', {
+    }, 'user_created', {
       userId: user.id,
       email: user.email
     });
@@ -352,18 +353,26 @@ export const PATCH = withTenantAuth(async (req: AuthenticatedRequest, { params }
 
       case 'assignRoles':
         if (!roleIds || roleIds.length === 0) {
-          return createErrorResponse('Role IDs are required for role assignment', 400);
+          return createErrorResponse('Role ID is required for role assignment', 400);
         }
+
+        if (roleIds.length > 1) {
+          return createErrorResponse('Only one role can be assigned per user', 400);
+        }
+
+        const roleId = roleIds[0]; // Take only the first role
 
         // Remove existing role assignments
         await prisma.userRole.deleteMany({
           where: { userId: { in: userIds } }
         });
 
-        // Assign new roles
-        const roleAssignments = userIds.flatMap(userId =>
-          roleIds.map(roleId => ({ userId, roleId }))
-        );
+        // Assign new role to all users
+        const roleAssignments = userIds.map(userId => ({
+          userId,
+          roleId: roleId,
+          assignedBy: req.user!.id
+        }));
 
         await prisma.userRole.createMany({
           data: roleAssignments

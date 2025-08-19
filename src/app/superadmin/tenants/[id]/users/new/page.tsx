@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
+import { useDataConsistency } from '@/lib/dataConsistency';
 import { ArrowLeft, Save, UserPlus, Eye, EyeOff, Check } from 'lucide-react';
 import { useTenant } from '@/hooks/useTenantsAPI';
 import { useToast } from '@/hooks/useToast';
@@ -15,7 +17,7 @@ interface CreateUserFormData {
   password: string;
   confirmPassword: string;
   contactNumber?: string;
-  roleId: string;
+  roleIds: string[];
   isActive: boolean;
 }
 
@@ -29,6 +31,8 @@ interface Role {
 export default function CreateUserPage() {
   const params = useParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { invalidateUserData, invalidateTenantData } = useDataConsistency();
   const { toast } = useToast();
   const { confirm } = useConfirmModalContext();
   const tenantId = params.id as string;
@@ -40,9 +44,13 @@ export default function CreateUserPage() {
     password: '',
     confirmPassword: '',
     contactNumber: '',
-    roleId: '',
+    roleIds: [],
     isActive: true
   });
+
+  // Validation state
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   // UI state
   const [showPassword, setShowPassword] = useState(false);
@@ -81,34 +89,41 @@ export default function CreateUserPage() {
   }, [tenantId]);
 
   // Form validation
-  const validateForm = (): { isValid: boolean; errors: string[] } => {
-    const errors: string[] = [];
+  const validateForm = (): { isValid: boolean; fieldErrors: Record<string, string> } => {
+    const fieldErrors: Record<string, string> = {};
 
+    // Name validation
     if (!formData.name.trim()) {
-      errors.push('Name is required');
+      fieldErrors.name = 'Name is required';
     }
 
+    // Email validation
     if (!formData.email.trim()) {
-      errors.push('Email is required');
+      fieldErrors.email = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      errors.push('Please enter a valid email address');
+      fieldErrors.email = 'Please enter a valid email address';
     }
 
+    // Password validation
     if (!formData.password) {
-      errors.push('Password is required');
+      fieldErrors.password = 'Password is required';
     } else if (formData.password.length < 8) {
-      errors.push('Password must be at least 8 characters long');
+      fieldErrors.password = 'Password must be at least 8 characters long';
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      errors.push('Passwords do not match');
+    // Confirm password validation
+    if (formData.password && formData.password !== formData.confirmPassword) {
+      fieldErrors.confirmPassword = 'Passwords do not match';
     }
 
-    if (!formData.roleId) {
-      errors.push('A role must be selected');
+    // Role validation
+    if (!formData.roleIds || formData.roleIds.length === 0) {
+      fieldErrors.roleIds = 'A role must be selected';
+    } else if (formData.roleIds.length > 1) {
+      fieldErrors.roleIds = 'Only one role can be selected';
     }
 
-    return { isValid: errors.length === 0, errors };
+    return { isValid: Object.keys(fieldErrors).length === 0, fieldErrors };
   };
 
   // Handle form submission
@@ -121,7 +136,14 @@ export default function CreateUserPage() {
   const submitForm = async () => {
     const validation = validateForm();
     if (!validation.isValid) {
-      validation.errors.forEach(error => toast.error(error));
+      setErrors(validation.fieldErrors);
+      // Mark all fields as touched to show errors
+      const allTouched = Object.keys(validation.fieldErrors).reduce((acc, key) => {
+        acc[key] = true;
+        return acc;
+      }, {} as Record<string, boolean>);
+      setTouched(allTouched);
+      toast.error('Please fill in all required details');
       return;
     }
 
@@ -139,7 +161,7 @@ export default function CreateUserPage() {
           email: formData.email,
           password: formData.password,
           contactNumber: formData.contactNumber || undefined,
-          roleIds: [formData.roleId],
+          roleIds: formData.roleIds,
           isActive: formData.isActive
         }),
       });
@@ -150,6 +172,15 @@ export default function CreateUserPage() {
       }
 
       toast.success('User created successfully!');
+      
+      // Invalidate all relevant queries to ensure data consistency
+      try {
+        invalidateUserData(tenantId);
+        invalidateTenantData(tenantId);
+      } catch (e) {
+        console.warn('Query invalidation failed:', e);
+      }
+      
       router.push(`/superadmin/tenants/${tenantId}`);
     } catch (error: any) {
       console.error('Error creating user:', error);
@@ -162,14 +193,45 @@ export default function CreateUserPage() {
   // Handle form field changes
   const handleInputChange = (field: keyof CreateUserFormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+    
+    // Mark field as touched
+    if (!touched[field]) {
+      setTouched(prev => ({ ...prev, [field]: true }));
+    }
   };
 
-  // Handle role selection
-  const handleRoleSelect = (roleId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      roleId: roleId
-    }));
+  // Handle role selection (single selection only)
+  const handleRoleToggle = (roleId: string) => {
+    setFormData(prev => {
+      const currentRoles = prev.roleIds || [];
+      // If the role is already selected, deselect it
+      if (currentRoles.includes(roleId)) {
+        return {
+          ...prev,
+          roleIds: []
+        };
+      }
+      // Otherwise, select only this role (single selection)
+      return {
+        ...prev,
+        roleIds: [roleId]
+      };
+    });
+    
+    // Clear error when user selects a role
+    if (errors.roleIds) {
+      setErrors(prev => ({ ...prev, roleIds: '' }));
+    }
+    
+    // Mark field as touched
+    if (!touched.roleIds) {
+      setTouched(prev => ({ ...prev, roleIds: true }));
+    }
   };
 
   // Handle back navigation
@@ -196,7 +258,7 @@ export default function CreateUserPage() {
           </button>
           <div className="h-8 bg-gray-200 dark:bg-gray-600 rounded animate-pulse w-48"></div>
         </div>
-        <TenantSkeleton type="card" />
+        <TenantSkeleton />
       </div>
     );
   }
@@ -289,10 +351,18 @@ export default function CreateUserPage() {
                   id="name"
                   value={formData.name}
                   onChange={(e) => handleInputChange('name', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  onBlur={() => setTouched(prev => ({ ...prev, name: true }))}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:border-transparent dark:bg-gray-700 dark:text-white ${
+                    touched.name && errors.name
+                      ? 'border-red-500 focus:ring-red-500'
+                      : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
+                  }`}
                   placeholder="Enter full name"
                   required
                 />
+                {touched.name && errors.name && (
+                  <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.name}</p>
+                )}
               </div>
 
               <div>
@@ -304,10 +374,18 @@ export default function CreateUserPage() {
                   id="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  onBlur={() => setTouched(prev => ({ ...prev, email: true }))}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:border-transparent dark:bg-gray-700 dark:text-white ${
+                    touched.email && errors.email
+                      ? 'border-red-500 focus:ring-red-500'
+                      : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
+                  }`}
                   placeholder="Enter email address"
                   required
                 />
+                {touched.email && errors.email && (
+                  <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.email}</p>
+                )}
               </div>
 
               <div>
@@ -319,9 +397,17 @@ export default function CreateUserPage() {
                   id="contactNumber"
                   value={formData.contactNumber}
                   onChange={(e) => handleInputChange('contactNumber', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  onBlur={() => setTouched(prev => ({ ...prev, contactNumber: true }))}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:border-transparent dark:bg-gray-700 dark:text-white ${
+                    touched.contactNumber && errors.contactNumber
+                      ? 'border-red-500 focus:ring-red-500'
+                      : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
+                  }`}
                   placeholder="Enter contact number"
                 />
+                {touched.contactNumber && errors.contactNumber && (
+                  <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.contactNumber}</p>
+                )}
               </div>
 
               <div>
@@ -355,7 +441,12 @@ export default function CreateUserPage() {
                     id="password"
                     value={formData.password}
                     onChange={(e) => handleInputChange('password', e.target.value)}
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    onBlur={() => setTouched(prev => ({ ...prev, password: true }))}
+                    className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:border-transparent dark:bg-gray-700 dark:text-white ${
+                      touched.password && errors.password
+                        ? 'border-red-500 focus:ring-red-500'
+                        : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
+                    }`}
                     placeholder="Enter password"
                     required
                   />
@@ -374,6 +465,9 @@ export default function CreateUserPage() {
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   Password must be at least 8 characters long
                 </p>
+                {touched.password && errors.password && (
+                  <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.password}</p>
+                )}
               </div>
 
               <div>
@@ -386,7 +480,12 @@ export default function CreateUserPage() {
                     id="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    onBlur={() => setTouched(prev => ({ ...prev, confirmPassword: true }))}
+                    className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:border-transparent dark:bg-gray-700 dark:text-white ${
+                      touched.confirmPassword && errors.confirmPassword
+                        ? 'border-red-500 focus:ring-red-500'
+                        : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
+                    }`}
                     placeholder="Confirm password"
                     required
                   />
@@ -402,8 +501,8 @@ export default function CreateUserPage() {
                     )}
                   </button>
                 </div>
-                {formData.confirmPassword && formData.password !== formData.confirmPassword && (
-                  <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+                {touched.confirmPassword && errors.confirmPassword && (
+                  <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.confirmPassword}</p>
                 )}
               </div>
             </div>
@@ -436,7 +535,7 @@ export default function CreateUserPage() {
                         : 'border-gray-300 dark:border-gray-600'
                     }`}>
                       {formData.roleIds.includes(role.id) && (
-                        <Check className="w-3 h-3 text-white" />
+                        <div className="w-2 h-2 bg-white rounded-full"></div>
                       )}
                     </div>
                   </div>
@@ -447,6 +546,12 @@ export default function CreateUserPage() {
               <p className="text-gray-500 dark:text-gray-400 text-center py-4">
                 No roles available for this tenant
               </p>
+            )}
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+              Select one role for the user
+            </p>
+            {touched.roleIds && errors.roleIds && (
+              <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.roleIds}</p>
             )}
           </div>
         </form>

@@ -5,10 +5,10 @@ import { createAuditLogFromRequest } from '@/lib/audit';
 import { asyncHandler } from '@/lib/errorHandler';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 
-// GET /api/superadmin/permissions - List all permissions
+// GET /api/superadmin/permissions - List all modules with their permissions
 export const GET = asyncHandler(async (req: NextRequest) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('🔑 Fetching permissions list');
+    console.log('🔑 Fetching modules and permissions list');
   }
 
   // Authenticate SuperAdmin
@@ -18,40 +18,83 @@ export const GET = asyncHandler(async (req: NextRequest) => {
   }
 
   try {
-    const permissions = await prisma.permission.findMany({
-      orderBy: [
-        { module: 'asc' },
-        { name: 'asc' }
-      ]
+    // Get all modules with their permissions
+    const modules = await prisma.module.findMany({
+      where: { isActive: true },
+      orderBy: { orderIndex: 'asc' }
+    });
+
+    // Get role permissions for all modules
+    const rolePermissions = await prisma.rolePermission.findMany({
+      include: {
+        role: {
+          select: {
+            id: true,
+            name: true,
+            tenantId: true
+          }
+        },
+        module: {
+          select: {
+            moduleKey: true,
+            moduleName: true,
+            description: true,
+            icon: true,
+            path: true,
+            isActive: true,
+            isVisible: true,
+            orderIndex: true
+          }
+        }
+      }
+    });
+
+    // Group permissions by module
+    const permissionsByModule = modules.map(module => {
+      const modulePermissions = rolePermissions.filter(rp => rp.moduleKey === module.moduleKey);
+      
+      return {
+        moduleKey: module.moduleKey,
+        moduleName: module.moduleName,
+        description: module.description,
+        icon: module.icon,
+        path: module.path,
+        isActive: module.isActive,
+        isVisible: module.isVisible,
+        orderIndex: module.orderIndex,
+        permissions: modulePermissions.map(rp => ({
+          id: rp.id,
+          roleId: rp.roleId,
+          roleName: rp.role.name,
+          tenantId: rp.role.tenantId,
+          canCreate: rp.canCreate,
+          canRead: rp.canRead,
+          canUpdate: rp.canUpdate,
+          canDelete: rp.canDelete,
+          canViewAll: rp.canViewAll
+        }))
+      };
     });
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('✅ Permissions fetched successfully:', permissions.length);
+      console.log('✅ Modules and permissions fetched successfully:', modules.length);
     }
 
     return createSuccessResponse({
-      permissions: permissions.map(permission => ({
-        id: permission.id,
-        name: permission.name,
-        description: permission.description,
-        module: permission.module,
-        action: permission.action,
-        createdAt: permission.createdAt,
-        updatedAt: permission.updatedAt
-      }))
-    }, 'Permissions fetched successfully');
+      modules: permissionsByModule
+    }, 'Modules and permissions fetched successfully');
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
-      console.error('❌ Error fetching permissions:', error);
+      console.error('❌ Error fetching modules and permissions:', error);
     }
     throw error;
   }
 });
 
-// POST /api/superadmin/permissions - Create new permission
+// POST /api/superadmin/permissions - Update role permissions for a module
 export const POST = asyncHandler(async (req: NextRequest) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log('🔑 Creating new permission');
+    console.log('🔑 Updating role permissions');
   }
 
   // Authenticate SuperAdmin
@@ -60,80 +103,101 @@ export const POST = asyncHandler(async (req: NextRequest) => {
     return authResult;
   }
 
-  const { name, description, module, action } = await req.json();
+  const { roleId, moduleKey, permissions } = await req.json();
 
-  if (!name || !module || !action) {
+  if (!roleId || !moduleKey || !permissions) {
     if (process.env.NODE_ENV === 'development') {
-      console.log('❌ Missing required fields for permission creation');
+      console.log('❌ Missing required fields for permission update');
     }
     return createErrorResponse(
-      'Permission name, module, and action are required',
-      400,
-      [
-        { field: 'name', message: 'Permission name is required' },
-        { field: 'module', message: 'Module is required' },
-        { field: 'action', message: 'Action is required' }
-      ]
+      'Role ID, module key, and permissions are required',
+      400
     );
   }
 
   try {
-    // Check if permission name already exists
-    const existingPermission = await prisma.permission.findFirst({
-      where: { name }
+    // Check if role exists
+    const role = await prisma.role.findUnique({
+      where: { id: roleId }
     });
 
-    if (existingPermission) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Permission name already exists:', name);
-      }
-      return createErrorResponse(
-        'Permission name already exists',
-        409,
-        [{ field: 'name', message: 'Permission name already exists' }]
-      );
+    if (!role) {
+      return createErrorResponse('Role not found', 404);
     }
 
-    // Create permission
-    const permission = await prisma.permission.create({
-      data: {
-        name,
-        description,
-        module,
-        action
+    // Check if module exists
+    const module = await prisma.module.findUnique({
+      where: { moduleKey }
+    });
+
+    if (!module) {
+      return createErrorResponse('Module not found', 404);
+    }
+
+    // Check if role permission already exists
+    const existingPermission = await prisma.rolePermission.findFirst({
+      where: {
+        roleId,
+        moduleKey
       }
     });
+
+    let rolePermission;
+    if (existingPermission) {
+      // Update existing permission
+      rolePermission = await prisma.rolePermission.update({
+        where: { id: existingPermission.id },
+        data: {
+          canCreate: permissions.canCreate || false,
+          canRead: permissions.canRead || false,
+          canUpdate: permissions.canUpdate || false,
+          canDelete: permissions.canDelete || false,
+          canViewAll: permissions.canViewAll || false
+        }
+      });
+    } else {
+      // Create new permission
+      rolePermission = await prisma.rolePermission.create({
+        data: {
+          roleId,
+          moduleKey,
+          canCreate: permissions.canCreate || false,
+          canRead: permissions.canRead || false,
+          canUpdate: permissions.canUpdate || false,
+          canDelete: permissions.canDelete || false,
+          canViewAll: permissions.canViewAll || false
+        }
+      });
+    }
 
     // Create audit log
     await createAuditLogFromRequest(
       req,
       authResult,
-      'permission.create',
+      'role.permissions.updated',
       {
-        permissionId: permission.id,
-        permissionName: permission.name,
-        module: permission.module,
-        action: permission.action
+        roleId,
+        roleName: role.name,
+        moduleKey,
+        moduleName: module.moduleName,
+        permissions: {
+          canCreate: permissions.canCreate,
+          canRead: permissions.canRead,
+          canUpdate: permissions.canUpdate,
+          canDelete: permissions.canDelete,
+          canViewAll: permissions.canViewAll
+        }
       }
     );
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('✅ Permission created successfully:', permission.name);
+      console.log('✅ Role permissions updated successfully');
     }
 
-    return createSuccessResponse({
-      permission: {
-        id: permission.id,
-        name: permission.name,
-        description: permission.description,
-        module: permission.module,
-        action: permission.action,
-        createdAt: permission.createdAt
-      }
-    }, 'Permission created successfully', 201);
+    return createSuccessResponse(rolePermission, 'Role permissions updated successfully');
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
-      console.error('❌ Error creating permission:', error);
+      console.error('❌ Error updating role permissions:', error);
     }
     throw error;
   }

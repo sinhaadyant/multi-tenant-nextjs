@@ -61,6 +61,12 @@ const superAdminNavElements: NavItem[] = [
     path: "/superadmin/users"
   },
   {
+    id: "superadmins",
+    label: "Superadmin Management",
+    icon: "user-circle",
+    path: "/superadmin/superadmins"
+  },
+  {
     id: "roles",
     label: "Roles & Permissions",
     icon: "shield",
@@ -89,6 +95,12 @@ const superAdminNavElements: NavItem[] = [
       { id: "insertSampleData", label: "Insert Sample Data", path: "/superadmin/data-management/insert" },
       { id: "clearData", label: "Clear Data", path: "/superadmin/data-management/clear" }
     ]
+  },
+  {
+    id: "menuManagement",
+    label: "Menu Management",
+    icon: "list",
+    path: "/superadmin/menu"
   },
   {
     id: "audit",

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireSuperAdmin } from '@/middleware/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import { createAuditLogFromRequest } from '@/lib/audit';
 import { asyncHandler } from '@/lib/errorHandler';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
@@ -13,8 +13,11 @@ export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params:
 
   // Authenticate SuperAdmin
   const authResult = await requireSuperAdmin(req);
-  if (authResult instanceof NextResponse) {
-    return authResult;
+  if (!authResult.success) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('❌ Authentication failed for tenant status API:', authResult.error);
+    }
+    return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
   }
 
   const { isActive } = await req.json();
@@ -51,7 +54,7 @@ export const PATCH = asyncHandler(async (req: NextRequest, { params }: { params:
     // Create audit log
     await createAuditLogFromRequest(
       req,
-      authResult,
+      authResult.user,
       'tenant.status_update',
       {
         tenantId: params.id,

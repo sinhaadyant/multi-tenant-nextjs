@@ -14,17 +14,6 @@ export const GET = asyncHandler(async (req: NextRequest) => {
 
   try {
     const modules = await prisma.module.findMany({
-      where: { isActive: true },
-      include: {
-        permissions: {
-          where: { isActive: true },
-          orderBy: { action: 'asc' }
-        },
-        childModules: {
-          where: { isActive: true },
-          orderBy: { orderIndex: 'asc' }
-        }
-      },
       orderBy: { orderIndex: 'asc' }
     });
 
@@ -39,15 +28,10 @@ export const GET = asyncHandler(async (req: NextRequest) => {
       isActive: module.isActive,
       isVisible: module.isVisible,
       orderIndex: module.orderIndex,
-      permissions: module.permissions.map(permission => ({
-        id: permission.id,
-        name: permission.name,
-        description: permission.description,
-        action: permission.action,
-        moduleKey: permission.moduleKey,
-        resource: permission.resource,
-        isActive: permission.isActive
-      }))
+      parentModuleKey: module.parentModuleKey,
+      version: module.version,
+      createdAt: module.createdAt.toISOString(),
+      updatedAt: module.updatedAt.toISOString()
     }));
 
     await createAuditLogFromRequest(req, authResult, 'module.list', {
@@ -57,6 +41,57 @@ export const GET = asyncHandler(async (req: NextRequest) => {
     return createSuccessResponse({ modules: transformedModules }, 'Modules retrieved successfully');
   } catch (error) {
     console.error('Error fetching modules:', error);
+    throw error;
+  }
+});
+
+// PUT /api/superadmin/modules - Update module order and visibility
+export const PUT = asyncHandler(async (req: NextRequest) => {
+  const authResult = await requireSuperAdmin(req);
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+
+  const { updates } = await req.json();
+
+  if (!updates || !Array.isArray(updates)) {
+    return createErrorResponse('Updates array is required', 400);
+  }
+
+  try {
+    // Update modules in a transaction
+    const results = await prisma.$transaction(async (tx) => {
+      const updatedModules = [];
+
+      for (const update of updates) {
+        if (!update.id || typeof update.orderIndex !== 'number') {
+          throw new Error('Each update must have id and orderIndex');
+        }
+
+        const updatedModule = await tx.module.update({
+          where: { id: update.id },
+          data: {
+            orderIndex: update.orderIndex,
+            isVisible: update.isVisible !== undefined ? update.isVisible : undefined,
+            isActive: update.isActive !== undefined ? update.isActive : undefined
+          }
+        });
+
+        updatedModules.push(updatedModule);
+      }
+
+      return updatedModules;
+    });
+
+    // Create audit log
+    await createAuditLogFromRequest(req, authResult, 'module.bulk_update', {
+      updatedModulesCount: results.length,
+      updates: updates.map(u => ({ id: u.id, orderIndex: u.orderIndex, isVisible: u.isVisible, isActive: u.isActive }))
+    });
+
+    return createSuccessResponse({ modules: results }, 'Modules updated successfully');
+  } catch (error) {
+    console.error('Error updating modules:', error);
     throw error;
   }
 });

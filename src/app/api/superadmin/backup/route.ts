@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireSuperAdmin } from '@/middleware/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import { asyncHandler } from '@/lib/errorHandler';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 import { createAuditLog } from '@/lib/audit';
@@ -10,11 +10,11 @@ export const POST = asyncHandler(async (request: NextRequest) => {
   try {
     // Authenticate SuperAdmin
     const authResult = await requireSuperAdmin(request);
-    if (authResult instanceof NextResponse) {
-      return authResult;
+    if (!authResult.success) {
+      return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
     }
 
-    const superAdmin = authResult as any;
+    const superAdmin = authResult.user;
     const body = await request.json();
     const {
       includeTenants = true,

@@ -164,7 +164,7 @@ const AppHeader = () => {
                             >
                               <div className="flex items-start space-x-3">
                                 <div className="flex-shrink-0 mt-0.5">
-                                  {getNotificationIcon(notification.type)}
+                                  {getNotificationIcon(notification.type || 'info')}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <p className={`text-sm font-medium ${
@@ -172,13 +172,13 @@ const AppHeader = () => {
                                       ? 'text-gray-900 dark:text-white' 
                                       : 'text-gray-600 dark:text-gray-400'
                                   }`}>
-                                    {notification.title}
+                                    {notification.title || 'No title'}
                                   </p>
                                   <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                                    {notification.message}
+                                    {notification.message || 'No message'}
                                   </p>
                                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                    {formatNotificationTime(notification.createdAt)}
+                                    {notification.createdAt ? formatNotificationTime(notification.createdAt) : 'Unknown time'}
                                   </p>
                                 </div>
                                 {!notification.isRead && (

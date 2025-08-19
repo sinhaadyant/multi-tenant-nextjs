@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireSuperAdmin } from '@/middleware/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import { asyncHandler } from '@/lib/errorHandler';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 
@@ -13,14 +13,14 @@ export const GET = asyncHandler(async (req: NextRequest) => {
   try {
     // Authenticate SuperAdmin
     const authResult = await requireSuperAdmin(req);
-    if (authResult instanceof NextResponse) {
+    if (!authResult.success) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Authentication failed:', authResult.status, authResult.statusText);
+        console.log('❌ Authentication failed:', authResult.error);
       }
-      return authResult;
+      return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
     }
 
-    const superAdmin = authResult as any;
+    const superAdmin = authResult.user;
     
     if (process.env.NODE_ENV === 'development') {
       console.log('✅ SuperAdmin authenticated:', superAdmin.email);

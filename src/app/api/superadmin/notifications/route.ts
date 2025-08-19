@@ -99,6 +99,18 @@ export async function GET(req: NextRequest) {
               slug: true,
             },
           },
+          userNotifications: {
+            where: {
+              user: {
+                email: authResult.user.email,
+                tenantId: null // Superadmin users don't belong to any tenant
+              }
+            },
+            select: {
+              isRead: true,
+              readAt: true,
+            },
+          },
           _count: {
             select: {
               userNotifications: true,
@@ -114,8 +126,19 @@ export async function GET(req: NextRequest) {
       prisma.notification.count({ where }),
     ]);
 
+    // Process notifications to add read status
+    const processedNotifications = notifications.map(notification => {
+      const userNotification = notification.userNotifications[0];
+      return {
+        ...notification,
+        isRead: userNotification?.isRead || false,
+        readAt: userNotification?.readAt || null,
+        userNotifications: undefined, // Remove the userNotifications array from response
+      };
+    });
+
     // If no notifications found, return empty response instead of error
-    if (notifications.length === 0) {
+    if (processedNotifications.length === 0) {
       const emptyResponse = {
         notifications: [],
         stats: {
@@ -157,7 +180,7 @@ export async function GET(req: NextRequest) {
     });
 
     const response = {
-      notifications,
+      notifications: processedNotifications,
       stats: statsMap,
       pagination: {
         page: filters.page,

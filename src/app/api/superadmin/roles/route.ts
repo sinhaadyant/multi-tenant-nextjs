@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireSuperAdmin } from '@/middleware/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import { asyncHandler } from '@/lib/errorHandler';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 import { createAuditLogFromRequest } from '@/lib/audit';
@@ -8,14 +8,15 @@ import { createAuditLogFromRequest } from '@/lib/audit';
 // GET /api/superadmin/roles - Get all roles (for tenant management)
 export const GET = asyncHandler(async (req: NextRequest) => {
   const authResult = await requireSuperAdmin(req);
-  if (authResult instanceof NextResponse) {
-    return authResult;
+  if (!authResult.success) {
+    return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
   }
 
   const { searchParams } = new URL(req.url);
   const tenantId = searchParams.get('tenantId');
   const search = searchParams.get('search');
   const status = searchParams.get('status');
+  const roleType = searchParams.get('roleType'); // 'global', 'tenant', or 'all'
   const sortBy = searchParams.get('sortBy') || 'createdAt';
   const sortOrder = searchParams.get('sortOrder') || 'desc';
   const page = parseInt(searchParams.get('page') || '1');
@@ -28,12 +29,16 @@ export const GET = asyncHandler(async (req: NextRequest) => {
     
     if (tenantId) {
       where.tenantId = tenantId;
+    } else if (roleType === 'global') {
+      where.isGlobal = true;
+    } else if (roleType === 'tenant') {
+      where.isGlobal = false;
     }
     
     if (search) {
       where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } }
+        { name: { contains: search } },
+        { description: { contains: search } }
       ];
     }
     
@@ -50,7 +55,14 @@ export const GET = asyncHandler(async (req: NextRequest) => {
       include: {
         permissions: {
           include: {
-            permission: true
+            module: true
+          }
+        },
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true
           }
         },
         _count: {
@@ -73,21 +85,27 @@ export const GET = asyncHandler(async (req: NextRequest) => {
       description: role.description,
       isGlobal: role.isGlobal,
       isActive: role.isActive,
+      tenantId: role.tenantId,
+      tenantName: role.tenant?.name,
+      tenantSlug: role.tenant?.slug,
       createdAt: role.createdAt.toISOString(),
       updatedAt: role.updatedAt.toISOString(),
       userCount: role._count.userRoles,
       permissions: role.permissions.map(rp => ({
-        id: rp.permission.id,
-        name: rp.permission.name,
-        description: rp.permission.description,
-        module: rp.permission.module,
-        action: rp.permission.action
+        moduleKey: rp.moduleKey,
+        moduleName: rp.module.moduleName,
+        canCreate: rp.canCreate,
+        canRead: rp.canRead,
+        canUpdate: rp.canUpdate,
+        canDelete: rp.canDelete,
+        canViewAll: rp.canViewAll,
       }))
     }));
 
     await createAuditLogFromRequest(req, authResult, 'role.list', {
       rolesCount: transformedRoles.length,
       tenantId,
+      roleType,
       filters: { search, status, sortBy, sortOrder, page, limit }
     });
 
@@ -111,11 +129,18 @@ export const GET = asyncHandler(async (req: NextRequest) => {
 // POST /api/superadmin/roles - Create new role (for tenant management)
 export const POST = asyncHandler(async (req: NextRequest) => {
   const authResult = await requireSuperAdmin(req);
-  if (authResult instanceof NextResponse) {
-    return authResult;
+  if (!authResult.success) {
+    return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
   }
 
-  const { name, description, isTemplate = false, permissions = [], tenantId } = await req.json();
+  const { 
+    name, 
+    description, 
+    isTemplate = false, 
+    permissions = [], 
+    tenantId,
+    isGlobal = false 
+  } = await req.json();
 
   // Validation
   if (!name || name.trim().length === 0) {
@@ -136,12 +161,25 @@ export const POST = asyncHandler(async (req: NextRequest) => {
     ]);
   }
 
+  // Validate role type
+  if (isGlobal && tenantId) {
+    return createErrorResponse('Global roles cannot have a tenant ID', 400, [
+      { field: 'tenantId', message: 'Global roles cannot have a tenant ID' }
+    ]);
+  }
+
+  if (!isGlobal && !tenantId) {
+    return createErrorResponse('Tenant roles must have a tenant ID', 400, [
+      { field: 'tenantId', message: 'Tenant roles must have a tenant ID' }
+    ]);
+  }
+
   try {
-    // Check for duplicate role name within the same tenant
+    // Check for duplicate role name within the same tenant (or global)
     const existingRole = await prisma.role.findFirst({
       where: { 
         name: name.trim(),
-        tenantId: tenantId || null
+        tenantId: isGlobal ? null : tenantId
       }
     });
 
@@ -159,15 +197,22 @@ export const POST = asyncHandler(async (req: NextRequest) => {
           description: description?.trim() || null,
           isTemplate,
           isActive: true,
-          tenantId: tenantId || null
+          tenantId: isGlobal ? null : tenantId,
+          isGlobal,
+          createdBy: authResult.user.id
         }
       });
 
       // Assign permissions if provided
       if (permissions && permissions.length > 0) {
-        const rolePermissions = permissions.map((permissionId: string) => ({
+        const rolePermissions = permissions.map((permissionData: any) => ({
           roleId: role.id,
-          permissionId
+          moduleKey: permissionData.moduleKey,
+          canCreate: permissionData.canCreate || false,
+          canRead: permissionData.canRead || false,
+          canUpdate: permissionData.canUpdate || false,
+          canDelete: permissionData.canDelete || false,
+          canViewAll: permissionData.canViewAll || false,
         }));
 
         await tx.rolePermission.createMany({
@@ -184,7 +229,14 @@ export const POST = asyncHandler(async (req: NextRequest) => {
       include: {
         permissions: {
           include: {
-            permission: true
+            module: true
+          }
+        },
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true
           }
         },
         _count: {
@@ -204,21 +256,28 @@ export const POST = asyncHandler(async (req: NextRequest) => {
       description: createdRole.description,
       isGlobal: createdRole.isGlobal,
       isActive: createdRole.isActive,
+      tenantId: createdRole.tenantId,
+      tenantName: createdRole.tenant?.name,
+      tenantSlug: createdRole.tenant?.slug,
       createdAt: createdRole.createdAt.toISOString(),
       updatedAt: createdRole.updatedAt.toISOString(),
       userCount: createdRole._count.userRoles,
       permissions: createdRole.permissions.map(rp => ({
-        id: rp.permission.id,
-        name: rp.permission.name,
-        description: rp.permission.description,
-        module: rp.permission.module,
-        action: rp.permission.action
+        moduleKey: rp.moduleKey,
+        moduleName: rp.module.moduleName,
+        canCreate: rp.canCreate,
+        canRead: rp.canRead,
+        canUpdate: rp.canUpdate,
+        canDelete: rp.canDelete,
+        canViewAll: rp.canViewAll,
       }))
     };
 
     await createAuditLogFromRequest(req, authResult, 'role.create', {
       roleId: result.id,
       roleName: result.name,
+      isGlobal: result.isGlobal,
+      tenantId: result.tenantId,
       permissionsCount: permissions.length,
       isTemplate: result.isTemplate
     });

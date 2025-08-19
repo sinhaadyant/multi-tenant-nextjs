@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireSuperAdmin } from '@/middleware/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import { asyncHandler } from '@/lib/errorHandler';
 
 // GET /api/superadmin/notifications/export - Export notifications to CSV
@@ -11,8 +11,8 @@ export const GET = asyncHandler(async (req: NextRequest) => {
 
   // Authenticate SuperAdmin
   const authResult = await requireSuperAdmin(req);
-  if (authResult instanceof NextResponse) {
-    return authResult;
+  if (!authResult.success) {
+    return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
   }
 
   const { searchParams } = new URL(req.url);
@@ -48,10 +48,10 @@ export const GET = asyncHandler(async (req: NextRequest) => {
     const notifications = await prisma.notification.findMany({
       where,
       include: {
-        super_admins: {
+        superAdmin: {
           select: { name: true, email: true }
         },
-        tenants: {
+        tenant: {
           select: { name: true, slug: true }
         }
       },
@@ -81,8 +81,8 @@ export const GET = asyncHandler(async (req: NextRequest) => {
       notification.isRead ? 'Yes' : 'No',
       notification.isActive ? 'Yes' : 'No',
       notification.targetType,
-      notification.super_admins?.name || 'System',
-      notification.tenants?.name || 'All Tenants',
+      notification.superAdmin?.name || 'System',
+      notification.tenant?.name || 'All Tenants',
       new Date(notification.createdAt).toISOString(),
       new Date(notification.updatedAt).toISOString()
     ]);

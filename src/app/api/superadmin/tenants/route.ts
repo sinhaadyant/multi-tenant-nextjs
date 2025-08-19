@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireSuperAdmin } from '@/middleware/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import { createAuditLogFromRequest } from '@/lib/audit';
 import { asyncHandler } from '@/lib/errorHandler';
 import { hashPassword } from '@/lib/jwt';
@@ -14,11 +14,11 @@ export const GET = asyncHandler(async (req: NextRequest) => {
 
   // Authenticate SuperAdmin
   const authResult = await requireSuperAdmin(req);
-  if (authResult instanceof NextResponse) {
+  if (!authResult.success) {
     if (process.env.NODE_ENV === 'development') {
-      console.log('❌ Authentication failed for tenants API');
+      console.log('❌ Authentication failed for tenants API:', authResult.error);
     }
-    return authResult;
+    return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
   }
 
   if (process.env.NODE_ENV === 'development') {
@@ -78,7 +78,7 @@ export const GET = asyncHandler(async (req: NextRequest) => {
   // Handle special cases for computed fields
   if (sortBy === 'userCount') {
     // For userCount, we need to sort by the count of related users
-    // Use a different approach with aggregation
+    // This requires a different approach with aggregation
     const dbField = 'createdAt'; // Default fallback for initial query
     orderBy[dbField] = 'desc';
   } else {
@@ -192,8 +192,8 @@ export const POST = asyncHandler(async (req: NextRequest) => {
 
   // Authenticate SuperAdmin
   const authResult = await requireSuperAdmin(req);
-  if (authResult instanceof NextResponse) {
-    return authResult;
+  if (!authResult.success) {
+    return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
   }
 
   const { tenant, admin } = await req.json();
@@ -261,11 +261,6 @@ export const POST = asyncHandler(async (req: NextRequest) => {
         orderBy: { orderIndex: 'asc' }
       });
 
-      // Get all available permissions
-      const availablePermissions = await tx.permission.findMany({
-        where: { isActive: true }
-      });
-
       // Create default roles for the tenant
       const defaultRoles = [
         {
@@ -309,35 +304,39 @@ export const POST = asyncHandler(async (req: NextRequest) => {
         createdRoles.push(role);
       }
 
-      // Assign permissions to roles
+      // Assign permissions to roles based on modules
       const adminRole = createdRoles.find(r => r.name === 'Admin');
       const managerRole = createdRoles.find(r => r.name === 'Manager');
       const userRole = createdRoles.find(r => r.name === 'User');
       const viewerRole = createdRoles.find(r => r.name === 'Viewer');
 
-      // Admin gets all permissions
+      // Admin gets all permissions for all modules
       if (adminRole) {
-        const adminPermissions = availablePermissions.map(permission => ({
+        const adminPermissions = availableModules.map(module => ({
           roleId: adminRole.id,
-          permissionId: permission.id
+          moduleKey: module.moduleKey,
+          canCreate: true,
+          canRead: true,
+          canUpdate: true,
+          canDelete: true,
+          canViewAll: true
         }));
         await tx.rolePermission.createMany({
           data: adminPermissions
         });
       }
 
-      // Manager gets most permissions (exclude sensitive ones)
+      // Manager gets most permissions (exclude delete for sensitive modules)
       if (managerRole) {
-        const managerPermissions = availablePermissions
-          .filter(permission => 
-            !permission.name.includes('delete') && 
-            !permission.name.includes('audit:export') &&
-            !permission.name.includes('modules.manage_versions')
-          )
-          .map(permission => ({
-            roleId: managerRole.id,
-            permissionId: permission.id
-          }));
+        const managerPermissions = availableModules.map(module => ({
+          roleId: managerRole.id,
+          moduleKey: module.moduleKey,
+          canCreate: true,
+          canRead: true,
+          canUpdate: true,
+          canDelete: !module.moduleKey.includes('audit') && !module.moduleKey.includes('system'),
+          canViewAll: true
+        }));
         await tx.rolePermission.createMany({
           data: managerPermissions
         });
@@ -345,16 +344,16 @@ export const POST = asyncHandler(async (req: NextRequest) => {
 
       // User gets basic permissions
       if (userRole) {
-        const userPermissions = availablePermissions
-          .filter(permission => 
-            permission.name.includes('view') ||
-            permission.name.includes('dashboard') ||
-            permission.name.includes('notifications:view') ||
-            permission.name.includes('content')
-          )
-          .map(permission => ({
+        const userPermissions = availableModules
+          .filter(module => !module.moduleKey.includes('audit') && !module.moduleKey.includes('system'))
+          .map(module => ({
             roleId: userRole.id,
-            permissionId: permission.id
+            moduleKey: module.moduleKey,
+            canCreate: module.moduleKey.includes('content') || module.moduleKey.includes('profile'),
+            canRead: true,
+            canUpdate: module.moduleKey.includes('content') || module.moduleKey.includes('profile'),
+            canDelete: false,
+            canViewAll: false
           }));
         await tx.rolePermission.createMany({
           data: userPermissions
@@ -363,14 +362,16 @@ export const POST = asyncHandler(async (req: NextRequest) => {
 
       // Viewer gets read-only permissions
       if (viewerRole) {
-        const viewerPermissions = availablePermissions
-          .filter(permission => 
-            permission.name.includes('view') ||
-            permission.name.includes('dashboard')
-          )
-          .map(permission => ({
+        const viewerPermissions = availableModules
+          .filter(module => !module.moduleKey.includes('audit') && !module.moduleKey.includes('system'))
+          .map(module => ({
             roleId: viewerRole.id,
-            permissionId: permission.id
+            moduleKey: module.moduleKey,
+            canCreate: false,
+            canRead: true,
+            canUpdate: false,
+            canDelete: false,
+            canViewAll: false
           }));
         await tx.rolePermission.createMany({
           data: viewerPermissions
@@ -384,7 +385,7 @@ export const POST = asyncHandler(async (req: NextRequest) => {
         isEnabled: true,
         isVisible: true,
         enabledAt: new Date(),
-        enabledBy: authResult.id
+        enabledBy: authResult.user.id // Use authResult.user.id
       }));
 
       await tx.tenantModule.createMany({
@@ -411,7 +412,7 @@ export const POST = asyncHandler(async (req: NextRequest) => {
         data: {
           userId: adminUser.id,
           roleId: adminRole!.id,
-          assignedBy: authResult.id
+          assignedBy: authResult.user.id // Use authResult.user.id
         }
       });
 
@@ -426,7 +427,7 @@ export const POST = asyncHandler(async (req: NextRequest) => {
     // Create audit log
     await createAuditLogFromRequest(
       req,
-      authResult,
+      authResult.user, // Use authResult.user
       'tenant.created',
       {
         tenantId: result.tenant.id,

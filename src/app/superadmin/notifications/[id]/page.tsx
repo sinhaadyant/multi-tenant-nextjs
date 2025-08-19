@@ -252,22 +252,22 @@ export default function NotificationDetailPage() {
           {/* Notification Content */}
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
             <div className="flex items-start space-x-4 mb-6">
-              <NotificationTypeIcon type={notification.type} />
+              <NotificationTypeIcon type={notification.type || 'info'} />
               <div className="flex-1">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                  {notification.title}
+                  {notification.title || 'No Title'}
                 </h2>
                 <div className="flex items-center space-x-4">
-                  <PriorityBadge priority={notification.priority} />
-                  <StatusBadge status={notification.status} />
-                  <TargetTypeBadge targetType={notification.targetType} />
+                  <PriorityBadge priority={notification.priority || 'low'} />
+                  <StatusBadge status={notification.status || 'draft'} />
+                  <TargetTypeBadge targetType={notification.targetType || 'superadmin'} />
                 </div>
               </div>
             </div>
             
             <div className="prose dark:prose-invert max-w-none">
               <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                {notification.message}
+                {notification.message || 'No message content'}
               </p>
             </div>
           </div>
@@ -312,16 +312,16 @@ export default function NotificationDetailPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600 dark:text-gray-400">Status</span>
-                <StatusBadge status={notification.status} />
+                <StatusBadge status={notification.status || 'draft'} />
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600 dark:text-gray-400">Priority</span>
-                <PriorityBadge priority={notification.priority} />
+                <PriorityBadge priority={notification.priority || 'low'} />
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600 dark:text-gray-400">Type</span>
                 <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  {notification.type.charAt(0).toUpperCase() + notification.type.slice(1)}
+                  {notification.type ? notification.type.charAt(0).toUpperCase() + notification.type.slice(1) : 'Unknown'}
                 </span>
               </div>
               {notification.isRead !== undefined && (

@@ -1,112 +1,47 @@
-import { prisma } from './prisma';
+import { prisma } from '@/lib/prisma';
 
-export interface UserWithRoles {
-  id: string;
-  email: string;
-  name: string;
-  tenantId: string | null;
-  userRoles: {
-    role: {
-      id: string;
-      name: string;
-      isActive: boolean;
-      permissions: {
-        permission: {
-          id: string;
-          name: string;
-          moduleKey: string;
-          action: string;
-          resource?: string;
-          isActive: boolean;
-        };
-      }[];
-    };
+export interface EffectivePermissions {
+  canCreate: boolean;
+  canRead: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
+  canViewAll: boolean;
+}
+
+export interface UserPermissions {
+  userId: string;
+  tenantId?: string;
+  roles: {
+    id: string;
+    name: string;
+    tenantId?: string;
+    isGlobal: boolean;
+    permissions: {
+      moduleKey: string;
+      canCreate: boolean;
+      canRead: boolean;
+      canUpdate: boolean;
+      canDelete: boolean;
+      canViewAll: boolean;
+    }[];
   }[];
 }
 
 /**
- * Check if a user has a specific permission within a tenant
- * @param user - User object with roles and permissions
- * @param tenantId - Tenant ID to check permissions for
- * @param permissionName - Permission name to check (e.g., 'modules.view')
- * @returns Promise<boolean> - True if user has permission
+ * Get effective permissions for a user across all their roles (global + tenant)
+ * Uses union logic where explicit deny (false) overrides grant (true)
  */
-export async function checkTenantPermission(
-  user: UserWithRoles,
-  tenantId: string,
-  permissionName: string
-): Promise<boolean> {
-  // Superadmin bypass (if implemented)
-  if (user.tenantId === null) {
-    return true; // Superadmin has all permissions
-  }
-
-  // Check if user belongs to the tenant
-  if (user.tenantId !== tenantId) {
-    return false;
-  }
-
-  // Get user's active roles
-  const activeRoles = user.userRoles.filter(ur => ur.role.isActive);
-  
-  if (activeRoles.length === 0) {
-    return false;
-  }
-
-  // Check if any role has the required permission
-  for (const userRole of activeRoles) {
-    const role = userRole.role;
-    
-    // Check role permissions
-    for (const rolePermission of role.permissions) {
-      const permission = rolePermission.permission;
-      
-      if (permission.isActive && permission.name === permissionName) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-/**
- * Check if a user has a specific permission within a tenant by user ID and tenant slug
- * @param userId - User ID to check permissions for
- * @param tenantSlug - Tenant slug to check permissions for
- * @param moduleKey - Module key (e.g., 'notifications')
- * @param action - Action to check (e.g., 'view', 'create')
- * @returns Promise<boolean> - True if user has permission
- */
-export async function checkTenantPermissionById(
-  userId: string,
-  tenantSlug: string,
-  moduleKey: string,
-  action: string
-): Promise<boolean> {
+export async function getEffectivePermissions(userId: string, moduleKey: string): Promise<EffectivePermissions | null> {
   try {
-    // Get tenant by slug
-    const tenant = await prisma.tenant.findUnique({
-      where: { slug: tenantSlug, isActive: true }
-    });
-
-    if (!tenant) {
-      return false;
-    }
-
-    // Get user with roles and permissions
+    // Get user with all their roles and permissions
     const user = await prisma.user.findUnique({
-      where: { id: userId, tenantId: tenant.id },
+      where: { id: userId },
       include: {
         userRoles: {
           include: {
             role: {
               include: {
-                permissions: {
-                  include: {
-                    permission: true
-                  }
-                }
+                permissions: true
               }
             }
           }
@@ -114,191 +49,181 @@ export async function checkTenantPermissionById(
       }
     });
 
-    if (!user || !user.isActive) {
-      return false;
+    if (!user) {
+      return null;
     }
 
-    // Check if any role has the required permission
+    // Collect all permissions for the specified module
+    const modulePermissions: EffectivePermissions[] = [];
+
     for (const userRole of user.userRoles) {
       const role = userRole.role;
       
-      if (!role.isActive) continue;
-      
-      // Check role permissions
       for (const rolePermission of role.permissions) {
-        const permission = rolePermission.permission;
-        
-        if (permission.isActive && 
-            permission.moduleKey === moduleKey && 
-            permission.action === action) {
-          return true;
+        if (rolePermission.moduleKey === moduleKey) {
+          modulePermissions.push({
+            canCreate: rolePermission.canCreate,
+            canRead: rolePermission.canRead,
+            canUpdate: rolePermission.canUpdate,
+            canDelete: rolePermission.canDelete,
+            canViewAll: rolePermission.canViewAll,
+          });
         }
       }
     }
 
-    return false;
+    if (modulePermissions.length === 0) {
+      return null;
+    }
+
+    // Union logic: explicit deny (false) overrides grant (true)
+    const effectivePermissions: EffectivePermissions = {
+      canCreate: modulePermissions.some(p => p.canCreate),
+      canRead: modulePermissions.some(p => p.canRead),
+      canUpdate: modulePermissions.some(p => p.canUpdate),
+      canDelete: modulePermissions.some(p => p.canDelete),
+      canViewAll: modulePermissions.some(p => p.canViewAll),
+    };
+
+    return effectivePermissions;
   } catch (error) {
-    console.error('Error checking tenant permission:', error);
+    console.error('Error getting effective permissions:', error);
+    return null;
+  }
+}
+
+/**
+ * Resolve scope based on user permissions for a module
+ */
+export function resolveScope(user: UserPermissions, moduleKey: string): 'none' | 'own' | 'tenant' {
+  // Find permissions for the specified module
+  const modulePermissions = user.roles.flatMap(role =>
+    role.permissions.filter(p => p.moduleKey === moduleKey)
+  );
+
+  if (modulePermissions.length === 0) {
+    return 'none';
+  }
+
+  // Union logic: if any role has the permission, user has it
+  const hasReadPermission = modulePermissions.some(p => p.canRead);
+  const hasViewAllPermission = modulePermissions.some(p => p.canViewAll);
+
+  if (!hasReadPermission) {
+    return 'none';
+  }
+
+  if (hasViewAllPermission) {
+    return 'tenant';
+  }
+
+  return 'own';
+}
+
+/**
+ * Get user permissions with all their roles and permissions
+ */
+export async function getUserPermissions(userId: string): Promise<UserPermissions | null> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        userRoles: {
+          include: {
+            role: {
+              include: {
+                permissions: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    return {
+      userId: user.id,
+      tenantId: user.tenantId || undefined,
+      roles: user.userRoles.map(userRole => ({
+        id: userRole.role.id,
+        name: userRole.role.name,
+        tenantId: userRole.role.tenantId || undefined,
+        isGlobal: userRole.role.isGlobal,
+        permissions: userRole.role.permissions.map(rp => ({
+          moduleKey: rp.moduleKey,
+          canCreate: rp.canCreate,
+          canRead: rp.canRead,
+          canUpdate: rp.canUpdate,
+          canDelete: rp.canDelete,
+          canViewAll: rp.canViewAll,
+        }))
+      }))
+    };
+  } catch (error) {
+    console.error('Error getting user permissions:', error);
+    return null;
+  }
+}
+
+/**
+ * Check if user can perform action on a module
+ */
+export async function canPerformAction(
+  userId: string, 
+  moduleKey: string, 
+  action: 'create' | 'read' | 'update' | 'delete' | 'viewAll'
+): Promise<boolean> {
+  const permissions = await getEffectivePermissions(userId, moduleKey);
+  
+  if (!permissions) {
     return false;
   }
-}
 
-/**
- * Check if a user has any of the specified permissions
- * @param user - User object with roles and permissions
- * @param tenantId - Tenant ID to check permissions for
- * @param permissionNames - Array of permission names to check
- * @returns Promise<boolean> - True if user has any of the permissions
- */
-export async function checkAnyTenantPermission(
-  user: UserWithRoles,
-  tenantId: string,
-  permissionNames: string[]
-): Promise<boolean> {
-  for (const permissionName of permissionNames) {
-    if (await checkTenantPermission(user, tenantId, permissionName)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
- * Check if a user has all of the specified permissions
- * @param user - User object with roles and permissions
- * @param tenantId - Tenant ID to check permissions for
- * @param permissionNames - Array of permission names to check
- * @returns Promise<boolean> - True if user has all permissions
- */
-export async function checkAllTenantPermissions(
-  user: UserWithRoles,
-  tenantId: string,
-  permissionNames: string[]
-): Promise<boolean> {
-  for (const permissionName of permissionNames) {
-    if (!(await checkTenantPermission(user, tenantId, permissionName))) {
+  switch (action) {
+    case 'create':
+      return permissions.canCreate;
+    case 'read':
+      return permissions.canRead;
+    case 'update':
+      return permissions.canUpdate;
+    case 'delete':
+      return permissions.canDelete;
+    case 'viewAll':
+      return permissions.canViewAll;
+    default:
       return false;
-    }
   }
-  return true;
 }
 
 /**
- * Get all permissions for a user within a tenant
- * @param user - User object with roles and permissions
- * @param tenantId - Tenant ID to get permissions for
- * @returns Promise<string[]> - Array of permission names
+ * Apply scope-based filtering to database queries
  */
-export async function getUserTenantPermissions(
-  user: UserWithRoles,
-  tenantId: string
-): Promise<string[]> {
-  if (user.tenantId !== tenantId) {
-    return [];
+export function applyScopeFilter(
+  scope: 'none' | 'own' | 'tenant',
+  user: UserPermissions,
+  baseWhere: any = {}
+): any {
+  if (scope === 'none') {
+    throw new Error('Unauthorized');
   }
 
-  const permissions = new Set<string>();
-  
-  const activeRoles = user.userRoles.filter(ur => ur.role.isActive);
-  
-  for (const userRole of activeRoles) {
-    const role = userRole.role;
-    
-    for (const rolePermission of role.permissions) {
-      const permission = rolePermission.permission;
-      
-      if (permission.isActive) {
-        permissions.add(permission.name);
-      }
-    }
+  if (scope === 'tenant') {
+    return {
+      ...baseWhere,
+      tenantId: user.tenantId
+    };
   }
 
-  return Array.from(permissions);
-}
+  if (scope === 'own') {
+    return {
+      ...baseWhere,
+      tenantId: user.tenantId,
+      userId: user.userId
+    };
+  }
 
-/**
- * Get user with roles and permissions from database
- * @param userId - User ID
- * @param tenantId - Tenant ID
- * @returns Promise<UserWithRoles | null> - User object with roles and permissions
- */
-export async function getUserWithRoles(
-  userId: string,
-  tenantId: string
-): Promise<UserWithRoles | null> {
-  return await prisma.user.findFirst({
-    where: {
-      id: userId,
-      tenantId: tenantId
-    },
-    include: {
-      userRoles: {
-        include: {
-          role: {
-            include: {
-              permissions: {
-                include: {
-                  permission: true
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  });
-}
-
-/**
- * Get user with roles and permissions by email
- * @param email - User email
- * @param tenantId - Tenant ID
- * @returns Promise<UserWithRoles | null> - User object with roles and permissions
- */
-export async function getUserWithRolesByEmail(
-  email: string,
-  tenantId: string
-): Promise<UserWithRoles | null> {
-  return await prisma.user.findFirst({
-    where: {
-      email: email,
-      tenantId: tenantId
-    },
-    include: {
-      userRoles: {
-        include: {
-          role: {
-            include: {
-              permissions: {
-                include: {
-                  permission: true
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  });
-}
-
-// Module-specific permission constants
-export const MODULE_PERMISSIONS = {
-  VIEW_MODULES: 'modules.view',
-  ENABLE_DISABLE_MODULES: 'modules.enable_disable',
-  MANAGE_MODULE_VERSIONS: 'modules.manage_versions',
-  VIEW_MODULE_ANALYTICS: 'modules.view_analytics'
-} as const;
-
-// Permission categories for UI grouping
-export const PERMISSION_CATEGORIES = {
-  MODULE_MANAGEMENT: 'Module Management',
-  USER_MANAGEMENT: 'User Management',
-  ROLE_MANAGEMENT: 'Role Management',
-  SETTINGS: 'Settings',
-  ANALYTICS: 'Analytics',
-  COMMUNICATION: 'Communication',
-  FILES: 'Files',
-  SUPPORT: 'Support',
-  API: 'API'
-} as const; 
+  return baseWhere;
+} 

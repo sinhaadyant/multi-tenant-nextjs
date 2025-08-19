@@ -556,6 +556,7 @@ async function getDashboardData(range: string): Promise<DashboardData> {
       totalTenants,
       activeTenants,
       totalUsers,
+      activeUsers,
       totalSuperAdmins: superAdminStats,
       growthMetrics,
     },
