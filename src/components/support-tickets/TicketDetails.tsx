@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
-import { useParams } from 'next/navigation';
+import { useParams, usePathname } from 'next/navigation';
 import { 
   ArrowLeft, 
   Edit, 
@@ -16,6 +16,7 @@ import {
   Shield
 } from 'lucide-react';
 import { SupportTicket, useAddReply, ReplyData } from '@/hooks/useSupportTickets';
+import { useAddSuperadminReply } from '@/hooks/useSuperadminSupportTickets';
 import { useToast } from '@/hooks/useToast';
 import { useConfirmModalContext } from '@/components/common/ConfirmModalProvider';
 import { AttachmentUploader, AttachmentFile } from './AttachmentUploader';
@@ -35,10 +36,16 @@ export const TicketDetails: React.FC<TicketDetailsProps> = ({
   className = ''
 }) => {
   const params = useParams();
+  const pathname = usePathname();
   const tenantSlug = params.tenantSlug as string;
   const { success, error } = useToast();
   const { confirm } = useConfirmModalContext();
-  const addReplyMutation = useAddReply();
+  
+  const isSuperadmin = pathname.startsWith('/superadmin');
+  const addReplyMutation = isSuperadmin 
+    ? useAddSuperadminReply() 
+    : useAddReply();
+    
   const queryClient = useQueryClient();
 
   const [replyText, setReplyText] = useState('');

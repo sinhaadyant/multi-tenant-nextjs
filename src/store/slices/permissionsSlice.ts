@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { mapFrontendToBackendKey } from '@/utils/moduleKeyMapping';
 
 // Types
 export interface MenuItem {
@@ -166,7 +167,8 @@ export const selectTenantSlug = (state: { permissions: PermissionsState }) => st
 // Permission check selectors - Updated for new permission structure
 export const selectHasPermission = (moduleKey: string, action: string) => (state: { permissions: PermissionsState }) => {
   const permissions = state.permissions.userPermissions;
-  console.log('🔍 Redux: selectHasPermission called with:', { moduleKey, action, permissions });
+  const mappedModuleKey = mapFrontendToBackendKey(moduleKey);
+  console.log('🔍 Redux: selectHasPermission called with:', { moduleKey, mappedModuleKey, action, permissions });
   
   if (!permissions || !permissions.permissions || !Array.isArray(permissions.permissions)) {
     console.log('🔍 Redux: No permissions available for check');
@@ -187,16 +189,17 @@ export const selectHasPermission = (moduleKey: string, action: string) => (state
   const permissionField = actionMap[action.toLowerCase()] || action;
   
   const result = permissions.permissions.some(permission => 
-    permission.moduleKey === moduleKey && permission[permissionField as keyof Permission] === true
+    permission.moduleKey === mappedModuleKey && permission[permissionField as keyof Permission] === true
   );
   
-  console.log('🔍 Redux: Permission check result:', { moduleKey, action, permissionField, result });
+  console.log('🔍 Redux: Permission check result:', { moduleKey, mappedModuleKey, action, permissionField, result });
   return result;
 };
 
 export const selectHasAnyPermission = (moduleKey: string) => (state: { permissions: PermissionsState }) => {
   const permissions = state.permissions.userPermissions;
-  console.log('🔍 Redux: selectHasAnyPermission called with:', { moduleKey, permissions });
+  const mappedModuleKey = mapFrontendToBackendKey(moduleKey);
+  console.log('🔍 Redux: selectHasAnyPermission called with:', { moduleKey, mappedModuleKey, permissions });
   
   if (!permissions || !permissions.permissions || !Array.isArray(permissions.permissions)) {
     console.log('🔍 Redux: No permissions available for any permission check');
@@ -204,10 +207,10 @@ export const selectHasAnyPermission = (moduleKey: string) => (state: { permissio
   }
   
   const result = permissions.permissions.some(permission => 
-    permission.moduleKey === moduleKey
+    permission.moduleKey === mappedModuleKey
   );
   
-  console.log('🔍 Redux: Any permission check result:', { moduleKey, result });
+  console.log('🔍 Redux: Any permission check result:', { moduleKey, mappedModuleKey, result });
   return result;
 };
 

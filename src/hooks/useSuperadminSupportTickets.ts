@@ -13,6 +13,8 @@ export interface SupportTicket {
   updatedAt: string;
   userId?: string;
   tenantId?: string;
+  createdBy?: string;
+  createdByType?: 'user' | 'superadmin';
   user?: {
     id: string;
     name: string;
@@ -22,6 +24,11 @@ export interface SupportTicket {
     id: string;
     name: string;
     slug: string;
+  };
+  createdBySuperAdmin?: {
+    id: string;
+    name: string;
+    email: string;
   };
   attachments: SupportTicketAttachment[];
   comments: SupportTicketComment[];
@@ -48,7 +55,7 @@ export interface SupportTicketComment {
   updatedAt: string;
   ticketId: string;
   commentedBy: string;
-  commenterType: 'user' | 'admin';
+  commenterType: 'user' | 'admin' | 'superadmin';
   attachments: SupportTicketCommentAttachment[];
 }
 
@@ -104,6 +111,7 @@ export interface UpdateTicketData {
   description?: string;
   priority?: 'low' | 'medium' | 'high' | 'urgent';
   category?: 'general' | 'technical' | 'billing' | 'feature-request' | 'bug-report';
+  status?: 'open' | 'pending' | 'closed';
 }
 
 export interface ReplyData {
@@ -142,8 +150,24 @@ export const useSuperadminSupportTicket = (id: string) => {
   return useQuery({
     queryKey: ['superadmin-support-ticket', id],
     queryFn: async (): Promise<{ ticket: SupportTicket }> => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🎫 Fetching SuperAdmin support ticket:', id);
+      }
+      
       const response = await api.get(`/superadmin/support-tickets/${id}`);
-      return response.data;
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🎫 SuperAdmin support ticket response:', {
+          success: response.data.success,
+          hasTicket: !!response.data.data?.ticket,
+          ticketId: response.data.data?.ticket?.id,
+          attachmentsCount: response.data.data?.ticket?.attachments?.length || 0,
+          commentsCount: response.data.data?.ticket?.comments?.length || 0,
+          _count: response.data.data?.ticket?._count
+        });
+      }
+      
+      return response.data.data;
     },
     enabled: !!id,
     staleTime: 1 * 60 * 1000, // 1 minute
@@ -202,12 +226,35 @@ export const useAddSuperadminReply = () => {
   
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: ReplyData }): Promise<{ message: string; comment: SupportTicketComment }> => {
-      const response = await api.post(`/superadmin/support-tickets/${id}/reply`, data);
+      const response = await api.post(`/superadmin/support-tickets/${id}/replies`, data);
       return response.data;
     },
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['superadmin-support-ticket', id] });
       queryClient.invalidateQueries({ queryKey: ['superadmin-support-tickets'] });
+    },
+  });
+};
+
+// Upload file attachment for SuperAdmin
+export const useUploadSuperadminAttachment = () => {
+  return useMutation({
+    mutationFn: async (file: File): Promise<{ filename: string; path: string; originalName: string; mimeType: string; size: number }> => {
+      const formData = new FormData();
+      formData.append('files', file);
+      
+      const response = await api.post('/superadmin/support-tickets/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      // Handle the response structure properly
+      if (response.data.success && response.data.data.files && response.data.data.files.length > 0) {
+        return response.data.data.files[0];
+      } else {
+        throw new Error('File upload failed or no files returned');
+      }
     },
   });
 };

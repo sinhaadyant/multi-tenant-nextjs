@@ -71,7 +71,7 @@ export const useReduxAuth = () => {
       dispatch(setTenantModulesLoading(true));
       console.log('🔍 Fetching modules from Redux auth...');
 
-      const response = await axios.get(`/tenant/${tenantSlug}/modules`, {
+      const response = await axios.get(`/api/tenant/${tenantSlug}/modules`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -114,7 +114,7 @@ export const useReduxAuth = () => {
       dispatch(setPermissionsLoading(true));
       console.log('🔍 Fetching user profile from Redux auth...');
 
-      const response = await axios.get(`/tenant/${tenantSlug}/me`, {
+      const response = await axios.get(`/api/tenant/${tenantSlug}/me`, {
         headers: {
           Authorization: `Bearer ${authToken}`
         }
@@ -195,9 +195,6 @@ export const useReduxAuth = () => {
         console.log('🔍 Dispatching permissions to Redux:', permissionsPayload);
         dispatch(setPermissions(permissionsPayload));
 
-        // Fetch modules after user profile is loaded
-        await fetchModules();
-
         console.log('🔍 Redux state updated successfully');
       } else {
         throw new Error(response.data.message || 'Failed to fetch user profile');
@@ -214,7 +211,14 @@ export const useReduxAuth = () => {
     } finally {
       dispatch(setPermissionsLoading(false));
     }
-  }, [tenantSlug, dispatch, fetchModules]);
+  }, [tenantSlug, dispatch]);
+
+  // Separate effect to fetch modules after user profile is loaded
+  useEffect(() => {
+    if (isLoggedIn && userPermissions?.permissions && userPermissions.permissions.length > 0 && (!modules || modules.length === 0)) {
+      fetchModules();
+    }
+  }, [isLoggedIn, userPermissions?.permissions, modules, fetchModules]);
 
   const logout = () => {
     console.log('🔍 Logging out user from Redux...');

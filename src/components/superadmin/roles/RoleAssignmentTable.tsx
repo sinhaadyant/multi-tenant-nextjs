@@ -331,7 +331,7 @@ const RoleAssignmentTable: React.FC<RoleAssignmentTableProps> = ({
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-sm text-gray-900 dark:text-white">
-                            {user.roleId ? getRoleName(user.roleId) : (
+                            {user.role.name ? user.role.name : (
                               <span className="text-gray-500 dark:text-gray-400 italic">No role assigned</span>
                             )}
                           </div>

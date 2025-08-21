@@ -7,6 +7,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { id } = params;
     const authResult = await requireSuperAdmin(request);
     if (authResult instanceof NextResponse) {
       return authResult;

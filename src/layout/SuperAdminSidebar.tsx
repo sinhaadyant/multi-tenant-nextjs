@@ -152,6 +152,7 @@ const getIcon = (iconName: string) => {
     "user-circle": <User className="w-5 h-5" />,
     database: <Database className="w-5 h-5" />,
     "hard-drive": <HardDrive className="w-5 h-5" />,
+    "list": <ClipboardList className="w-5 h-5" />,
   };
   return iconMap[iconName] || <Activity className="w-5 h-5" />;
 };

@@ -1,12 +1,20 @@
 "use client";
 
 import React from 'react';
-import { TicketForm } from '@/components/support-tickets/TicketForm';
+import { SuperAdminTicketForm } from '@/components/superadmin/support/SuperAdminTicketForm';
+import Head from 'next/head';
 
 export default function SuperAdminNewSupportTicketPage() {
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <TicketForm mode="create" />
-    </div>
+    <>
+      <Head>
+        <title>Create Support Ticket | SuperAdmin</title>
+      </Head>
+      <div className="min-h-screen bg-gray-50 py-8">
+        <SuperAdminTicketForm
+          mode="create"
+        />
+      </div>
+    </>
   );
 }

@@ -8,24 +8,25 @@ datasource db {
 }
 
 model SuperAdmin {
-  id                  String               @id @default(cuid())
-  email               String               @unique
-  name                String
-  password            String
-  isActive            Boolean              @default(true)
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  contactNumber       String?
-  avatar              String?
-  auditLogs           AuditLog[]
-  backups             Backup[]
-  inviteTokens        InviteToken[]
-  notifications       Notification[]
-  passwordResetTokens PasswordResetToken[]
-  refreshTokens       RefreshToken[]
-  reports             Report[]
-  createdMenuItems    MenuItem[]        @relation("MenuItemCreatedBy")
-  updatedMenuItems    MenuItem[]        @relation("MenuItemUpdatedBy")
+  id                    String               @id @default(cuid())
+  email                 String               @unique
+  name                  String
+  password              String
+  isActive              Boolean              @default(true)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  contactNumber         String?
+  avatar                String?
+  auditLogs             AuditLog[]
+  backups               Backup[]
+  inviteTokens          InviteToken[]
+  createdMenuItems      MenuItem[]           @relation("MenuItemCreatedBy")
+  updatedMenuItems      MenuItem[]           @relation("MenuItemUpdatedBy")
+  notifications         Notification[]
+  passwordResetTokens   PasswordResetToken[]
+  refreshTokens         RefreshToken[]
+  reports               Report[]
+  createdSupportTickets SupportTicket[]
 
   @@map("super_admins")
 }
@@ -87,11 +88,11 @@ model Role {
   isDefault   Boolean          @default(false)
   isTemplate  Boolean          @default(false)
   tenantId    String?
-  isGlobal    Boolean          @default(false)
   color       String?
   createdBy   String?
   isSystem    Boolean          @default(false)
   priority    Int              @default(0)
+  isGlobal    Boolean          @default(false)
   permissions RolePermission[]
   tenant      Tenant?          @relation(fields: [tenantId], references: [id])
   userRoles   UserRole[]
@@ -105,24 +106,24 @@ model Role {
 }
 
 model Module {
-  id              String         @id @default(cuid())
-  moduleKey       String         @unique
+  id              String           @id @default(cuid())
+  moduleKey       String           @unique
   moduleName      String
   path            String?
   icon            String?
   parentModuleKey String?
   description     String?
-  isActive        Boolean        @default(true)
-  isVisible       Boolean        @default(true)
-  orderIndex      Int            @default(0)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  isActive        Boolean          @default(true)
+  isVisible       Boolean          @default(true)
+  orderIndex      Int              @default(0)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   maxVersion      String?
   minVersion      String?
-  releaseNotes    String?        @db.Text
+  releaseNotes    String?          @db.Text
   version         String?
-  parentModule    Module?        @relation("ModuleHierarchy", fields: [parentModuleKey], references: [moduleKey])
-  childModules    Module[]       @relation("ModuleHierarchy")
+  parentModule    Module?          @relation("ModuleHierarchy", fields: [parentModuleKey], references: [moduleKey])
+  childModules    Module[]         @relation("ModuleHierarchy")
   rolePermissions RolePermission[]
   tenantModules   TenantModule[]
 
@@ -156,19 +157,17 @@ model TenantModule {
   @@map("tenant_modules")
 }
 
-
-
 model RolePermission {
-  id           String     @id @default(cuid())
-  roleId       String
-  moduleKey    String
-  canCreate    Boolean    @default(false)
-  canRead      Boolean    @default(false)
-  canUpdate    Boolean    @default(false)
-  canDelete    Boolean    @default(false)
-  canViewAll   Boolean    @default(false)
-  module       Module     @relation(fields: [moduleKey], references: [moduleKey], onDelete: Cascade)
-  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  id         String  @id @default(cuid())
+  roleId     String
+  canCreate  Boolean @default(false)
+  canDelete  Boolean @default(false)
+  canRead    Boolean @default(false)
+  canUpdate  Boolean @default(false)
+  canViewAll Boolean @default(false)
+  moduleKey  String
+  module     Module  @relation(fields: [moduleKey], references: [moduleKey], onDelete: Cascade)
+  role       Role    @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@unique([roleId, moduleKey])
   @@index([moduleKey], map: "role_permissions_moduleKey_fkey")
@@ -281,24 +280,28 @@ model UserNotification {
 }
 
 model SupportTicket {
-  id          String                    @id @default(cuid())
-  description String                    @db.Text
-  status      String                    @default("open")
-  priority    String                    @default("medium")
-  createdAt   DateTime                  @default(now())
-  updatedAt   DateTime                  @updatedAt
-  tenantId    String?
-  userId      String?
-  category    String                    @default("general")
-  isForwarded Boolean                   @default(false)
-  title       String                    @db.VarChar(255)
-  attachments SupportTicketAttachment[]
-  comments    SupportTicketComment[]
-  tenant      Tenant?                   @relation(fields: [tenantId], references: [id])
-  user        User?                     @relation(fields: [userId], references: [id])
+  id                  String                    @id @default(cuid())
+  description         String                    @db.Text
+  status              String                    @default("open")
+  priority            String                    @default("medium")
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  tenantId            String?
+  userId              String?
+  category            String                    @default("general")
+  isForwarded         Boolean                   @default(false)
+  title               String                    @db.VarChar(255)
+  createdBy           String?
+  createdByType       String                    @default("user")
+  attachments         SupportTicketAttachment[]
+  comments            SupportTicketComment[]
+  createdBySuperAdmin SuperAdmin?               @relation(fields: [createdBy], references: [id])
+  tenant              Tenant?                   @relation(fields: [tenantId], references: [id])
+  user                User?                     @relation(fields: [userId], references: [id])
 
   @@index([tenantId], map: "support_tickets_tenantId_fkey")
   @@index([userId], map: "support_tickets_userId_fkey")
+  @@index([createdBy], map: "support_tickets_createdBy_fkey")
   @@index([status], map: "support_tickets_status_fkey")
   @@index([priority], map: "support_tickets_priority_fkey")
   @@index([category], map: "support_tickets_category_fkey")
@@ -391,9 +394,9 @@ model Report {
   createdAt    DateTime    @default(now())
   data         String      @db.LongText
   name         String
-  status       String      @default("generating") // generating, ready, failed
   superAdminId String?
   type         String
+  status       String      @default("generating")
   superAdmin   SuperAdmin? @relation(fields: [superAdminId], references: [id])
   tenant       Tenant?     @relation(fields: [tenantId], references: [id])
 
@@ -439,18 +442,18 @@ model RefreshToken {
 }
 
 model Backup {
-  id          String      @id @default(cuid())
+  id          String     @id @default(cuid())
   filename    String
-  status      String      @default("processing") // processing, completed, failed
-  fileSize    Int         @default(0)
-  duration    Int         @default(0) // in milliseconds
+  status      String     @default("processing")
+  fileSize    Int        @default(0)
+  duration    Int        @default(0)
   description String?
-  createdAt   DateTime    @default(now())
+  createdAt   DateTime   @default(now())
   completedAt DateTime?
   createdById String
-  options     Json?       // Backup options as JSON
-  filePath    String?     // Path to the backup file
-  createdBy   SuperAdmin  @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  options     String?    @db.LongText
+  filePath    String?
+  createdBy   SuperAdmin @relation(fields: [createdById], references: [id], onDelete: Cascade)
 
   @@index([createdById], map: "backups_createdById_fkey")
   @@index([status])
@@ -459,24 +462,20 @@ model Backup {
 }
 
 model MenuItem {
-  id          String      @id @default(cuid())
-  label       String
-  path        String?
-  icon        String?
-  order       Int         @default(0)
-  isActive    Boolean     @default(true)
-  parentId    String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  createdBy   String?
-  updatedBy   String?
-  
-  // Self-referencing relationship for hierarchical menu
-  parent      MenuItem?   @relation("MenuItemHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children    MenuItem[]  @relation("MenuItemHierarchy")
-  
-  // SuperAdmin relationships
+  id                  String      @id @default(cuid())
+  label               String
+  path                String?
+  icon                String?
+  order               Int         @default(0)
+  isActive            Boolean     @default(true)
+  parentId            String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  createdBy           String?
+  updatedBy           String?
   createdBySuperAdmin SuperAdmin? @relation("MenuItemCreatedBy", fields: [createdBy], references: [id])
+  parent              MenuItem?   @relation("MenuItemHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children            MenuItem[]  @relation("MenuItemHierarchy")
   updatedBySuperAdmin SuperAdmin? @relation("MenuItemUpdatedBy", fields: [updatedBy], references: [id])
 
   @@index([parentId], map: "menu_items_parentId_fkey")

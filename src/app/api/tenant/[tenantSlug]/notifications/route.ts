@@ -213,7 +213,17 @@ export const POST = withTenantAuth(async (req: AuthenticatedRequest, { params }:
         isActive: validatedData.isActive,
         status: validatedData.status,
         targetTenantId: tenantId,
-        createdBy: userId
+        targetType: 'specific_tenant',
+        createdByType: 'user',
+        // Note: createdBy is null since it references SuperAdmin, not User
+        // We store the actual user info in metadata instead
+        metadata: JSON.stringify({
+          createdByUserId: userId,
+          createdByUser: {
+            id: req.user!.id,
+            email: req.user!.email
+          }
+        })
       }
     });
 

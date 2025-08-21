@@ -93,7 +93,7 @@ export const useModuleManagement = (tenantSlug: string) => {
         params.append('includeAnalytics', 'true');
       }
 
-      const response = await api.get(`/tenant/${tenantSlug}/modules?${params.toString()}`);
+      const response = await api.get(`/api/tenant/${tenantSlug}/modules?${params.toString()}`);
       
       if (response.data?.success) {
         setState(prev => ({
@@ -120,7 +120,7 @@ export const useModuleManagement = (tenantSlug: string) => {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
-      const response = await api.post(`/tenant/${tenantSlug}/modules`, action);
+      const response = await api.post(`/api/tenant/${tenantSlug}/modules`, action);
       
       if (response.data?.success) {
         // Refresh modules to get updated state

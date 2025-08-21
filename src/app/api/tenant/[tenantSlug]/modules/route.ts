@@ -28,7 +28,7 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const { tenantSlug } = params;
+    const { tenantSlug } = await params;
     const { searchParams } = new URL(request.url);
     const includeAnalytics = searchParams.get('includeAnalytics') === 'true';
 
@@ -222,7 +222,7 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const { tenantSlug } = params;
+    const { tenantSlug } = await params;
     const body = await request.json();
     const { action, moduleKey, settings, version } = body;
 

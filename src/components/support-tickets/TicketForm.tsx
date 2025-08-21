@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, usePathname } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Save, X } from 'lucide-react';
 import { useCreateSupportTicket, useUpdateSupportTicket, CreateTicketData, UpdateTicketData, SupportTicket } from '@/hooks/useSupportTickets';
+import { useCreateSuperadminSupportTicket, useUpdateSuperadminSupportTicket } from '@/hooks/useSuperadminSupportTickets';
 import { useToast } from '@/hooks/useToast';
 import { AttachmentUploader, AttachmentFile } from './AttachmentUploader';
 import Link from 'next/link';
@@ -22,12 +23,19 @@ export const TicketForm: React.FC<TicketFormProps> = ({
 }) => {
   const router = useRouter();
   const params = useParams();
+  const pathname = usePathname();
   const tenantSlug = params.tenantSlug as string;
   const { success, error } = useToast();
   const queryClient = useQueryClient();
   
-  const createTicketMutation = useCreateSupportTicket();
-  const updateTicketMutation = useUpdateSupportTicket();
+  const isSuperadmin = pathname.startsWith('/superadmin');
+  
+  const createTicketMutation = isSuperadmin 
+    ? useCreateSuperadminSupportTicket() 
+    : useCreateSupportTicket();
+  const updateTicketMutation = isSuperadmin 
+    ? useUpdateSuperadminSupportTicket() 
+    : useUpdateSupportTicket();
 
   const [formData, setFormData] = useState({
     title: ticket?.title || '',
@@ -107,7 +115,11 @@ export const TicketForm: React.FC<TicketFormProps> = ({
         
         // Add a small delay to ensure cache is updated
         setTimeout(() => {
-          router.push(`/${tenantSlug}/support-tickets`);
+          if (isSuperadmin) {
+            router.push('/superadmin/support-tickets');
+          } else {
+            router.push(`/${tenantSlug}/support-tickets`);
+          }
         }, 500);
       } else {
         const updateData: UpdateTicketData = {
@@ -120,7 +132,11 @@ export const TicketForm: React.FC<TicketFormProps> = ({
         await updateTicketMutation.mutateAsync({ id: ticket!.id, data: updateData });
         success('Support ticket updated successfully!');
         
-        router.push(`/${tenantSlug}/support-tickets/${ticket!.id}`);
+        if (isSuperadmin) {
+          router.push(`/superadmin/support-tickets/${ticket!.id}`);
+        } else {
+          router.push(`/${tenantSlug}/support-tickets/${ticket!.id}`);
+        }
       }
     } catch (err: any) {
       error(err.message || 'An error occurred while saving the ticket');
@@ -137,13 +153,6 @@ export const TicketForm: React.FC<TicketFormProps> = ({
       <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Link
-              href={`/${tenantSlug}/support-tickets`}
-              className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Tickets
-            </Link>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
                 {mode === 'create' ? 'Create New Support Ticket' : 'Edit Support Ticket'}

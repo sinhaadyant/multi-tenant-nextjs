@@ -28,6 +28,7 @@ const commentSchema = z.object({
 });
 
 export const GET = asyncHandler(async (request: NextRequest, { params }: { params: { id: string } }) => {
+  const { id } = params;
   if (process.env.NODE_ENV === 'development') {
     console.log('🎫 Fetching support ticket details:', id);
   }
@@ -76,10 +77,20 @@ export const GET = asyncHandler(async (request: NextRequest, { params }: { param
     console.log('✅ Support ticket fetched successfully');
   }
 
-  return createSuccessResponse({ ticket }, 'Support ticket fetched successfully');
+  // Transform ticket to include counts like the list endpoint
+  const ticketWithCounts = {
+    ...ticket,
+    _count: {
+      comments: ticket.comments.length,
+      attachments: ticket.attachments.length,
+    },
+  };
+
+  return createSuccessResponse({ ticket: ticketWithCounts }, 'Support ticket fetched successfully');
 });
 
 export const PUT = asyncHandler(async (request: NextRequest, { params }: { params: { id: string } }) => {
+  const { id } = params;
   if (process.env.NODE_ENV === 'development') {
     console.log('🎫 Updating support ticket:', id);
   }
@@ -176,10 +187,20 @@ export const PUT = asyncHandler(async (request: NextRequest, { params }: { param
     console.log('✅ Support ticket updated successfully');
   }
 
-  return createSuccessResponse({ ticket: updatedTicket }, 'Support ticket updated successfully');
+  // Transform ticket to include counts like the list endpoint
+  const ticketWithCounts = {
+    ...updatedTicket,
+    _count: {
+      comments: updatedTicket.comments.length,
+      attachments: updatedTicket.attachments.length,
+    },
+  };
+
+  return createSuccessResponse({ ticket: ticketWithCounts }, 'Support ticket updated successfully');
 });
 
 export const DELETE = asyncHandler(async (request: NextRequest, { params }: { params: { id: string } }) => {
+  const { id } = params;
   if (process.env.NODE_ENV === 'development') {
     console.log('🎫 Deleting support ticket:', id);
   }

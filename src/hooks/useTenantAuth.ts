@@ -45,7 +45,7 @@ export const useTenantAuth = () => {
     };
 
     initializeAuth();
-  }, [tenantSlug, isLoggedIn, permissions, modules, isInitialized, fetchUserProfile]);
+  }, [tenantSlug, isLoggedIn, permissions, modules, isInitialized]);
 
   // Check if auth is fully loaded
   const isFullyLoaded = isInitialized && !isLoading && !modulesLoading && 

@@ -1,28 +1,37 @@
 "use client";
 
-import React from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { TicketDetails } from '@/components/support-tickets/TicketDetails';
-import { TicketForm } from '@/components/support-tickets/TicketForm';
-import { useSupportTicket, useDeleteSupportTicket } from '@/hooks/useSupportTickets';
+import React, { useState, useEffect } from 'react';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import { SuperAdminTicketDetails } from '@/components/superadmin/support/SuperAdminTicketDetails';
+import { SuperAdminTicketForm } from '@/components/superadmin/support/SuperAdminTicketForm';
+import { useSuperadminSupportTicket, useDeleteSuperadminSupportTicket, SupportTicket } from '@/hooks/useSuperadminSupportTickets';
 import { useToast } from '@/hooks/useToast';
+import Head from 'next/head';
 
 type ViewMode = 'details' | 'edit';
 
 export default function SuperAdminSupportTicketDetailPage() {
+  const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const { success, error } = useToast();
-  const deleteTicketMutation = useDeleteSupportTicket();
-
   const ticketId = params.id as string;
-  const initialMode = searchParams.get('mode') as ViewMode || 'details';
-  const [viewMode, setViewMode] = React.useState<ViewMode>(initialMode);
+  const { success, error } = useToast();
+  const deleteTicketMutation = useDeleteSuperadminSupportTicket();
 
-  const { data: ticketData, isLoading, error: ticketError } = useSupportTicket(ticketId);
+  const [viewMode, setViewMode] = useState<ViewMode>('details');
 
-  const handleEditTicket = () => {
+  // Check URL query parameter for edit mode
+  useEffect(() => {
+    const mode = searchParams.get('mode');
+    if (mode === 'edit') {
+      setViewMode('edit');
+    }
+  }, [searchParams]);
+
+  // Fetch ticket data
+  const { data: ticketData, isLoading, error: ticketError } = useSuperadminSupportTicket(ticketId);
+
+  const handleEditTicket = (ticket: SupportTicket) => {
     setViewMode('edit');
   };
 
@@ -36,17 +45,20 @@ export default function SuperAdminSupportTicketDetailPage() {
     }
   };
 
-  const handleBackToDetails = () => {
-    setViewMode('details');
+  const handleBackToList = () => {
+    router.push('/superadmin/support-tickets');
   };
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-2 text-gray-600">Loading ticket...</span>
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <div className="animate-pulse">
+              <div className="h-6 bg-gray-200 rounded w-1/4 mb-4"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -56,18 +68,18 @@ export default function SuperAdminSupportTicketDetailPage() {
   if (ticketError || !ticketData?.ticket) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-            <h2 className="text-lg font-medium text-red-800 mb-2">Error Loading Ticket</h2>
-            <p className="text-red-600">
-              {ticketError?.message || 'Failed to load support ticket. Please try again.'}
-            </p>
-            <button
-              onClick={() => router.push('/superadmin/support-tickets')}
-              className="mt-4 inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Back to Tickets
-            </button>
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <div className="text-center">
+              <h1 className="text-xl font-semibold text-gray-900 mb-2">Ticket Not Found</h1>
+              <p className="text-gray-600 mb-4">The support ticket you're looking for doesn't exist or you don't have permission to view it.</p>
+              <button
+                onClick={handleBackToList}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Back to Support Tickets
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -76,24 +88,37 @@ export default function SuperAdminSupportTicketDetailPage() {
 
   const ticket = ticketData.ticket;
 
-  if (viewMode === 'edit') {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <TicketForm
-          ticket={ticket}
-          mode="edit"
-        />
-      </div>
-    );
-  }
+  // Render based on view mode
+  switch (viewMode) {
+    case 'edit':
+      return (
+        <>
+          <Head>
+            <title>Edit Support Ticket | SuperAdmin</title>
+          </Head>
+          <div className="min-h-screen bg-gray-50 py-8">
+            <SuperAdminTicketForm
+              ticket={ticket}
+              mode="edit"
+            />
+          </div>
+        </>
+      );
 
-  return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <TicketDetails
-        ticket={ticket}
-        onEditTicket={handleEditTicket}
-        onDeleteTicket={handleDeleteTicket}
-      />
-    </div>
-  );
+    default:
+      return (
+        <>
+          <Head>
+            <title>Support Ticket Details | SuperAdmin</title>
+          </Head>
+          <div className="min-h-screen bg-gray-50 py-8">
+            <SuperAdminTicketDetails
+              ticket={ticket}
+              onEditTicket={handleEditTicket}
+              onDeleteTicket={handleDeleteTicket}
+            />
+          </div>
+        </>
+      );
+  }
 }

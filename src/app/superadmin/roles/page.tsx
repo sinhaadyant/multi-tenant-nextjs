@@ -314,8 +314,8 @@ const RolesPage = () => {
                 {roles?.length > 0 && (
                   <div className="mt-2">
                     <p className="font-medium">Available Roles:</p>
-                    {roles.map(role => (
-                      <p key={role.id} className="ml-2">• {role.name} ({role.isGlobal ? 'Global' : 'Tenant'}) - Tenant ID: {role.tenantId || 'N/A'}</p>
+                    {roles.filter(role => role && role.id).map(role => (
+                      <p key={role.id} className="ml-2">• {role.name || 'Unnamed Role'} ({role.isGlobal ? 'Global' : 'Tenant'}) - Tenant ID: {role.tenantId || 'N/A'}</p>
                     ))}
                   </div>
                 )}

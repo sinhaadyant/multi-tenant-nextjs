@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { useParams } from 'next/navigation';
+import { useParams, usePathname } from 'next/navigation';
 import { 
   Search, 
   Filter, 
@@ -17,6 +17,7 @@ import {
   MoreHorizontal
 } from 'lucide-react';
 import { useSupportTickets, SupportTicketsFilters, SupportTicket } from '@/hooks/useSupportTickets';
+import { useSuperadminSupportTickets } from '@/hooks/useSuperadminSupportTickets';
 import { useToast } from '@/hooks/useToast';
 import { useConfirmModalContext } from '@/components/common/ConfirmModalProvider';
 import Link from 'next/link';
@@ -35,7 +36,10 @@ export const TicketList: React.FC<TicketListProps> = ({
   className = ''
 }) => {
   const params = useParams();
+  const pathname = usePathname();
   const tenantSlug = params.tenantSlug as string;
+  
+  const isSuperadmin = pathname.startsWith('/superadmin');
   
   const [filters, setFilters] = useState<SupportTicketsFilters>({
     page: 1,
@@ -66,7 +70,9 @@ export const TicketList: React.FC<TicketListProps> = ({
     return debouncedFilters();
   }, [debouncedFilters]);
 
-  const { data, isLoading, error } = useSupportTickets(filters);
+  const { data, isLoading, error } = isSuperadmin 
+    ? useSuperadminSupportTickets(filters)
+    : useSupportTickets(filters);
 
   const handlePageChange = (page: number) => {
     setFilters(prev => ({ ...prev, page }));
@@ -391,7 +397,7 @@ export const TicketList: React.FC<TicketListProps> = ({
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
                         <Link
-                          href={`/${tenantSlug}/support-tickets/${ticket.id}`}
+                          href={`/superadmin/support-tickets/${ticket.id}`}
                           className="text-blue-600 hover:text-blue-900 transition-colors"
                         >
                           <Eye className="w-4 h-4" />

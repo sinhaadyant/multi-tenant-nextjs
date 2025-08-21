@@ -78,6 +78,7 @@ export const GET = asyncHandler(async (request: NextRequest) => {
             email: true,
           },
         },
+
         comments: {
           select: {
             id: true,
@@ -157,32 +158,34 @@ export const POST = asyncHandler(async (request: NextRequest) => {
   }
 
   const body = await request.json();
-  const { title, description, category, priority, tenantId, userId } = body;
+  const { title, description, category, priority, tenantId, userId, attachments = [] } = body;
 
   // Validate required fields
-  if (!title || !description || !tenantId) {
+  if (!title || !description) {
     return createErrorResponse(
-      'Title, description, and tenantId are required',
+      'Title and description are required',
       400,
       [
         { field: 'title', message: 'Title is required' },
-        { field: 'description', message: 'Description is required' },
-        { field: 'tenantId', message: 'Tenant ID is required' }
+        { field: 'description', message: 'Description is required' }
       ]
     );
   }
 
-  // Verify tenant exists and is active
-  const tenant = await prisma.tenant.findUnique({
-    where: { id: tenantId, isActive: true }
-  });
+  // Verify tenant exists and is active (if tenantId is provided)
+  let tenant = null;
+  if (tenantId) {
+    tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId, isActive: true }
+    });
 
-  if (!tenant) {
-    return createErrorResponse('Tenant not found or inactive', 404);
+    if (!tenant) {
+      return createErrorResponse('Tenant not found or inactive', 404);
+    }
   }
 
-  // Verify user exists if provided
-  if (userId) {
+  // Verify user exists if provided (and tenantId is provided)
+  if (userId && tenantId) {
     const user = await prisma.user.findUnique({
       where: { id: userId, tenantId, isActive: true }
     });
@@ -192,7 +195,7 @@ export const POST = asyncHandler(async (request: NextRequest) => {
     }
   }
 
-  // Create ticket
+  // Create ticket with attachments
   const ticket = await prisma.supportTicket.create({
     data: {
       title,
@@ -200,8 +203,18 @@ export const POST = asyncHandler(async (request: NextRequest) => {
       category: category || 'general',
       priority: priority || 'medium',
       status: 'open',
-      tenantId,
+      tenantId: tenantId || null,
       userId: userId || null,
+
+      attachments: {
+        create: attachments.map((att: any) => ({
+          filename: att.filename,
+          originalName: att.originalName,
+          mimeType: att.mimeType,
+          size: att.size,
+          path: att.path,
+        })),
+      },
     },
     include: {
       tenant: {
@@ -218,14 +231,31 @@ export const POST = asyncHandler(async (request: NextRequest) => {
           email: true,
         },
       },
+
+      attachments: true,
+      comments: {
+        select: {
+          id: true,
+        },
+      },
     },
   });
+
+  // Transform ticket to include counts
+  const ticketWithCounts = {
+    ...ticket,
+    _count: {
+      comments: ticket.comments.length,
+      attachments: ticket.attachments.length,
+    },
+    comments: undefined,
+  };
 
   if (process.env.NODE_ENV === 'development') {
     console.log('✅ Support ticket created successfully:', ticket.id);
   }
 
   return createSuccessResponse({
-    ticket
+    ticket: ticketWithCounts
   }, 'Support ticket created successfully', 201);
 }); 

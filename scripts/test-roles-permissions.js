@@ -73,7 +73,7 @@ async function testModulesAPI() {
   console.log('\n📦 Testing Modules API...');
   
   try {
-    const response = await axios.get(`${BASE_URL}/tenant/acme-corp/modules`, {
+    const response = await axios.get(`${BASE_URL}/api/tenant/acme-corp/modules`, {
       headers: { Authorization: `Bearer ${authToken}` }
     });
 

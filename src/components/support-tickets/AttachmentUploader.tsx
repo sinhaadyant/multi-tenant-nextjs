@@ -3,6 +3,8 @@
 import React, { useState, useRef } from 'react';
 import { X, Upload, File, Image, FileText, Archive } from 'lucide-react';
 import { useUploadAttachment } from '@/hooks/useSupportTickets';
+import { useUploadSuperadminAttachment } from '@/hooks/useSuperadminSupportTickets';
+import { usePathname } from 'next/navigation';
 
 export interface AttachmentFile {
   file: File;
@@ -49,7 +51,12 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
   const [dragActive, setDragActive] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const uploadAttachmentMutation = useUploadAttachment();
+  const pathname = usePathname();
+  const isSuperadmin = pathname.startsWith('/superadmin');
+  
+  const uploadAttachmentMutation = isSuperadmin 
+    ? useUploadSuperadminAttachment() 
+    : useUploadAttachment();
 
   const validateFile = (file: File): string | null => {
     // Check file size
