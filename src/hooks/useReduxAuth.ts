@@ -1,6 +1,6 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import axios from 'axios';
 import { 
   selectTenantAuth, 
@@ -11,6 +11,7 @@ import {
   selectTenantModulesLoading,
   selectTenantModulesError,
   setTenantLogin,
+  setTenantLogout,
   setTenantModules,
   setTenantModulesLoading,
   setTenantModulesError,
@@ -31,8 +32,10 @@ import { RootState } from '@/store/store';
 
 export const useReduxAuth = () => {
   const dispatch = useDispatch();
+  const router = useRouter();
   const params = useParams();
   const tenantSlug = params.tenantSlug as string;
+  const [isInitializing, setIsInitializing] = useState(true);
 
   // Selectors
   const isLoggedIn = useSelector(selectTenantIsLoggedIn);
@@ -44,13 +47,16 @@ export const useReduxAuth = () => {
   const modulesLoading = useSelector(selectTenantModulesLoading);
   const modulesError = useSelector(selectTenantModulesError);
 
-  const getAuthToken = () => {
+  const getAuthToken = useCallback(() => {
     return token || localStorage.getItem('tenant_auth_token') || 
            localStorage.getItem('auth_token') || 
            sessionStorage.getItem('access_token');
-  };
+  }, [token]);
 
-  const clearAuthData = () => {
+  const clearAuthData = useCallback(() => {
+    console.log('🔍 Clearing auth data...');
+    
+    // Clear Redux state
     dispatch(clearTenantAuth());
     dispatch(clearPermissions());
     
@@ -59,10 +65,18 @@ export const useReduxAuth = () => {
     localStorage.removeItem('tenant_auth_token');
     localStorage.removeItem('refresh_token');
     sessionStorage.removeItem('access_token');
-  };
+    
+    // Clear any other auth-related data
+    localStorage.removeItem('user_data');
+    localStorage.removeItem('tenant_data');
+    sessionStorage.removeItem('user_data');
+    sessionStorage.removeItem('tenant_data');
+    
+    console.log('✅ Auth data cleared successfully');
+  }, [dispatch]);
 
   const fetchModules = useCallback(async () => {
-    if (!tenantSlug || !token) {
+    if (!tenantSlug || !getAuthToken()) {
       console.log('🔍 No tenant slug or token available for modules fetch');
       return;
     }
@@ -73,7 +87,7 @@ export const useReduxAuth = () => {
 
       const response = await axios.get(`/api/tenant/${tenantSlug}/modules`, {
         headers: {
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${getAuthToken()}`
         }
       });
 
@@ -91,23 +105,28 @@ export const useReduxAuth = () => {
       }
     } catch (err: any) {
       console.error('❌ Error fetching modules:', err);
-      dispatch(setTenantModulesError(err.response?.data?.message || err.message || 'Failed to fetch modules'));
+      if (err.response?.status === 401) {
+        console.log('🔍 401 Unauthorized - clearing auth data');
+        clearAuthData();
+      } else {
+        dispatch(setTenantModulesError(err.response?.data?.message || err.message || 'Failed to fetch modules'));
+      }
     } finally {
       dispatch(setTenantModulesLoading(false));
     }
-  }, [tenantSlug, token, dispatch]);
+  }, [tenantSlug, getAuthToken, dispatch, clearAuthData]);
 
   const fetchUserProfile = useCallback(async () => {
     if (!tenantSlug) {
       console.log('🔍 No tenant slug available');
-      return;
+      return false;
     }
 
     const authToken = getAuthToken();
     if (!authToken) {
       console.log('🔍 No auth token available');
       clearAuthData();
-      return;
+      return false;
     }
 
     try {
@@ -196,6 +215,7 @@ export const useReduxAuth = () => {
         dispatch(setPermissions(permissionsPayload));
 
         console.log('🔍 Redux state updated successfully');
+        return true;
       } else {
         throw new Error(response.data.message || 'Failed to fetch user profile');
       }
@@ -208,10 +228,42 @@ export const useReduxAuth = () => {
       } else {
         dispatch(setPermissionsError(err.response?.data?.message || err.message || 'Failed to fetch user profile'));
       }
+      return false;
     } finally {
       dispatch(setPermissionsLoading(false));
     }
-  }, [tenantSlug, dispatch]);
+  }, [tenantSlug, getAuthToken, dispatch, clearAuthData]);
+
+  // Initialize auth state
+  useEffect(() => {
+    const initializeAuth = async () => {
+      if (!tenantSlug) {
+        setIsInitializing(false);
+        return;
+      }
+
+      console.log('🔍 Initializing auth for tenant:', tenantSlug);
+      
+      const authToken = getAuthToken();
+      if (authToken) {
+        console.log('🔍 Found auth token, validating...');
+        const success = await fetchUserProfile();
+        if (success) {
+          console.log('🔍 Auth validation successful');
+        } else {
+          console.log('🔍 Auth validation failed, clearing data');
+          clearAuthData();
+        }
+      } else {
+        console.log('🔍 No auth token found');
+        clearAuthData();
+      }
+      
+      setIsInitializing(false);
+    };
+
+    initializeAuth();
+  }, [tenantSlug, fetchUserProfile, clearAuthData, getAuthToken]);
 
   // Separate effect to fetch modules after user profile is loaded
   useEffect(() => {
@@ -220,10 +272,55 @@ export const useReduxAuth = () => {
     }
   }, [isLoggedIn, userPermissions?.permissions, modules, fetchModules]);
 
-  const logout = () => {
-    console.log('🔍 Logging out user from Redux...');
-    clearAuthData();
-  };
+  const logout = useCallback(async (options?: {
+    redirect?: boolean;
+    redirectTo?: string;
+    showToast?: boolean;
+  }) => {
+    const { 
+      redirect = true, 
+      redirectTo = `/${tenantSlug}/login`, 
+      showToast = true
+    } = options || {};
+
+    try {
+      console.log('🔍 Logging out user from Redux...');
+      
+      // Clear all auth data
+      clearAuthData();
+      
+      // Call logout API (don't wait for it)
+      if (getAuthToken()) {
+        axios.post(`/api/tenant/${tenantSlug}/auth/logout`, {}, {
+          headers: {
+            Authorization: `Bearer ${getAuthToken()}`
+          }
+        }).catch(err => console.warn('Server logout failed:', err));
+      }
+
+      if (showToast) {
+        // You can add toast notification here if needed
+        console.log('✅ Logged out successfully');
+      }
+
+      if (redirect) {
+        router.push(redirectTo);
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Logout error:', error);
+      
+      // Even if there's an error, clear everything
+      clearAuthData();
+      
+      if (redirect) {
+        router.push(redirectTo);
+      }
+
+      return { success: false, error };
+    }
+  }, [clearAuthData, getAuthToken, tenantSlug, router]);
 
   const hasPermission = (module: string, action: string): boolean => {
     const state = { permissions } as RootState;
@@ -248,20 +345,13 @@ export const useReduxAuth = () => {
 
   const refreshUser = async () => {
     console.log('🔍 Refreshing user profile from Redux...');
-    await fetchUserProfile();
+    return await fetchUserProfile();
   };
 
   const refreshModules = useCallback(async () => {
     console.log('🔍 Refreshing modules from Redux...');
     await fetchModules();
   }, [fetchModules]);
-
-  useEffect(() => {
-    console.log('🔍 ReduxAuth - useEffect triggered, tenantSlug:', tenantSlug);
-    if (tenantSlug && !isLoggedIn) {
-      fetchUserProfile();
-    }
-  }, [tenantSlug, fetchUserProfile, isLoggedIn]);
 
   // Log current state for debugging
   useEffect(() => {
@@ -273,9 +363,10 @@ export const useReduxAuth = () => {
       modulesCount: modules?.length || 0,
       modulesLoading,
       modulesError,
-      permissionsState: permissions
+      permissionsState: permissions,
+      isInitializing
     });
-  }, [isLoggedIn, user, userPermissions, modules, modulesLoading, modulesError, permissions]);
+  }, [isLoggedIn, user, userPermissions, modules, modulesLoading, modulesError, permissions, isInitializing]);
 
   return {
     // Auth state
@@ -283,7 +374,7 @@ export const useReduxAuth = () => {
     user,
     token,
     tenant: userPermissions?.user?.tenant || null,
-    isLoading: permissions.isLoading,
+    isLoading: permissions.isLoading || isInitializing,
     error: permissions.error,
     
     // Permissions
@@ -302,6 +393,8 @@ export const useReduxAuth = () => {
     refreshUser,
     refreshModules,
     logout,
-    fetchUserProfile
+    fetchUserProfile,
+    clearAuthData,
+    getAuthToken
   };
 };

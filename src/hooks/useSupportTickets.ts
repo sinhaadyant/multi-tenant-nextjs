@@ -49,7 +49,7 @@ export interface SupportTicketComment {
   updatedAt: string;
   ticketId: string;
   commentedBy: string;
-  commenterType: 'user' | 'admin';
+  commenterType: 'user' | 'admin' | 'superadmin';
   attachments: SupportTicketCommentAttachment[];
 }
 

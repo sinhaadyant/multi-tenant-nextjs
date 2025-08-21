@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { useDispatch } from "react-redux";
 import { setTenantLogin, setTenantPermissions, setTenantModules, setTenantModulesLoading, setTenantModulesError } from "@/store/slices/tenantAuthSlice";
 import { setPermissions } from "@/store/slices/permissionsSlice";
 import TenantLogin from "@/components/auth/TenantLogin";
-import { Loader2 } from "lucide-react";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import axios from "axios";
 
 const TenantLoginPage: React.FC = () => {
@@ -15,16 +15,8 @@ const TenantLoginPage: React.FC = () => {
   const params = useParams();
   const dispatch = useDispatch();
   const tenantSlug = params.tenantSlug as string;
-  const { isLoggedIn, isLoading } = useReduxAuth();
+  const { isLoggedIn } = useReduxAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    // If user is already logged in, redirect to dashboard
-    if (isLoggedIn && !isLoading) {
-      console.log('🔍 User already logged in, redirecting to dashboard');
-      router.replace(`/${tenantSlug}/dashboard`);
-    }
-  }, [isLoggedIn, isLoading, router, tenantSlug]);
 
   // Function to fetch user permissions and modules
   const fetchUserData = async (authToken: string) => {
@@ -191,36 +183,16 @@ const TenantLoginPage: React.FC = () => {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (isLoggedIn) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Redirecting to dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-      <TenantLogin 
-        tenantSlug={tenantSlug} 
-        onLoginSuccess={handleLoginSuccess}
-        isSubmitting={isSubmitting}
-      />
-    </div>
+    <ProtectedRoute requireAuth={false}>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+        <TenantLogin 
+          tenantSlug={tenantSlug} 
+          onLoginSuccess={handleLoginSuccess}
+          isSubmitting={isSubmitting}
+        />
+      </div>
+    </ProtectedRoute>
   );
 };
 
