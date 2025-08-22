@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useParams } from "next/navigation";
+import { useSelector } from "react-redux";
 import { useSidebar } from "../context/SidebarContext";
 import { useTenantAuth } from "@/hooks/useTenantAuth";
 import {
@@ -57,109 +58,229 @@ const TenantSidebar: React.FC = () => {
     hasAnyPermission, 
     hasRole, 
     tenant,
-    modules,
-    modulesLoading,
+    modules: apiModules, 
+    modulesLoading, 
     modulesError
   } = useTenantAuth();
 
+  // Get the full userPermissions object from Redux
+  const userPermissions = useSelector((state: any) => state.permissions.userPermissions);
+
   console.log('🔍 TenantSidebar rendered with:', {
     user: user?.name,
-    permissionsCount: permissions?.length,
+    permissionsAvailable: !!userPermissions,
+    accessibleModulesCount: userPermissions?.accessibleModules?.length || 0,
+    permissionsCount: userPermissions?.permissions?.length || 0,
+    modulePermissionsCount: Object.keys(userPermissions?.modulePermissions || {}).length,
     rolesCount: roles?.length,
     tenantName: tenant?.name,
-    modulesCount: modules?.length,
+    modulesCount: apiModules?.length,
     modulesLoading,
     modulesError,
     isExpanded, isMobileOpen, isHovered
   });
 
+  // Debug Redux state directly
+  console.log('🔍 Redux state debug:', {
+    apiModules: apiModules,
+    modulesLoading,
+    modulesError,
+    userPermissions: userPermissions,
+    modulesCount: apiModules?.length || 0,
+    userPermissionsModulesCount: userPermissions?.modules?.length || 0
+  });
+
+  // Check if we have modules from either source
+  const hasModulesFromAPI = apiModules && apiModules.length > 0;
+  const hasModulesFromUserPermissions = userPermissions?.modules && userPermissions.modules.length > 0;
+  
+  console.log('🔍 Module availability check:', {
+    hasModulesFromAPI,
+    hasModulesFromUserPermissions,
+    modulesLoading,
+    modulesError
+  });
+
+  // Debug permissions
+  if (userPermissions) {
+    console.log('🔐 User permissions structure:', {
+      accessibleModules: userPermissions.accessibleModules,
+      permissions: userPermissions.permissions,
+      modulePermissions: userPermissions.modulePermissions
+    });
+  }
+
   const [openSubmenu, setOpenSubmenu] = useState<number | null>(null);
   const [subMenuHeight, setSubMenuHeight] = useState<Record<number, number>>({});
   const subMenuRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
-  // Dynamic navigation items based on modules from Redux
+  // Custom permission checking function for API permissions
+  const checkApiPermission = useCallback((moduleKey: string): boolean => {
+    // Always allow dashboard and profile
+    if (['dashboard', 'profile'].includes(moduleKey)) {
+      return true;
+    }
+    
+    // Check if user has permissions for this module
+    if (!userPermissions) {
+      console.log(`❌ Module ${moduleKey} - no permissions available`);
+      return false;
+    }
+
+    // Check if module is in accessible modules list
+    if (userPermissions.accessibleModules && userPermissions.accessibleModules.includes(moduleKey)) {
+      console.log(`✅ Module ${moduleKey} - found in accessible modules`);
+      return true;
+    }
+
+    // Check if user has any permission for this module (read, create, update, delete)
+    const modulePermissions = userPermissions.modulePermissions?.[moduleKey];
+    if (modulePermissions && modulePermissions.length > 0) {
+      console.log(`✅ Module ${moduleKey} - has module permissions:`, modulePermissions);
+      return true;
+    }
+
+    // Check if user has any permission that matches this module
+    const hasAnyModulePermission = userPermissions.permissions?.some((permission: any) => 
+      permission.moduleKey === moduleKey && (permission.canRead || permission.canCreate || permission.canUpdate || permission.canDelete)
+    );
+    
+    if (hasAnyModulePermission) {
+      console.log(`✅ Module ${moduleKey} - has matching permissions`);
+      return true;
+    }
+
+    console.log(`❌ Module ${moduleKey} - no permissions found`);
+    return false;
+  }, [userPermissions]);
+
+  // Dynamic navigation items based on modules from API
   const getTenantNavElements = useCallback((): NavItem[] => {
-    console.log('🔍 Building sidebar navigation from Redux modules:', {
+    console.log('🔍 Building sidebar navigation from API modules:', {
       user: user?.name,
-      modulesCount: modules?.length,
+      modulesCount: apiModules?.length,
       modulesLoading,
       modulesError
     });
 
     if (modulesLoading) {
-      console.log('⏳ Loading modules from Redux...');
+      console.log('⏳ Loading modules from API...');
       return [];
     }
 
     if (modulesError) {
-      console.error('❌ Error loading modules from Redux:', modulesError);
+      console.error('❌ Error loading modules from API:', modulesError);
       return [];
     }
 
-    if (!modules || modules.length === 0) {
-      console.log('⚠️ No modules found in Redux state');
+    // Use modules from userPermissions if apiModules is not available
+    const modulesToUse = apiModules ? (apiModules.length > 0 ? apiModules : (userPermissions?.modules || [])) : (userPermissions?.modules || []);
+    
+    if (!modulesToUse || modulesToUse.length === 0) {
+      console.log('⚠️ No modules found in API response or userPermissions');
       return [];
     }
 
     // Filter modules based on visibility and permissions
-    const visibleModules = modules.filter(module => {
+    const visibleModules = modulesToUse.filter((module: any) => {
+      const moduleKey = module.moduleKey;
+      
+      // Explicitly exclude module-management from sidebar
+      if (['module-management', 'modules'].includes(moduleKey)) {
+        console.log(`❌ Module ${moduleKey} - explicitly excluded from sidebar`);
+        return false;
+      }
+      
       // Check if module is visible in tenant
-      if (!module.isVisibleInTenant) {
-        console.log(`❌ Module ${module.moduleKey} is not visible in tenant`);
+      if (module.isVisibleInTenant === false) {
+        console.log(`❌ Module ${moduleKey} is not visible in tenant`);
         return false;
       }
 
       // Check if module is enabled
-      if (!module.isEnabled) {
-        console.log(`❌ Module ${module.moduleKey} is not enabled`);
+      if (module.isEnabled === false) {
+        console.log(`❌ Module ${moduleKey} is not enabled`);
         return false;
       }
 
       // Check if module is visible globally
-      if (!module.isVisible) {
-        console.log(`❌ Module ${module.moduleKey} is not visible globally`);
+      if (module.isVisible === false) {
+        console.log(`❌ Module ${moduleKey} is not visible globally`);
         return false;
       }
 
       // Special handling for modules that should be available to all users
-      if (['dashboard', 'profile', 'support'].includes(module.moduleKey)) {
-        console.log(`✅ Module ${module.moduleKey} is available to all users`);
+      if (['dashboard', 'profile'].includes(moduleKey)) {
+        console.log(`✅ Module ${moduleKey} is available to all users`);
         return true;
       }
 
-      // Check user permissions for other modules
-      const hasModulePermission = hasAnyPermission(module.moduleKey);
+      // For all other modules, check if user has ANY permission (read, create, update, delete)
+      const hasModulePermission = checkApiPermission(moduleKey);
       if (hasModulePermission) {
-        console.log(`✅ Module ${module.moduleKey} - user has permissions`);
+        console.log(`✅ Module ${moduleKey} - user has permissions`);
       } else {
-        console.log(`❌ Module ${module.moduleKey} - no permissions`);
+        console.log(`❌ Module ${moduleKey} - no permissions, excluding from sidebar`);
       }
       return hasModulePermission;
     });
 
-    // Convert modules to navigation items
-    const navItems: NavItem[] = visibleModules.map(module => {
+    // Convert modules to navigation items with correct route mapping
+    const navItems: NavItem[] = visibleModules.map((module: any) => {
+      const moduleKey = module.moduleKey;
+      
+      // Map module keys to correct route paths (excluding module-management)
+      const routeMapping: { [key: string]: string } = {
+        'dashboard': `/${tenantSlug}/dashboard`,
+        'user-management': `/${tenantSlug}/users`,
+        'users': `/${tenantSlug}/users`,
+        'roles-permissions': `/${tenantSlug}/roles`,
+        'roles': `/${tenantSlug}/roles`,
+        'audit-logs': `/${tenantSlug}/audit`,
+        'audit': `/${tenantSlug}/audit`,
+        'notifications': `/${tenantSlug}/notifications`,
+        'support': `/${tenantSlug}/support-tickets`,
+        'support-tickets': `/${tenantSlug}/support-tickets`,
+        'reports-analytics': `/${tenantSlug}/reports`,
+        'reports': `/${tenantSlug}/reports`,
+        'profile': `/${tenantSlug}/profile`,
+        'tenant-management': `/${tenantSlug}/tenants`,
+        'tenants': `/${tenantSlug}/tenants`,
+        'menu-management': `/${tenantSlug}/menu`,
+        'menu': `/${tenantSlug}/menu`,
+        'backup-import': `/${tenantSlug}/backup`,
+        'backup': `/${tenantSlug}/backup`,
+        'data-management': `/${tenantSlug}/data-management`,
+        'import': `/${tenantSlug}/import`,
+        'content-management': `/${tenantSlug}/content-management`,
+        'analytics': `/${tenantSlug}/analytics`
+      };
+
       const navItem: NavItem = {
-        id: module.moduleKey,
+        id: moduleKey,
         label: module.moduleName,
         icon: module.icon || 'home',
-        path: module.path ? `/${tenantSlug}${module.path}` : undefined
+        path: routeMapping[moduleKey] || `/${tenantSlug}/${moduleKey}`
       };
 
       // Add children if module has child modules
       if (module.childModules && module.childModules.length > 0) {
         navItem.children = module.childModules
-          .filter(child => child.isVisible && child.isEnabled)
-          .map(child => ({
-            id: child.moduleKey,
-            label: child.moduleName,
-            path: `/${tenantSlug}${child.path || `/${child.moduleKey}`}`,
-            requiredPermission: `${child.moduleKey}:read`
-          }));
+          .filter((child: any) => child.isVisible && child.isEnabled)
+          .map((child: any) => {
+            const childKey = child.moduleKey;
+            const childPath = routeMapping[childKey] || `/${tenantSlug}/${childKey}`;
+            return {
+              id: childKey,
+              label: child.moduleName,
+              path: childPath,
+              requiredPermission: `${childKey}:read`
+            };
+          });
       }
 
       // Special handling for modules that need custom children
-      if (module.moduleKey === 'support') {
+      if (moduleKey === 'support' || moduleKey === 'support-tickets') {
         navItem.children = [
           { 
             id: "allTickets", 
@@ -174,12 +295,67 @@ const TenantSidebar: React.FC = () => {
         ];
       }
 
+      // Special handling for backup/import module
+      if (moduleKey === 'backup-import' || moduleKey === 'backup') {
+        navItem.children = [
+          { 
+            id: "backup", 
+            label: "Backup Data", 
+            path: `/${tenantSlug}/backup`
+          },
+          { 
+            id: "import", 
+            label: "Import Data", 
+            path: `/${tenantSlug}/import`
+          }
+        ];
+      }
+
+      // Special handling for data management module
+      if (moduleKey === 'data-management') {
+        navItem.children = [
+          { 
+            id: "insertData", 
+            label: "Insert Sample Data", 
+            path: `/${tenantSlug}/data-management`
+          },
+          { 
+            id: "clearData", 
+            label: "Clear Data", 
+            path: `/${tenantSlug}/data-management`
+          }
+        ];
+      }
+
       return navItem;
     });
 
     console.log('🔍 Final navigation items:', navItems.map(item => ({ id: item.id, label: item.label })));
+    console.log('🔍 Modules source:', apiModules && apiModules.length > 0 ? 'API' : 'userPermissions');
+    console.log('🔍 Total modules available:', modulesToUse.length);
+    console.log('🔍 Visible modules after filtering:', visibleModules.length);
+    
+    // If no modules are available, provide fallback navigation
+    if (navItems.length === 0) {
+      console.log('⚠️ No modules available, providing fallback navigation');
+      return [
+        {
+          id: 'dashboard',
+          label: 'Dashboard',
+          icon: 'dashboard',
+          path: `/${tenantSlug}/dashboard`
+        },
+        {
+          id: 'profile',
+          label: 'Profile',
+          icon: 'user',
+          path: `/${tenantSlug}/profile`
+        }
+      ];
+    }
+    
     return navItems;
-  }, [modules, modulesLoading, modulesError, user?.name, tenantSlug, hasAnyPermission]);
+  }, [apiModules, modulesLoading, modulesError, user?.name, tenantSlug, checkApiPermission]);
 
   // Get icon component based on icon name
   const getIconComponent = useCallback((iconName: string) => {
@@ -368,7 +544,36 @@ const TenantSidebar: React.FC = () => {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {renderMenuItems(navItems)}
+        {modulesLoading ? (
+          // Loading state
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div key={index} className="flex items-center px-3 py-2">
+                <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mr-3" />
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse flex-1" />
+              </div>
+            ))}
+          </div>
+        ) : modulesError ? (
+          // Error state
+          <div className="px-3 py-2 text-sm text-red-500 dark:text-red-400">
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4">⚠️</div>
+              <span>Error loading modules</span>
+            </div>
+          </div>
+        ) : navItems.length === 0 ? (
+          // No modules state
+          <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4">ℹ️</div>
+              <span>No modules available</span>
+            </div>
+          </div>
+        ) : (
+          // Normal navigation
+          renderMenuItems(navItems)
+        )}
       </nav>
 
       {/* User Info */}

@@ -24,6 +24,7 @@ import {
   AlertCircle,
   X
 } from 'lucide-react';
+import InviteUserModal from './InviteUserModal';
 
 interface User {
   id: string;
@@ -94,6 +95,7 @@ const TenantUsersClient: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const [formData, setFormData] = useState<CreateUserForm>({
     name: '',
     email: '',
@@ -327,13 +329,22 @@ const TenantUsersClient: React.FC = () => {
           </p>
         </div>
         {permissions?.canCreate && (
-          <button 
-            onClick={() => setShowAddModal(true)}
-            className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            <UserPlus className="w-4 h-4 mr-2" />
-            Add User
-          </button>
+          <div className="mt-4 sm:mt-0 flex gap-3">
+            <button 
+              onClick={() => setShowInviteModal(true)}
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              <Mail className="w-4 h-4 mr-2" />
+              Invite User
+            </button>
+            <button 
+              onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Add User
+            </button>
+          </div>
         )}
       </div>
 
@@ -692,6 +703,18 @@ const TenantUsersClient: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Invite User Modal */}
+      {showInviteModal && (
+        <InviteUserModal
+          isOpen={showInviteModal}
+          onClose={() => setShowInviteModal(false)}
+          onSuccess={() => {
+            setShowInviteModal(false);
+            refetch();
+          }}
+        />
       )}
     </div>
   );

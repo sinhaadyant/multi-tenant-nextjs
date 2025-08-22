@@ -88,7 +88,7 @@ export const useToggleSuperAdminStatus = () => {
     onSuccess: (data, variables) => {
       const status = variables.isActive ? 'activated' : 'deactivated';
       toast.success(`Superadmin ${status} successfully!`);
-      queryClient.invalidateQueries({ queryKey: ['superadmins'] });
+      queryClient.invalidateQueries({ queryKey: ['superadmins'], exact: false });
     },
     onError: (error: any) => {
       const message = error.response?.data?.message || 'Failed to update superadmin status';
@@ -108,7 +108,7 @@ export const useCreateSuperAdminInvite = () => {
     },
     onSuccess: (data) => {
       toast.success('Superadmin invite created successfully!');
-      queryClient.invalidateQueries({ queryKey: ['superadmins'] });
+      queryClient.invalidateQueries({ queryKey: ['superadmins'], exact: false });
       return data;
     },
     onError: (error: any) => {

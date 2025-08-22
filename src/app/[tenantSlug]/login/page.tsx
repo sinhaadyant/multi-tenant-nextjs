@@ -15,27 +15,83 @@ const TenantLoginPage: React.FC = () => {
   const params = useParams();
   const dispatch = useDispatch();
   const tenantSlug = params.tenantSlug as string;
-  const { isLoggedIn, isLoading } = useReduxAuth();
+  const { isLoggedIn, isLoading, error } = useReduxAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [sessionCheckComplete, setSessionCheckComplete] = useState(false);
 
   useEffect(() => {
-    // If user is already logged in, redirect to dashboard
-    if (isLoggedIn && !isLoading) {
-      console.log('🔍 User already logged in, redirecting to dashboard');
+    // Check if we have a valid session
+    const checkSession = async () => {
+      try {
+        // Try to get token from Redux state first, then fallback to localStorage
+        const authToken = localStorage.getItem('tenant_auth_token') || 
+                         localStorage.getItem('auth_token') || 
+                         sessionStorage.getItem('access_token');
+        
+        if (authToken && tenantSlug) {
+          console.log('🔍 Checking existing session...');
+          
+          // Try to validate the token by making a quick API call
+          try {
+            const response = await axios.get(`/api/tenant/${tenantSlug}/me`, {
+              headers: { Authorization: `Bearer ${authToken}` },
+              timeout: 5000 // 5 second timeout
+            });
+            
+            if (response.data.success) {
+              // If successful, user has valid session, redirect to dashboard
+              console.log('✅ Valid session found, redirecting to dashboard');
+              
+              // Check if user was trying to access a specific page before login
+              const redirectPath = sessionStorage.getItem('redirectAfterLogin') || `/${tenantSlug}/dashboard`;
+              sessionStorage.removeItem('redirectAfterLogin');
+              
+              router.replace(redirectPath);
+              return;
+            }
+          } catch (apiError: any) {
+            console.log('❌ Invalid or expired session:', apiError.response?.status);
+            
+            // Clear invalid tokens
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('tenant_auth_token');
+            localStorage.removeItem('refresh_token');
+            sessionStorage.removeItem('access_token');
+            
+            // Continue to login page
+            setSessionCheckComplete(true);
+          }
+        } else {
+          // No token found, continue to login page
+          setSessionCheckComplete(true);
+        }
+      } catch (error) {
+        console.error('❌ Error checking session:', error);
+        setSessionCheckComplete(true);
+      }
+    };
+
+    if (tenantSlug) {
+      checkSession();
+    }
+  }, [tenantSlug, router]);
+
+  // If user is already logged in (from Redux), redirect to dashboard
+  useEffect(() => {
+    if (isLoggedIn && !isLoading && sessionCheckComplete) {
+      console.log('🔍 User already logged in (Redux), redirecting to dashboard');
       router.replace(`/${tenantSlug}/dashboard`);
     }
-  }, [isLoggedIn, isLoading, router, tenantSlug]);
+  }, [isLoggedIn, isLoading, sessionCheckComplete, router, tenantSlug]);
 
-  // Function to fetch user permissions and modules
-  const fetchUserData = async (authToken: string) => {
+  // Optimized function to fetch user data and modules in parallel
+  const fetchUserDataOptimized = async (authToken: string) => {
     try {
-      console.log('🔍 Fetching user permissions and modules...');
+      console.log('🔍 Fetching user data with modules in single API call...');
       
-      // Fetch user profile with permissions
-      const userResponse = await axios.get(`/api/tenant/${tenantSlug}/me`, {
-        headers: {
-          Authorization: `Bearer ${authToken}`
-        }
+      // Use the optimized endpoint that includes modules data
+      const userResponse = await axios.get(`/api/tenant/${tenantSlug}/me?includeModules=true`, {
+        headers: { Authorization: `Bearer ${authToken}` }
       });
 
       if (!userResponse.data.success) {
@@ -43,10 +99,11 @@ const TenantLoginPage: React.FC = () => {
       }
 
       const userData = userResponse.data.data;
-      console.log('🔍 User data fetched:', {
+
+      console.log('🔍 User data and modules fetched successfully:', {
         userId: userData.id,
         permissionsCount: userData.permissions?.length || 0,
-        rolesCount: userData.roles?.length || 0
+        modulesCount: userData.modules?.length || 0
       });
 
       // Create module permissions mapping
@@ -63,23 +120,9 @@ const TenantLoginPage: React.FC = () => {
         });
       }
 
-      // Fetch modules
-      dispatch(setTenantModulesLoading(true));
-      const modulesResponse = await axios.get(`/api/tenant/${tenantSlug}/modules`, {
-        headers: {
-          Authorization: `Bearer ${authToken}`
-        }
-      });
-
-      if (!modulesResponse.data.success) {
-        throw new Error('Failed to fetch modules');
-      }
-
-      const modulesData = modulesResponse.data.data;
-      console.log('🔍 Modules data fetched:', {
-        modulesCount: modulesData.modules?.length || 0
-      });
-
+      // Update all Redux state in parallel
+      dispatch(setTenantModulesLoading(false));
+      
       // Update permissions state
       dispatch(setTenantPermissions({
         allPermissions: userData.permissions?.map((p: any) => p.moduleKey) || [],
@@ -90,7 +133,7 @@ const TenantLoginPage: React.FC = () => {
 
       // Update modules state
       dispatch(setTenantModules({
-        modules: modulesData.modules || []
+        modules: userData.modules || []
       }));
 
       // Update global permissions state
@@ -105,7 +148,7 @@ const TenantLoginPage: React.FC = () => {
         totalModules: userData.permissions?.length || 0
       }));
 
-      console.log('🔍 User data, permissions, and modules loaded successfully');
+      console.log('🔍 All Redux state updated successfully');
 
     } catch (error) {
       console.error('❌ Error fetching user data:', error);
@@ -124,17 +167,19 @@ const TenantLoginPage: React.FC = () => {
       localStorage.removeItem('tenant_auth_token');
       sessionStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
-
-      // Store access token in localStorage (primary location for API)
-      localStorage.setItem('auth_token', result.data.token);
+      
+      // Store tokens in localStorage for API client fallback
       localStorage.setItem('tenant_auth_token', result.data.token);
-
-      // Store access token in sessionStorage (backup)
+      localStorage.setItem('auth_token', result.data.token);
       sessionStorage.setItem('access_token', result.data.token);
-
-      // Store refresh token in localStorage
       if (result.data.refreshToken) {
         localStorage.setItem('refresh_token', result.data.refreshToken);
+      }
+      
+      // Also store in sessionStorage for immediate access
+      sessionStorage.setItem('tenant_auth_token', result.data.token);
+      if (result.data.refreshToken) {
+        sessionStorage.setItem('refresh_token', result.data.refreshToken);
       }
 
       // Update Redux state with basic user info
@@ -158,31 +203,17 @@ const TenantLoginPage: React.FC = () => {
         expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
       }));
 
-      // Fetch complete user data including permissions and modules
-      await fetchUserData(result.data.token);
-
-      // Add a small delay to ensure tokens are stored
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Fetch complete user data including permissions and modules (optimized)
+      await fetchUserDataOptimized(result.data.token);
 
       // Redirect immediately after successful login
-      try {
-        console.log('🔄 Redirecting to dashboard...');
-        const dashboardPath = `/${tenantSlug}/dashboard`;
-        router.replace(dashboardPath);
-
-        // Fallback redirect after a short delay
-        setTimeout(() => {
-          if (window.location.pathname !== dashboardPath) {
-            console.log('🔄 Fallback redirect...');
-            window.location.href = dashboardPath;
-          }
-        }, 500);
-
-      } catch (error) {
-        console.error('❌ Router redirect failed:', error);
-        // Fallback to window.location
-        window.location.href = `/${tenantSlug}/dashboard`;
-      }
+      console.log('🔄 Redirecting to dashboard...');
+      
+      // Check if user was trying to access a specific page before login
+      const redirectPath = sessionStorage.getItem('redirectAfterLogin') || `/${tenantSlug}/dashboard`;
+      sessionStorage.removeItem('redirectAfterLogin');
+      
+      router.replace(redirectPath);
 
     } catch (error) {
       console.error('❌ Error during login success handling:', error);
@@ -191,23 +222,49 @@ const TenantLoginPage: React.FC = () => {
     }
   };
 
-  if (isLoading) {
+  // Show loading while checking session or if Redux is loading
+  if (!sessionCheckComplete || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+          <p className="text-gray-600 dark:text-gray-400">Checking session...</p>
         </div>
       </div>
     );
   }
 
+  // Show loading if user is logged in (redirecting)
   if (isLoggedIn) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
           <p className="text-gray-600 dark:text-gray-400">Redirecting to dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if there's an authentication error
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 max-w-md">
+            <h3 className="text-lg font-medium text-red-800 dark:text-red-200 mb-2">
+              Authentication Error
+            </h3>
+            <p className="text-red-600 dark:text-red-300 mb-4">
+              {error}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+            >
+              Try Again
+            </button>
+          </div>
         </div>
       </div>
     );

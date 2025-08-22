@@ -79,7 +79,7 @@ export const useUsers = (filters: UserFilters = {}) => {
       });
 
       const response = await api.get(`/superadmin/users?${params.toString()}`);
-      return response.data;
+      return response.data.data; // Extract data from the API response wrapper
     },
 
     retry: (failureCount, error: any) => {
@@ -98,7 +98,7 @@ export const useUser = (id: string) => {
     queryKey: ['user', id],
     queryFn: async () => {
       const response = await api.get(`/superadmin/users/${id}`);
-      return response.data.user;
+      return response.data.data.user; // Extract data from the API response wrapper
     },
     enabled: !!id,
   });

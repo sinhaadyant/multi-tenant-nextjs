@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import axios from 'axios';
 import { ThemeToggleButton } from '@/components/common/ThemeToggleButton';
 import { useSidebar } from '@/context/SidebarContext';
 
@@ -21,9 +22,59 @@ const TenantHeader: React.FC = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  const handleLogout = () => {
-    logout();
-    router.push(`/${tenantSlug}/login`);
+  const handleLogout = async () => {
+    try {
+      console.log('🔍 Tenant logout initiated...');
+      
+      // Call server-side logout API if possible
+      try {
+        await axios.post(`/api/tenant/${tenantSlug}/logout`, {}, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('tenant_auth_token') || localStorage.getItem('auth_token')}`
+          },
+          timeout: 3000 // 3 second timeout
+        });
+        console.log('✅ Server-side logout successful');
+      } catch (logoutError) {
+        console.warn('⚠️ Server-side logout failed, continuing with client-side cleanup:', logoutError);
+      }
+      
+      // Clear all auth data from Redux
+      logout();
+      
+      // Clear all tokens from storage
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('tenant_auth_token');
+      localStorage.removeItem('refresh_token');
+      sessionStorage.removeItem('access_token');
+      
+      // Clear any other tenant-specific data
+      localStorage.removeItem('tenant_data');
+      sessionStorage.removeItem('tenant_data');
+      localStorage.removeItem('persist:tenantAuth-root');
+      localStorage.removeItem('persist:permissions-root');
+      
+      // Clear any redirect paths
+      sessionStorage.removeItem('redirectAfterLogin');
+      
+      console.log('✅ Tenant logout successful, redirecting to login...');
+      
+      // Show success message
+      const { toast } = await import('react-hot-toast');
+      toast.success('Logged out successfully');
+      
+      // Redirect to tenant login page
+      router.push(`/${tenantSlug}/login`);
+    } catch (error) {
+      console.error('❌ Error during tenant logout:', error);
+      
+      // Show error message
+      const { toast } = await import('react-hot-toast');
+      toast.error('Error during logout, but you have been signed out');
+      
+      // Force redirect even if there's an error
+      router.push(`/${tenantSlug}/login`);
+    }
   };
 
   const getUserRoleDisplay = () => {

@@ -83,7 +83,7 @@ export const useCreateNotification = () => {
     onSuccess: (data) => {
       const recipientCount = data.data?.notification?.totalRecipients || 0;
       toast.success(`Notification sent to ${recipientCount} recipients successfully!`);
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['notification-recipients'] });
     },
     onError: (error: any) => {
@@ -140,7 +140,7 @@ export const useMarkNotificationAsRead = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'], exact: false });
     },
     onError: (error: any) => {
       const message = error.response?.data?.message || 'Failed to mark notification as read';
@@ -161,7 +161,7 @@ export const useToggleNotificationStatus = () => {
     onSuccess: (data, variables) => {
       const status = variables.isActive ? 'activated' : 'deactivated';
       toast.success(`Notification ${status} successfully!`);
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'], exact: false });
     },
     onError: (error: any) => {
       const message = error.response?.data?.message || 'Failed to update notification status';

@@ -13,6 +13,7 @@ export interface JWTPayload {
   email: string;
   role: 'superadmin' | 'user';
   tenantId?: string;
+  tenantSlug?: string;
   jti?: string; // JWT ID for tracking/revocation
 }
 

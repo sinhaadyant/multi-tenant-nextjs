@@ -21,7 +21,7 @@ import { DropdownItem } from '@/components/ui/dropdown/DropdownItem';
 interface UserTableProps {
   users: User[];
   loading: boolean;
-  pagination: {
+  pagination?: {
     page: number;
     limit: number;
     totalPages: number;
@@ -348,6 +348,10 @@ const UserTable: React.FC<UserTableProps> = ({
     state: {
       sorting,
       rowSelection,
+      pagination: {
+        pageIndex: ((pagination?.page || 1) - 1),
+        pageSize: pagination?.limit || 10,
+      },
     },
     onSortingChange: (updater) => {
       const newSorting = typeof updater === 'function' ? updater(sorting) : updater;
@@ -360,7 +364,7 @@ const UserTable: React.FC<UserTableProps> = ({
     getPaginationRowModel: getPaginationRowModel(),
     manualPagination: true,
     manualSorting: true,
-    pageCount: pagination.totalPages,
+    pageCount: pagination?.totalPages || 0,
   });
 
   const handlePageChange = (page: number) => {
@@ -518,7 +522,7 @@ const UserTable: React.FC<UserTableProps> = ({
           <div className="flex items-center space-x-2">
             <span className="text-sm text-gray-700 dark:text-gray-300">Show:</span>
             <select
-              value={pagination.limit}
+              value={pagination?.limit || 10}
               onChange={(e) => handlePageSizeChange(Number(e.target.value))}
               className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
@@ -532,18 +536,18 @@ const UserTable: React.FC<UserTableProps> = ({
           
           <div className="flex items-center space-x-2">
             <button
-              onClick={() => handlePageChange(pagination.page - 1)}
-              disabled={pagination.page <= 1}
+              onClick={() => handlePageChange((pagination?.page || 1) - 1)}
+              disabled={(pagination?.page || 1) <= 1}
               className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Previous
             </button>
             <span className="text-sm text-gray-700 dark:text-gray-300">
-              Page {pagination.page} of {pagination.totalPages}
+              Page {pagination?.page || 1} of {pagination?.totalPages || 1}
             </span>
             <button
-              onClick={() => handlePageChange(pagination.page + 1)}
-              disabled={pagination.page >= pagination.totalPages}
+              onClick={() => handlePageChange((pagination?.page || 1) + 1)}
+              disabled={(pagination?.page || 1) >= (pagination?.totalPages || 1)}
               className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next

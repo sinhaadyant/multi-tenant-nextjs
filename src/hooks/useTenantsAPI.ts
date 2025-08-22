@@ -172,7 +172,7 @@ export const useCreateTenant = () => {
     },
     onSuccess: (data) => {
       toast.success('Tenant created successfully!');
-      queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      queryClient.invalidateQueries({ queryKey: ['tenants'], exact: false });
       return data;
     },
     onError: (error: any) => {
@@ -193,7 +193,7 @@ export const useUpdateTenant = () => {
     },
     onSuccess: (data, variables) => {
       toast.success('Tenant updated successfully!');
-      queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      queryClient.invalidateQueries({ queryKey: ['tenants'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['tenant', variables.id] });
     },
     onError: (error: any) => {
@@ -216,7 +216,7 @@ export const useToggleTenantStatus = () => {
       const status = variables.isActive ? 'activated' : 'suspended';
       toast.success(`Tenant ${status} successfully!`);
       // Invalidate all tenant-related queries
-      queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      queryClient.invalidateQueries({ queryKey: ['tenants'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['tenant', variables.id] });
       queryClient.invalidateQueries({ queryKey: ['tenant-users'] });
       queryClient.invalidateQueries({ queryKey: ['tenant-activity'] });
@@ -239,7 +239,7 @@ export const useDeleteTenant = () => {
     },
     onSuccess: () => {
       toast.success('Tenant deleted successfully!');
-      queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      queryClient.invalidateQueries({ queryKey: ['tenants'], exact: false });
     },
     onError: (error: any) => {
       const message = error.response?.data?.message || 'Failed to delete tenant';
@@ -386,5 +386,32 @@ export const useTenantActivityLogs = (tenantId: string, filters: {
     },
     enabled: !!tenantId,
     staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+}; 
+
+// Fetch tenant roles
+export const useTenantRoles = (tenantId: string) => {
+  return useQuery({
+    queryKey: ['tenant-roles', tenantId],
+    queryFn: async () => {
+      try {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 useTenantRoles making API call for tenant ID:', tenantId);
+        }
+        const response = await api.get(`/superadmin/tenants/${tenantId}/roles`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 useTenantRoles API Response:', response.data);
+        }
+        return response.data;
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('❌ useTenantRoles API Error:', error);
+        }
+        throw error;
+      }
+    },
+    enabled: !!tenantId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 1,
   });
 }; 

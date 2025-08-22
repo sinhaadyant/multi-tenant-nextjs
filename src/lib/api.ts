@@ -1,91 +1,96 @@
-import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
+import axios, { AxiosInstance, AxiosResponse, AxiosError, AxiosRequestConfig } from 'axios';
 import toast from 'react-hot-toast';
 
 // We'll need to access the store for logout action
-let store: { dispatch: (action: { type: string }) => void } | null = null;
+let store: { dispatch: (action: any) => void; getState: () => any } | null = null;
 
-export const setStore = (storeInstance: { dispatch: (action: { type: string }) => void }) => {
+export const setStore = (storeInstance: { dispatch: (action: any) => void; getState: () => any }) => {
   store = storeInstance;
 };
 
-// Token management utilities
-const getAuthToken = (): string | null => {
+// Get auth token from Redux store first, then fallback to localStorage
+const getAuthToken = async (): Promise<string | null> => {
   try {
-    if (typeof window !== 'undefined') {
-      // Check for tenant auth token first
-      const tenantToken = localStorage.getItem('tenant_auth_token');
-      if (tenantToken && isValidToken(tenantToken)) {
-        return tenantToken;
-      }
-      
-      // Check for superadmin token
-      const superadminToken = localStorage.getItem('superadmin_token');
-      if (superadminToken && isValidToken(superadminToken)) {
-        return superadminToken;
-      }
-      
-      // Primary: Get from localStorage (where simpleStorage stores it)
-      const localToken = localStorage.getItem('auth_token');
-      if (localToken && isValidToken(localToken)) {
-        return localToken;
-      }
-      
-      // Fallback: Check sessionStorage
-      const sessionToken = sessionStorage.getItem('access_token');
-      if (sessionToken && isValidToken(sessionToken)) {
-        return sessionToken;
-      }
-      
-      // Fallback: Check Redux persist state
-      const persistedState = localStorage.getItem('persist:superadmin-root');
-      if (persistedState) {
-        try {
-          const parsed = JSON.parse(persistedState);
-          const authData = parsed.auth ? JSON.parse(parsed.auth) : null;
-          const tenantAuthData = parsed.tenantAuth ? JSON.parse(parsed.tenantAuth) : null;
-          
-          if (authData?.token && isValidToken(authData.token)) {
-            return authData.token;
-          }
-          
-          if (tenantAuthData?.token && isValidToken(tenantAuthData.token)) {
-            return tenantAuthData.token;
-          }
-        } catch (parseError) {
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('Error parsing Redux persist state:', parseError);
-          }
-          // Clear corrupted persisted state
-          localStorage.removeItem('persist:superadmin-root');
-        }
-      }
-      
-      // If we found invalid tokens, clear them
-      if (localToken && !isValidToken(localToken)) {
-        localStorage.removeItem('auth_token');
-      }
-      if (sessionToken && !isValidToken(sessionToken)) {
-        sessionStorage.removeItem('access_token');
+    // Try to get from Redux store first
+    if (store) {
+      const state = store.getState();
+      const reduxToken = state.tenantAuth?.token;
+      if (reduxToken) {
+        return reduxToken;
       }
     }
     
-    return null;
+    // Fallback to localStorage and sessionStorage
+    return localStorage.getItem('tenant_auth_token') || 
+           localStorage.getItem('auth_token') || 
+           sessionStorage.getItem('access_token') ||
+           sessionStorage.getItem('tenant_auth_token');
   } catch (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('Error getting auth token:', error);
-    }
-    return null;
+    // Fallback to localStorage and sessionStorage if Redux is not available
+    return localStorage.getItem('tenant_auth_token') || 
+           localStorage.getItem('auth_token') || 
+           sessionStorage.getItem('access_token') ||
+           sessionStorage.getItem('tenant_auth_token');
   }
 };
 
-const clearAuthData = () => {
+// Get refresh token from Redux store first, then fallback to localStorage
+const getRefreshToken = async (): Promise<string | null> => {
+  try {
+    // Try to get from Redux store first
+    if (store) {
+      const state = store.getState();
+      const reduxRefreshToken = state.tenantAuth?.refreshToken;
+      if (reduxRefreshToken) {
+        return reduxRefreshToken;
+      }
+    }
+    
+    // Fallback to localStorage
+    return localStorage.getItem('refresh_token');
+  } catch (error) {
+    // Fallback to localStorage if Redux is not available
+    return localStorage.getItem('refresh_token');
+  }
+};
+
+// Update tokens in Redux store
+const updateTokensInRedux = async (accessToken: string, refreshToken?: string) => {
+  try {
+    if (store) {
+      const { refreshTenantTokens } = await import('@/store/slices/tenantAuthSlice');
+      store.dispatch(refreshTenantTokens({
+        token: accessToken,
+        refreshToken: refreshToken || '',
+        expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
+      }));
+    }
+  } catch (error) {
+    console.warn('Failed to update tokens in Redux:', error);
+  }
+};
+
+const clearAuthData = async () => {
   try {
     if (typeof window !== 'undefined') {
+      // Clear Redux state if available
+      if (store) {
+        try {
+          const { clearTenantAuth } = await import('@/store/slices/tenantAuthSlice');
+          const { clearPermissions } = await import('@/store/slices/permissionsSlice');
+          store.dispatch(clearTenantAuth());
+          store.dispatch(clearPermissions());
+        } catch (error) {
+          console.warn('Failed to clear Redux state:', error);
+        }
+      }
+      
       // Clear all possible token locations
       sessionStorage.removeItem('access_token');
       sessionStorage.removeItem('auth_token');
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('auth_token');
+      localStorage.removeItem('tenant_auth_token');
       localStorage.removeItem('superadmin_token');
       localStorage.removeItem('persist:superadmin-root');
       
@@ -94,9 +99,7 @@ const clearAuthData = () => {
       document.cookie = 'refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     }
   } catch (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('Error clearing auth data:', error);
-    }
+    console.error('Error clearing auth data:', error);
   }
 };
 
@@ -158,9 +161,9 @@ const redirectToLogin = () => {
 };
 
 // Debug utility to log token info
-export const debugToken = () => {
+export const debugToken = async () => {
   if (typeof window !== 'undefined') {
-    const token = getAuthToken();
+    const token = await getAuthToken();
     if (token) {
       try {
         const payload = JSON.parse(atob(token.split('.')[1]));
@@ -204,6 +207,7 @@ const api: AxiosInstance = axios.create({
 api.interceptors.request.use(
   async (config) => {
     try {
+      // Get token from Redux store instead of localStorage
       const token = await getAuthToken();
       
       if (token) {
@@ -214,20 +218,22 @@ api.interceptors.request.use(
           
           if (payload.exp && payload.exp < currentTime) {
             if (process.env.NODE_ENV === 'development') {
-              console.log('⚠️ Token expired, clearing auth data');
+              console.log('⚠️ Token expired in request interceptor, will handle in response interceptor');
             }
-            await clearAuthData();
-            redirectToLogin();
-            return Promise.reject(new Error('Token expired'));
+            // Don't reject here, let the response interceptor handle the refresh
+            // Just continue without the expired token
+          } else {
+            config.headers.Authorization = `Bearer ${token}`;
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log('🔐 Adding auth token to request:', config.url);
+            }
           }
         } catch (error) {
           // Token is malformed, continue without it
-        }
-        
-        config.headers.Authorization = `Bearer ${token}`;
-        
-        if (process.env.NODE_ENV === 'development') {
-          console.log('🔐 Adding auth token to request:', config.url);
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('Malformed token, continuing without auth header');
+          }
         }
       } else {
         // Only log in development and only for non-public endpoints
@@ -266,25 +272,97 @@ api.interceptors.response.use(
       console.log('❌ API response error:', error.config?.url, error.response?.status);
     }
     
-    // Handle authentication errors
-    if (error.response?.status === 401) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔐 Authentication failed, clearing session and redirecting to login');
-      }
-      
-      try {
-        // Clear all auth data
-        await clearAuthData();
-        
-        // Show toast notification
-        toast.error('Session expired. Please log in again.');
-        
-        // Redirect to appropriate login page
-        redirectToLogin();
-        
-      } catch (clearError) {
+    const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
+
+    // Handle authentication errors with token refresh
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      // Skip refresh attempt for refresh endpoint and login endpoints to prevent loops
+      if (originalRequest.url?.includes('/auth/refresh') || 
+          originalRequest.url?.includes('/auth/login') ||
+          originalRequest.url?.includes('/login')) {
         if (process.env.NODE_ENV === 'development') {
-          console.warn('Error clearing auth data:', clearError);
+          console.log('🔐 Authentication failed on auth endpoint, clearing session and redirecting to login');
+        }
+        
+        try {
+          await clearAuthData();
+          toast.error('Session expired. Please log in again.');
+          redirectToLogin();
+        } catch (clearError) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('Error clearing auth data:', clearError);
+          }
+        }
+        return Promise.reject(error);
+      }
+
+      // Try to refresh the token
+      try {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔄 Attempting to refresh token...');
+        }
+
+        const refreshToken = await getRefreshToken();
+        if (!refreshToken) {
+          throw new Error('No refresh token available');
+        }
+
+        // Check if refresh token is also expired
+        if (isTokenExpired(refreshToken)) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('❌ Refresh token is also expired');
+          }
+          throw new Error('Refresh token expired');
+        }
+
+        // Get tenant slug from URL or current path
+        const pathSegments = window.location.pathname.split('/');
+        const tenantSlug = pathSegments[1]; // Assuming format: /tenantSlug/...
+
+        if (!tenantSlug) {
+          throw new Error('No tenant slug found');
+        }
+
+        // Call refresh endpoint
+        const refreshResponse = await axios.post(`/api/tenant/auth/refresh`, {
+          refreshToken
+        });
+
+        if (refreshResponse.data.success) {
+          const { accessToken, refreshToken: newRefreshToken } = refreshResponse.data.data;
+          
+          // Update tokens in storage
+          await updateTokensInRedux(accessToken, newRefreshToken);
+
+          if (process.env.NODE_ENV === 'development') {
+            console.log('✅ Token refreshed successfully');
+          }
+
+          // Update the original request with new token
+          originalRequest.headers = originalRequest.headers || {};
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          
+          // Retry the original request
+          return api(originalRequest);
+        } else {
+          throw new Error('Token refresh failed');
+        }
+      } catch (refreshError) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('❌ Token refresh failed:', refreshError);
+          console.log('🔐 Clearing session and redirecting to login');
+        }
+        
+        try {
+          await clearAuthData();
+          toast.error('Session expired. Please log in again.');
+          redirectToLogin();
+        } catch (clearError) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('Error clearing auth data:', clearError);
+          }
         }
       }
     }

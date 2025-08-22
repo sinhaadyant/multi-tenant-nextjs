@@ -4,12 +4,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDataConsistency } from '@/lib/dataConsistency';
-import { ArrowLeft, Save, UserPlus, Eye, EyeOff, Check } from 'lucide-react';
-import { useTenant } from '@/hooks/useTenantsAPI';
+import { ArrowLeft, Save, UserPlus, Eye, EyeOff, Check, Shield, Users } from 'lucide-react';
+import { useTenant, useTenantRoles } from '@/hooks/useTenantsAPI';
 import { useToast } from '@/hooks/useToast';
 import { useConfirmModalContext } from '@/components/common/ConfirmModalProvider';
 import TenantSkeleton from '@/components/superadmin/TenantSkeleton';
 import Button from '@/components/ui/button/Button';
+import RoleCard from '@/components/common/RoleCard';
 
 interface CreateUserFormData {
   name: string;
@@ -26,6 +27,9 @@ interface Role {
   name: string;
   description?: string;
   isActive: boolean;
+  isDefault?: boolean;
+  color?: string;
+  priority?: number;
 }
 
 export default function CreateUserPage() {
@@ -57,36 +61,14 @@ export default function CreateUserPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Data state
-  const [roles, setRoles] = useState<Role[]>([]);
-
   // API hooks
   const { data: tenantData, isLoading: tenantLoading, error: tenantError } = useTenant(tenantId);
+  const { data: rolesData, isLoading: rolesLoading, error: rolesError } = useTenantRoles(tenantId);
 
   const tenant = tenantData?.data?.tenant;
+  const roles = rolesData?.data?.roles || [];
 
-  // Load roles
-  useEffect(() => {
-    const loadRoles = async () => {
-      try {
-        const response = await fetch(`/api/superadmin/tenants/${tenantId}/roles`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('superadmin_token') || localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')}`,
-          },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setRoles(data.data?.roles || []);
-        }
-      } catch (error) {
-        console.error('Error loading roles:', error);
-      }
-    };
 
-    if (tenantId) {
-      loadRoles();
-    }
-  }, [tenantId]);
 
   // Form validation
   const validateForm = (): { isValid: boolean; fieldErrors: Record<string, string> } => {
@@ -249,7 +231,7 @@ export default function CreateUserPage() {
     }
   };
 
-  if (tenantLoading) {
+  if (tenantLoading || rolesLoading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center space-x-4">
@@ -263,7 +245,7 @@ export default function CreateUserPage() {
     );
   }
 
-  if (tenantError || !tenant) {
+  if (tenantError || rolesError || !tenant) {
     return (
       <div className="space-y-6">
         <div className="flex items-center space-x-4">
@@ -284,10 +266,10 @@ export default function CreateUserPage() {
             </div>
             <div className="ml-3">
               <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
-                Error loading tenant
+                Error loading data
               </h3>
               <div className="mt-2 text-sm text-red-700 dark:text-red-300">
-                {tenantError?.message || 'An error occurred while loading the tenant data.'}
+                {tenantError?.message || rolesError?.message || 'An error occurred while loading the data.'}
               </div>
             </div>
           </div>
@@ -508,50 +490,81 @@ export default function CreateUserPage() {
             </div>
           </div>
 
-          {/* Role Assignment */}
+                    {/* Role Assignment */}
           <div>
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Role Assignment</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {roles.map((role) => (
-                <div
-                  key={role.id}
-                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                    formData.roleIds.includes(role.id)
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                      : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
-                  }`}
-                  onClick={() => handleRoleToggle(role.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium text-gray-900 dark:text-white">{role.name}</h4>
-                      {role.description && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{role.description}</p>
-                      )}
-                    </div>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                      formData.roleIds.includes(role.id)
-                        ? 'border-blue-500 bg-blue-500'
-                        : 'border-gray-300 dark:border-gray-600'
-                    }`}>
-                      {formData.roleIds.includes(role.id) && (
-                        <div className="w-2 h-2 bg-white rounded-full"></div>
-                      )}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Role Assignment</h3>
+              <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+                <Shield className="w-4 h-4" />
+                <span>{roles.length} role{roles.length !== 1 ? 's' : ''} available</span>
+              </div>
+            </div>
+            
+            {rolesLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="mt-2 text-gray-500 dark:text-gray-400">Loading roles...</p>
+              </div>
+            ) : rolesError ? (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
+                      Error loading roles
+                    </h3>
+                    <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+                      {rolesError?.message || 'Failed to load roles. Please try refreshing the page.'}
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-            {roles.length === 0 && (
-              <p className="text-gray-500 dark:text-gray-400 text-center py-4">
-                No roles available for this tenant
-              </p>
-            )}
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-              Select one role for the user
-            </p>
-            {touched.roleIds && errors.roleIds && (
-              <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.roleIds}</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {roles.map((role) => (
+                    <RoleCard
+                      key={role.id}
+                      role={role}
+                      isSelected={formData.roleIds.includes(role.id)}
+                      onClick={handleRoleToggle}
+                      showDetails={true}
+                    />
+                  ))}
+                </div>
+                
+                {roles.length === 0 && (
+                  <div className="text-center py-8">
+                    <Shield className="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+                    <p className="text-gray-500 dark:text-gray-400 mb-2">No roles available for this tenant</p>
+                    <p className="text-sm text-gray-400 dark:text-gray-500">
+                      Contact your administrator to create roles for this tenant
+                    </p>
+                  </div>
+                )}
+                
+                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className="flex items-start space-x-2">
+                    <div className="flex-shrink-0 mt-0.5">
+                      <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="text-sm text-blue-800 dark:text-blue-200">
+                      <p className="font-medium mb-1">Role Selection</p>
+                      <p>Select one role for the user. The role determines the user's permissions and access levels within the tenant.</p>
+                    </div>
+                  </div>
+                </div>
+                
+                {touched.roleIds && errors.roleIds && (
+                  <p className="text-sm text-red-600 dark:text-red-400 mt-2">{errors.roleIds}</p>
+                )}
+              </>
             )}
           </div>
         </form>

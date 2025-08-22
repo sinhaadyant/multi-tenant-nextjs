@@ -45,57 +45,39 @@ export const useReduxAuth = () => {
   const modulesError = useSelector(selectTenantModulesError);
 
   const getAuthToken = () => {
-    return token || localStorage.getItem('tenant_auth_token') || 
+    // Try to get from Redux state first
+    if (token) {
+      return token;
+    }
+    
+    // Fallback to localStorage
+    return localStorage.getItem('tenant_auth_token') || 
            localStorage.getItem('auth_token') || 
            sessionStorage.getItem('access_token');
   };
 
+  const getRefreshToken = () => {
+    // Try to get from Redux state first
+    const reduxRefreshToken = useSelector((state: RootState) => state.tenantAuth.refreshToken);
+    if (reduxRefreshToken) {
+      return reduxRefreshToken;
+    }
+    
+    // Fallback to localStorage
+    return localStorage.getItem('refresh_token');
+  };
+
   const clearAuthData = () => {
+    // Clear Redux state
     dispatch(clearTenantAuth());
     dispatch(clearPermissions());
     
-    // Clear tokens from storage
+    // Clear tokens from storage as backup
     localStorage.removeItem('auth_token');
     localStorage.removeItem('tenant_auth_token');
     localStorage.removeItem('refresh_token');
     sessionStorage.removeItem('access_token');
   };
-
-  const fetchModules = useCallback(async () => {
-    if (!tenantSlug || !token) {
-      console.log('🔍 No tenant slug or token available for modules fetch');
-      return;
-    }
-
-    try {
-      dispatch(setTenantModulesLoading(true));
-      console.log('🔍 Fetching modules from Redux auth...');
-
-      const response = await axios.get(`/api/tenant/${tenantSlug}/modules`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-
-      if (response.data.success) {
-        const modulesData = response.data.data;
-        console.log('🔍 Modules fetched successfully:', {
-          modulesCount: modulesData.modules?.length || 0
-        });
-
-        dispatch(setTenantModules({
-          modules: modulesData.modules || []
-        }));
-      } else {
-        throw new Error(response.data.message || 'Failed to fetch modules');
-      }
-    } catch (err: any) {
-      console.error('❌ Error fetching modules:', err);
-      dispatch(setTenantModulesError(err.response?.data?.message || err.message || 'Failed to fetch modules'));
-    } finally {
-      dispatch(setTenantModulesLoading(false));
-    }
-  }, [tenantSlug, token, dispatch]);
 
   const fetchUserProfile = useCallback(async () => {
     if (!tenantSlug) {
@@ -110,14 +92,75 @@ export const useReduxAuth = () => {
       return;
     }
 
+    // Check if token is expired before making the request
+    try {
+      const payload = JSON.parse(atob(authToken.split('.')[1]));
+      const currentTime = Date.now() / 1000;
+      
+      if (payload.exp && payload.exp < currentTime) {
+        console.log('🔍 Token expired, attempting refresh...');
+        
+        // Try to refresh the token first
+        const refreshToken = getRefreshToken();
+        if (refreshToken) {
+          try {
+            const refreshResponse = await axios.post(`/api/tenant/auth/refresh`, {
+              refreshToken
+            });
+            
+                         if (refreshResponse.data.success) {
+               const { accessToken, refreshToken: newRefreshToken } = refreshResponse.data.data;
+               
+               // Update Redux state with new tokens
+               dispatch(setTenantLogin({
+                 user: {
+                   id: '',
+                   email: '',
+                   name: '',
+                   role: 'user',
+                   tenantId: '',
+                   tenantSlug: tenantSlug,
+                   permissions: [],
+                   accessibleModules: [],
+                   hasAccess: true
+                 },
+                 token: accessToken,
+                 refreshToken: newRefreshToken || '',
+                 email: '',
+                 tenantSlug: tenantSlug,
+                 expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
+               }));
+               
+               console.log('✅ Token refreshed successfully, retrying user profile fetch');
+               // Recursively call with new token
+               return fetchUserProfile();
+             }
+          } catch (refreshError) {
+            console.log('❌ Token refresh failed:', refreshError);
+            clearAuthData();
+            return;
+          }
+        } else {
+          console.log('🔍 No refresh token available, clearing auth data');
+          clearAuthData();
+          return;
+        }
+      }
+    } catch (error) {
+      console.log('🔍 Error checking token expiration:', error);
+      // Continue with the request, let the API handle it
+    }
+
     try {
       dispatch(setPermissionsLoading(true));
       console.log('🔍 Fetching user profile from Redux auth...');
 
-      const response = await axios.get(`/api/tenant/${tenantSlug}/me`, {
+      // Use optimized endpoint that includes modules data
+      const response = await axios.get(`/api/tenant/${tenantSlug}/me?includeModules=true`, {
         headers: {
           Authorization: `Bearer ${authToken}`
-        }
+        },
+        timeout: 10000 // 10 second timeout
       });
 
       console.log('🔍 API Response:', {
@@ -133,6 +176,7 @@ export const useReduxAuth = () => {
         console.log('🔍 Raw API Response Data:', userData);
         console.log('🔍 Permissions from API:', userData.permissions);
         console.log('🔍 Roles from API:', userData.roles);
+        console.log('🔍 Modules from API:', userData.modules);
         
         console.log('🔍 Setting user data in Redux:', {
           userId: userData.id,
@@ -140,6 +184,7 @@ export const useReduxAuth = () => {
           tenantName: userData.tenant?.name,
           rolesCount: userData.roles?.length || 0,
           permissionsCount: userData.permissions?.length || 0,
+          modulesCount: userData.modules?.length || 0,
           permissions: userData.permissions?.map((p: any) => `${p.moduleKey}:${p.canRead ? 'read' : ''}${p.canCreate ? 'create' : ''}${p.canUpdate ? 'update' : ''}${p.canDelete ? 'delete' : ''}`)
         });
 
@@ -195,6 +240,13 @@ export const useReduxAuth = () => {
         console.log('🔍 Dispatching permissions to Redux:', permissionsPayload);
         dispatch(setPermissions(permissionsPayload));
 
+        // Update modules state if modules data is available
+        if (userData.modules) {
+          dispatch(setTenantModules({
+            modules: userData.modules || []
+          }));
+        }
+
         console.log('🔍 Redux state updated successfully');
       } else {
         throw new Error(response.data.message || 'Failed to fetch user profile');
@@ -202,10 +254,18 @@ export const useReduxAuth = () => {
     } catch (err: any) {
       console.error('❌ Error fetching user profile:', err);
       
+      // Handle different types of errors
       if (err.response?.status === 401) {
         console.log('🔍 401 Unauthorized - clearing auth data');
         clearAuthData();
+      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        console.log('🔍 Request timeout - clearing auth data');
+        clearAuthData();
+      } else if (err.response?.status >= 500) {
+        console.log('🔍 Server error - setting error state');
+        dispatch(setPermissionsError('Server error. Please try again later.'));
       } else {
+        console.log('🔍 Other error - setting error state');
         dispatch(setPermissionsError(err.response?.data?.message || err.message || 'Failed to fetch user profile'));
       }
     } finally {
@@ -216,9 +276,9 @@ export const useReduxAuth = () => {
   // Separate effect to fetch modules after user profile is loaded
   useEffect(() => {
     if (isLoggedIn && userPermissions?.permissions && userPermissions.permissions.length > 0 && (!modules || modules.length === 0)) {
-      fetchModules();
+      // fetchModules(); // Removed separate modules fetch
     }
-  }, [isLoggedIn, userPermissions?.permissions, modules, fetchModules]);
+  }, [isLoggedIn, userPermissions?.permissions, modules]); // Removed fetchModules from dependency array
 
   const logout = () => {
     console.log('🔍 Logging out user from Redux...');
@@ -228,21 +288,18 @@ export const useReduxAuth = () => {
   const hasPermission = (module: string, action: string): boolean => {
     const state = { permissions } as RootState;
     const result = selectHasPermission(module, action)(state);
-    console.log(`🔒 hasPermission(${module}, ${action}) = ${result}`);
     return result;
   };
 
   const hasAnyPermission = (module: string): boolean => {
     const state = { permissions } as RootState;
     const result = selectHasAnyPermission(module)(state);
-    console.log(`🔒 hasAnyPermission(${module}) = ${result}`);
     return result;
   };
 
   const hasRole = (roleName: string): boolean => {
     const state = { permissions } as RootState;
     const result = selectHasRole(roleName)(state);
-    console.log(`🔒 hasRole(${roleName}) = ${result}`);
     return result;
   };
 
@@ -253,29 +310,44 @@ export const useReduxAuth = () => {
 
   const refreshModules = useCallback(async () => {
     console.log('🔍 Refreshing modules from Redux...');
-    await fetchModules();
-  }, [fetchModules]);
+    // This function is no longer needed as modules are fetched in fetchUserProfile
+    // await fetchModules(); 
+  }, []);
 
+  // Optimized useEffect to prevent unnecessary API calls
   useEffect(() => {
     console.log('🔍 ReduxAuth - useEffect triggered, tenantSlug:', tenantSlug);
-    if (tenantSlug && !isLoggedIn) {
-      fetchUserProfile();
+    
+    // Only fetch if we have a tenant slug, user is not logged in, and we have a valid token
+    const authToken = getAuthToken();
+    if (tenantSlug && !isLoggedIn && authToken) {
+      // Add a small delay to prevent rapid API calls during page loads
+      const timeoutId = setTimeout(() => {
+        console.log('🔍 Fetching user profile...');
+        fetchUserProfile();
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
+    } else if (tenantSlug && !authToken) {
+      console.log('🔍 No auth token found, clearing auth data');
+      clearAuthData();
     }
   }, [tenantSlug, fetchUserProfile, isLoggedIn]);
 
-  // Log current state for debugging
+  // Remove excessive logging in production
   useEffect(() => {
-    console.log('🔍 Current Redux State:', {
-      isLoggedIn,
-      user: user?.name,
-      permissionsCount: userPermissions?.permissions?.length || 0,
-      rolesCount: userPermissions?.user?.roles?.length || 0,
-      modulesCount: modules?.length || 0,
-      modulesLoading,
-      modulesError,
-      permissionsState: permissions
-    });
-  }, [isLoggedIn, user, userPermissions, modules, modulesLoading, modulesError, permissions]);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 Current Redux State:', {
+        isLoggedIn,
+        user: user?.name,
+        permissionsCount: userPermissions?.permissions?.length || 0,
+        rolesCount: userPermissions?.user?.roles?.length || 0,
+        modulesCount: modules?.length || 0,
+        modulesLoading,
+        modulesError
+      });
+    }
+  }, [isLoggedIn, user, userPermissions, modules, modulesLoading, modulesError]);
 
   return {
     // Auth state

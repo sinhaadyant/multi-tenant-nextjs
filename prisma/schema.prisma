@@ -50,6 +50,7 @@ model Tenant {
   roles             Role[]
   supportTickets    SupportTicket[]
   tenantModules     TenantModule[]
+  userInvitations   UserInvitation[]
   userNotifications UserNotification[]
   users             User[]
 
@@ -71,11 +72,40 @@ model User {
   supportTickets    SupportTicket[]
   userNotifications UserNotification[]
   userRoles         UserRole[]
+  sentInvitations   UserInvitation[]   @relation("UserInvitationInviter")
   tenant            Tenant?            @relation(fields: [tenantId], references: [id])
 
   @@unique([email, tenantId])
   @@index([tenantId], map: "users_tenantId_fkey")
   @@map("users")
+}
+
+model UserInvitation {
+  id          String    @id @default(cuid())
+  email       String
+  name        String
+  tenantId    String
+  roleId      String
+  invitedById String
+  token       String    @unique
+  expiresAt   DateTime
+  message     String?   @db.Text
+  status      String    @default("pending") // pending, accepted, expired, cancelled
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  acceptedAt  DateTime?
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  role        Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  invitedBy   User      @relation("UserInvitationInviter", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@index([tenantId], map: "user_invitations_tenantId_fkey")
+  @@index([roleId], map: "user_invitations_roleId_fkey")
+  @@index([invitedById], map: "user_invitations_invitedById_fkey")
+  @@index([email])
+  @@index([token])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("user_invitations")
 }
 
 model Role {
@@ -93,9 +123,10 @@ model Role {
   isSystem    Boolean          @default(false)
   priority    Int              @default(0)
   isGlobal    Boolean          @default(false)
-  permissions RolePermission[]
-  tenant      Tenant?          @relation(fields: [tenantId], references: [id])
-  userRoles   UserRole[]
+  permissions     RolePermission[]
+  tenant          Tenant?          @relation(fields: [tenantId], references: [id])
+  userInvitations UserInvitation[]
+  userRoles       UserRole[]
 
   @@unique([name, isGlobal])
   @@index([tenantId], map: "roles_tenantId_fkey")

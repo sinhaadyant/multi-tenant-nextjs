@@ -132,7 +132,7 @@ export const useCreateSuperadminUser = () => {
     },
     onSuccess: (data) => {
       toast.success('User created successfully!');
-      queryClient.invalidateQueries({ queryKey: ['superadmin-users'] });
+      queryClient.invalidateQueries({ queryKey: ['superadmin-users'], exact: false });
       return data;
     },
     onError: (error: any) => {
@@ -153,7 +153,7 @@ export const useUpdateSuperadminUser = () => {
     },
     onSuccess: (data, variables) => {
       toast.success('User updated successfully!');
-      queryClient.invalidateQueries({ queryKey: ['superadmin-users'] });
+      queryClient.invalidateQueries({ queryKey: ['superadmin-users'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['superadmin-user', variables.id] });
     },
     onError: (error: any) => {
@@ -175,7 +175,7 @@ export const useToggleSuperadminUserStatus = () => {
     onSuccess: (data, variables) => {
       const status = variables.isActive ? 'activated' : 'suspended';
       toast.success(`User ${status} successfully!`);
-      queryClient.invalidateQueries({ queryKey: ['superadmin-users'] });
+      queryClient.invalidateQueries({ queryKey: ['superadmin-users'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['superadmin-user', variables.id] });
     },
     onError: (error: any) => {
@@ -196,7 +196,7 @@ export const useDeleteSuperadminUser = () => {
     },
     onSuccess: (data, variables) => {
       toast.success('User deleted successfully!');
-      queryClient.invalidateQueries({ queryKey: ['superadmin-users'] });
+      queryClient.invalidateQueries({ queryKey: ['superadmin-users'], exact: false });
     },
     onError: (error: any) => {
       const message = error.response?.data?.message || 'Failed to delete user';

@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: "SuperAdmin dashboard for managing multi-tenant application",
 };
 
-export default function SuperAdminPage() {
-  // Redirect to the dashboard page
-  redirect("/superadmin/dashboard");
+export default function TenantPage({ params }: { params: { tenantSlug: string } }) {
+  // Redirect to the tenant dashboard page
+  redirect(`/${params.tenantSlug}/dashboard`);
 }

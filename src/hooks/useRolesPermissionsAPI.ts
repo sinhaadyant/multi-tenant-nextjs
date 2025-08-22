@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 // Types
@@ -103,6 +104,8 @@ export const useRolesPermissionsAPI = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const queryClient = useQueryClient();
 
   // Fetch tenants with pagination and search
   const fetchTenants = useCallback(async (filters: { search?: string; page?: number; limit?: number } = {}) => {
@@ -324,117 +327,201 @@ export const useRolesPermissionsAPI = () => {
     }
   }, []);
 
-  // Create a new role
-  const createRole = useCallback(async (roleData: CreateRoleData): Promise<Role> => {
-    try {
-      setError(null);
-      
+  // Create a new role with React Query mutation
+  const createRoleMutation = useMutation({
+    mutationFn: async (roleData: CreateRoleData): Promise<Role> => {
       const response = await api.post('/superadmin/roles', roleData);
       
       if (response.data.success) {
-        const newRole = response.data.role;
-        setRoles(prev => Array.isArray(prev) ? [...prev, newRole] : [newRole]);
-        return newRole;
+        return response.data.role;
       } else {
         throw new Error(response.data.message || 'Failed to create role');
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to create role');
-      throw err;
-    }
-  }, []);
-
-  // Update an existing role
-  const updateRole = useCallback(async (roleId: string, roleData: UpdateRoleData): Promise<Role> => {
-    try {
-      setError(null);
+    },
+    onSuccess: (newRole) => {
+      // Update local state
+      setRoles(prev => Array.isArray(prev) ? [...prev, newRole] : [newRole]);
       
+      // Invalidate React Query cache for roles
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-roles'] });
+      queryClient.invalidateQueries({ queryKey: ['superadmin-roles'] });
+      
+      // If we have a selected tenant, also invalidate tenant-specific queries
+      if (selectedTenant) {
+        queryClient.invalidateQueries({ queryKey: ['roles', selectedTenant.id] });
+        queryClient.invalidateQueries({ queryKey: ['tenant-roles', selectedTenant.slug] });
+      }
+    },
+    onError: (err: any) => {
+      setError(err.message || 'Failed to create role');
+    }
+  });
+
+  // Update an existing role with React Query mutation
+  const updateRoleMutation = useMutation({
+    mutationFn: async ({ roleId, roleData }: { roleId: string; roleData: UpdateRoleData }): Promise<Role> => {
       const response = await api.put(`/superadmin/roles/${roleId}`, roleData);
       
       if (response.data.success) {
-        const updatedRole = response.data.role;
-        setRoles(prev => Array.isArray(prev) ? prev.map(role =>
-          role.id === roleId ? updatedRole : role
-        ) : [updatedRole]);
-        return updatedRole;
+        return response.data.role;
       } else {
         throw new Error(response.data.message || 'Failed to update role');
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to update role');
-      throw err;
-    }
-  }, []);
-
-  // Delete a role
-  const deleteRole = useCallback(async (roleId: string): Promise<void> => {
-    try {
-      setError(null);
+    },
+    onSuccess: (updatedRole) => {
+      // Update local state
+      setRoles(prev => Array.isArray(prev) ? prev.map(role =>
+        role.id === updatedRole.id ? updatedRole : role
+      ) : [updatedRole]);
       
+      // Invalidate React Query cache for roles
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-roles'] });
+      queryClient.invalidateQueries({ queryKey: ['superadmin-roles'] });
+      
+      // If we have a selected tenant, also invalidate tenant-specific queries
+      if (selectedTenant) {
+        queryClient.invalidateQueries({ queryKey: ['roles', selectedTenant.id] });
+        queryClient.invalidateQueries({ queryKey: ['tenant-roles', selectedTenant.slug] });
+      }
+    },
+    onError: (err: any) => {
+      setError(err.message || 'Failed to update role');
+    }
+  });
+
+  // Delete a role with React Query mutation
+  const deleteRoleMutation = useMutation({
+    mutationFn: async (roleId: string): Promise<void> => {
       const response = await api.delete(`/superadmin/roles/${roleId}`);
       
       if (response.data.success) {
-        setRoles(prev => Array.isArray(prev) ? prev.filter(role => role.id !== roleId) : []);
         return response.data;
       } else {
         throw new Error(response.data.message || 'Failed to delete role');
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete role');
-      throw err;
-    }
-  }, []);
-
-  // Update role permissions
-  const updateRolePermissions = useCallback(async (roleId: string, permissions: { moduleId: string; actions: string[] }[]): Promise<void> => {
-    try {
-      setError(null);
+    },
+    onSuccess: (_, roleId) => {
+      // Update local state
+      setRoles(prev => Array.isArray(prev) ? prev.filter(role => role.id !== roleId) : []);
       
+      // Invalidate React Query cache for roles
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-roles'] });
+      queryClient.invalidateQueries({ queryKey: ['superadmin-roles'] });
+      
+      // If we have a selected tenant, also invalidate tenant-specific queries
+      if (selectedTenant) {
+        queryClient.invalidateQueries({ queryKey: ['roles', selectedTenant.id] });
+        queryClient.invalidateQueries({ queryKey: ['tenant-roles', selectedTenant.slug] });
+      }
+    },
+    onError: (err: any) => {
+      setError(err.message || 'Failed to delete role');
+    }
+  });
+
+  // Legacy functions for backward compatibility
+  const createRole = useCallback(async (roleData: CreateRoleData): Promise<Role> => {
+    return createRoleMutation.mutateAsync(roleData);
+  }, [createRoleMutation]);
+
+  const updateRole = useCallback(async (roleId: string, roleData: UpdateRoleData): Promise<Role> => {
+    return updateRoleMutation.mutateAsync({ roleId, roleData });
+  }, [updateRoleMutation]);
+
+  const deleteRole = useCallback(async (roleId: string): Promise<void> => {
+    return deleteRoleMutation.mutateAsync(roleId);
+  }, [deleteRoleMutation]);
+
+  // Update role permissions with React Query mutation
+  const updateRolePermissionsMutation = useMutation({
+    mutationFn: async ({ roleId, permissions }: { roleId: string; permissions: { moduleId: string; actions: string[] }[] }): Promise<any> => {
       const response = await api.post(`/superadmin/roles/${roleId}/permissions`, { permissions });
       
       if (response.data.success) {
-        // Update the specific role with new permissions in the local state
-        const updatedRole = response.data.role;
-        if (updatedRole) {
-          setRoles(prev => Array.isArray(prev) ? prev.map(role =>
-            role.id === roleId ? updatedRole : role
-          ) : [updatedRole]);
-        } else {
-          // Fallback: refresh all roles to get updated permissions
-          if (selectedTenant) {
-            await fetchAllRolesForTenant(selectedTenant.id);
-          }
-        }
+        return response.data;
       } else {
         throw new Error(response.data.message || 'Failed to update role permissions');
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to update role permissions');
-      throw err;
-    }
-  }, [selectedTenant, fetchAllRolesForTenant]);
-
-  // Assign roles to users
-  const assignRolesToUsers = useCallback(async (tenantId: string, assignments: RoleAssignment[]): Promise<void> => {
-    try {
-      setError(null);
+    },
+    onSuccess: (data, { roleId }) => {
+      // Update the specific role with new permissions in the local state
+      const updatedRole = data.role;
+      if (updatedRole) {
+        setRoles(prev => Array.isArray(prev) ? prev.map(role =>
+          role.id === roleId ? updatedRole : role
+        ) : [updatedRole]);
+      } else {
+        // Fallback: refresh all roles to get updated permissions
+        if (selectedTenant) {
+          fetchAllRolesForTenant(selectedTenant.id);
+        }
+      }
       
+      // Invalidate React Query cache for roles
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-roles'] });
+      queryClient.invalidateQueries({ queryKey: ['superadmin-roles'] });
+      
+      // If we have a selected tenant, also invalidate tenant-specific queries
+      if (selectedTenant) {
+        queryClient.invalidateQueries({ queryKey: ['roles', selectedTenant.id] });
+        queryClient.invalidateQueries({ queryKey: ['tenant-roles', selectedTenant.slug] });
+      }
+    },
+    onError: (err: any) => {
+      setError(err.message || 'Failed to update role permissions');
+    }
+  });
+
+  // Legacy function for backward compatibility
+  const updateRolePermissions = useCallback(async (roleId: string, permissions: { moduleId: string; actions: string[] }[]): Promise<void> => {
+    return updateRolePermissionsMutation.mutateAsync({ roleId, permissions });
+  }, [updateRolePermissionsMutation]);
+
+  // Assign roles to users with React Query mutation
+  const assignRolesToUsersMutation = useMutation({
+    mutationFn: async ({ tenantId, assignments }: { tenantId: string; assignments: RoleAssignment[] }): Promise<any> => {
       const response = await api.post('/superadmin/role-assignment', {
         tenantId,
         assignments
       });
       
       if (response.data.success) {
-        // Refresh users to get updated role assignments
-        await fetchUsers(tenantId);
+        return response.data;
       } else {
         throw new Error(response.data.message || 'Failed to assign roles');
       }
-    } catch (err: any) {
+    },
+    onSuccess: (data, { tenantId }) => {
+      // Refresh users to get updated role assignments
+      fetchUsers(tenantId);
+      
+      // Invalidate React Query cache for users and roles
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-users'] });
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-roles'] });
+      
+      // If we have a selected tenant, also invalidate tenant-specific queries
+      if (selectedTenant) {
+        queryClient.invalidateQueries({ queryKey: ['users', selectedTenant.id] });
+        queryClient.invalidateQueries({ queryKey: ['roles', selectedTenant.id] });
+        queryClient.invalidateQueries({ queryKey: ['tenant-users', selectedTenant.slug] });
+        queryClient.invalidateQueries({ queryKey: ['tenant-roles', selectedTenant.slug] });
+      }
+    },
+    onError: (err: any) => {
       setError(err.message || 'Failed to assign roles');
-      throw err;
     }
-  }, [fetchUsers]);
+  });
+
+  // Legacy function for backward compatibility
+  const assignRolesToUsers = useCallback(async (tenantId: string, assignments: RoleAssignment[]): Promise<void> => {
+    return assignRolesToUsersMutation.mutateAsync({ tenantId, assignments });
+  }, [assignRolesToUsersMutation]);
 
   // Load all data for a specific tenant
   const loadTenantData = useCallback(async (tenant: Tenant) => {
@@ -490,6 +577,13 @@ export const useRolesPermissionsAPI = () => {
     loadTenantData,
     clearData,
     setSelectedTenant,
-    setError
+    setError,
+    
+    // Mutations for direct access
+    createRoleMutation,
+    updateRoleMutation,
+    deleteRoleMutation,
+    updateRolePermissionsMutation,
+    assignRolesToUsersMutation
   };
 };

@@ -29,7 +29,7 @@ export interface UserPermissions {
 
 /**
  * Check if user has a specific permission for a tenant
- * This function checks if the user has any permission for the given module
+ * This function checks if the user has the specific permission for the given module and action
  */
 export async function checkTenantPermission(
   user: any,
@@ -50,17 +50,58 @@ export async function checkTenantPermission(
       return false;
     }
     
-    // For other permissions, check specific module
+    // For other permissions, check specific module and action
     const [moduleKey, action] = permissionKey.split('.');
     
-    // Check if user has any permission for this module
+    // Map module keys to handle different naming conventions
+    const moduleKeyMapping: { [key: string]: string[] } = {
+      'users': ['users', 'user-management'],
+      'roles': ['roles', 'roles-permissions'],
+      'audit': ['audit', 'audit-logs'],
+      'reports': ['reports', 'reports-analytics'],
+      'analytics': ['analytics', 'reports-analytics'],
+      'notifications': ['notifications'],
+      'content': ['content', 'content-management'],
+      'support': ['support'],
+      'profile': ['profile'],
+      'dashboard': ['dashboard']
+    };
+    
+    // Get the possible module keys for this permission
+    const possibleModuleKeys = moduleKeyMapping[moduleKey] || [moduleKey];
+    
+    // Check if user has the specific permission for any of the possible module keys
     for (const userRole of user.userRoles) {
       const role = userRole.role;
       
       for (const rolePermission of role.permissions) {
-        if (rolePermission.moduleKey === moduleKey) {
-          // If user has any permission for this module, allow access
-          return true;
+        if (possibleModuleKeys.includes(rolePermission.moduleKey)) {
+          // Check the specific action
+          switch (action) {
+            case 'view':
+            case 'read':
+              if (rolePermission.canRead) return true;
+              break;
+            case 'create':
+              if (rolePermission.canCreate) return true;
+              break;
+            case 'update':
+            case 'edit':
+              if (rolePermission.canUpdate) return true;
+              break;
+            case 'delete':
+              if (rolePermission.canDelete) return true;
+              break;
+            case 'viewAll':
+              if (rolePermission.canViewAll) return true;
+              break;
+            default:
+              // If no specific action or unknown action, check if user has any permission
+              if (rolePermission.canRead || rolePermission.canCreate || 
+                  rolePermission.canUpdate || rolePermission.canDelete) {
+                return true;
+              }
+          }
         }
       }
     }
@@ -248,6 +289,66 @@ export async function canPerformAction(
       return permissions.canViewAll;
     default:
       return false;
+  }
+}
+
+/**
+ * Enhanced permission checker that handles module key mapping
+ */
+export async function checkModulePermission(
+  user: any,
+  moduleKey: string,
+  action: 'create' | 'read' | 'update' | 'delete' | 'viewAll'
+): Promise<boolean> {
+  try {
+    // Map module keys to handle different naming conventions
+    const moduleKeyMapping: { [key: string]: string[] } = {
+      'users': ['users', 'user-management'],
+      'roles': ['roles', 'roles-permissions'],
+      'audit': ['audit', 'audit-logs'],
+      'reports': ['reports', 'reports-analytics'],
+      'analytics': ['analytics', 'reports-analytics'],
+      'notifications': ['notifications'],
+      'content': ['content', 'content-management'],
+      'support': ['support'],
+      'profile': ['profile'],
+      'dashboard': ['dashboard']
+    };
+    
+    // Get the possible module keys for this permission
+    const possibleModuleKeys = moduleKeyMapping[moduleKey] || [moduleKey];
+    
+    // Check if user has the specific permission for any of the possible module keys
+    for (const userRole of user.userRoles) {
+      const role = userRole.role;
+      
+      for (const rolePermission of role.permissions) {
+        if (possibleModuleKeys.includes(rolePermission.moduleKey)) {
+          switch (action) {
+            case 'read':
+              if (rolePermission.canRead) return true;
+              break;
+            case 'create':
+              if (rolePermission.canCreate) return true;
+              break;
+            case 'update':
+              if (rolePermission.canUpdate) return true;
+              break;
+            case 'delete':
+              if (rolePermission.canDelete) return true;
+              break;
+            case 'viewAll':
+              if (rolePermission.canViewAll) return true;
+              break;
+          }
+        }
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error checking module permission:', error);
+    return false;
   }
 }
 

@@ -1,67 +1,39 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireTenantAuth } from '@/middleware/auth';
+import { asyncHandler } from '@/lib/errorHandler';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-import { verifyToken } from '@/lib/jwt';
-import { createAuditLog } from '@/lib/audit';
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) {
+// GET /api/tenant/[tenantSlug]/me - Get current user profile
+export const GET = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log('👤 Fetching user profile for tenant:', (await params).tenantSlug);
+  }
+
+  // Authenticate user
+  const authResult = await requireTenantAuth(req);
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+
+  const { searchParams } = new URL(req.url);
+  const includeModules = searchParams.get('includeModules') === 'true';
+  const { tenantSlug } = await params;
+
   try {
-    const { tenantSlug } = await params;
-    
-    console.log('🔍 Tenant /me endpoint called for tenant:', tenantSlug);
-
-    if (!tenantSlug) {
-      return createErrorResponse('Tenant slug is required', 400);
-    }
-
-    // Get authorization header
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return createErrorResponse('Authorization header is required', 401);
-    }
-
-    const token = authHeader.substring(7);
-
-    // Verify the token
-    let decoded;
-    try {
-      decoded = verifyToken(token);
-    } catch (error) {
-      console.error('Token verification failed:', error);
-      return createErrorResponse('Invalid or expired token', 401);
-    }
-    
-    if (!decoded || !decoded.id) {
-      return createErrorResponse('Invalid token payload', 401);
-    }
-
-    // Find the tenant
-    const tenant = await prisma.tenant.findUnique({
-      where: { 
-        slug: tenantSlug,
-        isActive: true
-      },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        plan: true,
-        isActive: true,
-      }
-    });
-
-    if (!tenant) {
-      return createErrorResponse('Tenant not found or inactive', 404);
-    }
-
-    // Find the user in this tenant
-    const user = await prisma.user.findFirst({
-      where: {
-        id: decoded.id,
-        tenantId: tenant.id,
-        isActive: true
-      },
+    // Get user with roles and permissions
+    const user = await prisma.user.findUnique({
+      where: { id: authResult.id },
       include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            plan: true,
+            isActive: true
+          }
+        },
         userRoles: {
           include: {
             role: {
@@ -74,81 +46,112 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tena
               }
             }
           }
-        },
-        tenant: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            plan: true,
-            isActive: true,
-          }
         }
       }
     });
 
     if (!user) {
-      return createErrorResponse('User not found in this tenant', 404);
+      return createErrorResponse('User not found', 404);
     }
 
-    // Create audit log
-    await createAuditLog({
-      action: 'tenant.user_profile_accessed',
-      details: { 
-        userId: user.id,
-        tenantId: tenant.id,
-        tenantSlug: tenant.slug
-      },
-      ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
-      userAgent: req.headers.get('user-agent') || 'unknown',
-      tenantId: tenant.id,
-      userId: user.id,
-    });
+    // Verify user belongs to the correct tenant
+    if (user.tenant?.slug !== tenantSlug) {
+      return createErrorResponse('Access denied to this tenant', 403);
+    }
 
-    // Format the response
-    const userProfile = {
+    // Transform user data
+    const userData = {
       id: user.id,
-      name: user.name,
       email: user.email,
-      avatar: user.avatar,
+      name: user.name,
       isActive: user.isActive,
       lastLogin: user.lastLogin,
       createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
       tenant: user.tenant,
       roles: user.userRoles.map(userRole => ({
         id: userRole.role.id,
         name: userRole.role.name,
         description: userRole.role.description,
-        isDefault: userRole.role.isDefault,
-        permissions: userRole.role.permissions.map(rolePermission => ({
-          id: rolePermission.id,
-          moduleKey: rolePermission.moduleKey,
-          moduleName: rolePermission.module.moduleName,
-          canCreate: rolePermission.canCreate,
-          canRead: rolePermission.canRead,
-          canUpdate: rolePermission.canUpdate,
-          canDelete: rolePermission.canDelete,
-          canViewAll: rolePermission.canViewAll
+        permissions: userRole.role.permissions.map(rp => ({
+          id: rp.id,
+          moduleKey: rp.moduleKey,
+          moduleName: rp.module.moduleName,
+          canCreate: rp.canCreate,
+          canRead: rp.canRead,
+          canUpdate: rp.canUpdate,
+          canDelete: rp.canDelete,
+          canViewAll: rp.canViewAll
         }))
       })),
       permissions: user.userRoles.flatMap(userRole => 
-        userRole.role.permissions.map(rolePermission => ({
-          id: rolePermission.id,
-          moduleKey: rolePermission.moduleKey,
-          moduleName: rolePermission.module.moduleName,
-          canCreate: rolePermission.canCreate,
-          canRead: rolePermission.canRead,
-          canUpdate: rolePermission.canUpdate,
-          canDelete: rolePermission.canDelete,
-          canViewAll: rolePermission.canViewAll
+        userRole.role.permissions.map(rp => ({
+          id: rp.id,
+          moduleKey: rp.moduleKey,
+          moduleName: rp.module.moduleName,
+          canCreate: rp.canCreate,
+          canRead: rp.canRead,
+          canUpdate: rp.canUpdate,
+          canDelete: rp.canDelete,
+          canViewAll: rp.canViewAll
         }))
       )
     };
 
-    return createSuccessResponse(userProfile);
+    // If modules are requested, fetch them as well
+    let modulesData = null;
+    if (includeModules && user.tenantId) {
+      const tenantModules = await prisma.tenantModule.findMany({
+        where: {
+          tenantId: user.tenantId,
+          isEnabled: true,
+          isVisible: true
+        },
+        include: {
+          module: true
+        },
+        orderBy: {
+          module: {
+            orderIndex: 'asc'
+          }
+        }
+      });
 
-  } catch (error) {
-    console.error('Tenant /me endpoint error:', error);
-    return createErrorResponse('Internal server error', 500);
+      modulesData = {
+        modules: tenantModules.map(tm => ({
+          id: tm.module.id,
+          moduleKey: tm.module.moduleKey,
+          moduleName: tm.module.moduleName,
+          description: tm.module.description,
+          icon: tm.module.icon,
+          orderIndex: tm.module.orderIndex,
+          isActive: tm.module.isActive,
+          isEnabled: tm.isEnabled,
+          isVisible: tm.isVisible,
+          isVisibleInTenant: tm.isVisible, // Use isVisible as isVisibleInTenant
+          version: tm.version,
+          settings: tm.settings
+        }))
+      };
+    }
+
+    const responseData = {
+      ...userData,
+      ...(modulesData && { modules: modulesData.modules })
+    };
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ User profile fetched successfully:', {
+        userId: user.id,
+        permissionsCount: userData.permissions.length,
+        modulesCount: modulesData?.modules?.length || 0
+      });
+    }
+
+    return createSuccessResponse(responseData, 'User profile retrieved successfully');
+
+  } catch (error: any) {
+    console.error('❌ Error fetching user profile:', error);
+    return createErrorResponse('Failed to fetch user profile', 500);
   }
-} 
+}); 

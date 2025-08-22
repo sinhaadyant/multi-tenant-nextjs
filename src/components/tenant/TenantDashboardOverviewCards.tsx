@@ -93,15 +93,38 @@ export const TenantDashboardOverviewCards: React.FC<TenantDashboardOverviewCards
     },
   ];
 
+  // Filter cards based on permissions
+  const visibleCards = statsCards.filter(stat => stat.permission);
+
+  // If no cards are visible, show a message
+  if (visibleCards.length === 0) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+        <div className="text-center">
+          <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            No Dashboard Access
+          </h3>
+          <p className="text-gray-500 dark:text-gray-400">
+            You don't have permission to view any dashboard statistics. Contact your administrator for access.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {statsCards.map((stat, index) => (
+    <div className={`grid gap-6 ${
+      visibleCards.length === 1 ? 'grid-cols-1' :
+      visibleCards.length === 2 ? 'grid-cols-1 md:grid-cols-2' :
+      visibleCards.length === 3 ? 'grid-cols-1 md:grid-cols-3' :
+      'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'
+    }`}>
+      {visibleCards.map((stat, index) => (
         <div 
           key={index} 
-          className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-200 dark:border-gray-700 ${
-            !stat.permission ? 'opacity-50' : 'hover:shadow-md transition-shadow cursor-pointer'
-          }`}
-          onClick={() => stat.permission && stat.href && router.push(stat.href)}
+          className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow cursor-pointer"
+          onClick={() => stat.href && router.push(stat.href)}
         >
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-medium text-gray-900 dark:text-white">{stat.title}</h3>
@@ -110,7 +133,7 @@ export const TenantDashboardOverviewCards: React.FC<TenantDashboardOverviewCards
             </div>
           </div>
           <div className="text-2xl font-bold text-gray-900 dark:text-white">
-            {formatNumber(stat.value)}
+            {formatNumber(stat.value || 0)}
           </div>
           {stat.change !== 0 && (
             <div className="flex items-center mt-2">
@@ -123,9 +146,6 @@ export const TenantDashboardOverviewCards: React.FC<TenantDashboardOverviewCards
                 {formatPercentage(stat.change)}
               </span>
             </div>
-          )}
-          {!stat.permission && (
-            <p className="text-xs text-gray-500 mt-1">Permission required</p>
           )}
         </div>
       ))}

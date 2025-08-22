@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { toast } from 'react-hot-toast';
 
 // Types
 export interface SupportTicket {
@@ -174,64 +175,111 @@ export const useSuperadminSupportTicket = (id: string) => {
   });
 };
 
-// Create support ticket for SuperAdmin
+// Create support ticket
 export const useCreateSuperadminSupportTicket = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async (data: CreateTicketData): Promise<{ message: string; ticket: SupportTicket }> => {
+    mutationFn: async (data: CreateTicketData) => {
       const response = await api.post('/superadmin/support-tickets', data);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['superadmin-support-tickets'] });
+            onSuccess: (data) => {
+          toast.success('Support ticket created successfully!');
+          queryClient.invalidateQueries({ queryKey: ['superadmin-support-tickets'], exact: false });
+          queryClient.invalidateQueries({ queryKey: ['support-stats'] });
+          return data;
+        },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Failed to create support ticket';
+      toast.error(message);
     },
   });
 };
 
-// Update support ticket for SuperAdmin
+// Update support ticket
 export const useUpdateSuperadminSupportTicket = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateTicketData }): Promise<{ message: string; ticket: SupportTicket }> => {
+    mutationFn: async ({ id, data }: { id: string; data: UpdateTicketData }) => {
       const response = await api.put(`/superadmin/support-tickets/${id}`, data);
       return response.data;
     },
-    onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: ['superadmin-support-tickets'] });
-      queryClient.invalidateQueries({ queryKey: ['superadmin-support-ticket', id] });
+    onSuccess: (data, variables) => {
+      toast.success('Support ticket updated successfully!');
+      queryClient.invalidateQueries({ queryKey: ['superadmin-support-tickets'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['superadmin-support-ticket', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['support-stats'] });
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Failed to update support ticket';
+      toast.error(message);
     },
   });
 };
 
-// Delete support ticket for SuperAdmin
+// Delete support ticket
 export const useDeleteSuperadminSupportTicket = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async (id: string): Promise<{ message: string }> => {
+    mutationFn: async (id: string) => {
       const response = await api.delete(`/superadmin/support-tickets/${id}`);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['superadmin-support-tickets'] });
+    onSuccess: (data, variables) => {
+      toast.success('Support ticket deleted successfully!');
+      queryClient.invalidateQueries({ queryKey: ['superadmin-support-tickets'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['support-stats'] });
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Failed to delete support ticket';
+      toast.error(message);
     },
   });
 };
 
-// Add reply to support ticket for SuperAdmin
+// Add reply to support ticket
 export const useAddSuperadminReply = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: ReplyData }): Promise<{ message: string; comment: SupportTicketComment }> => {
+    mutationFn: async ({ id, data }: { id: string; data: ReplyData }) => {
       const response = await api.post(`/superadmin/support-tickets/${id}/replies`, data);
       return response.data;
     },
-    onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: ['superadmin-support-ticket', id] });
-      queryClient.invalidateQueries({ queryKey: ['superadmin-support-tickets'] });
+    onSuccess: (data, variables) => {
+      toast.success('Reply added successfully!');
+      queryClient.invalidateQueries({ queryKey: ['superadmin-support-tickets'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['superadmin-support-ticket', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['support-stats'] });
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Failed to add reply';
+      toast.error(message);
+    },
+  });
+};
+
+// Update support ticket status
+export const useUpdateSuperadminTicketStatus = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const response = await api.patch(`/superadmin/support-tickets/${id}/status`, { status });
+      return response.data;
+    },
+    onSuccess: (data, variables) => {
+      toast.success('Support ticket status updated successfully!');
+      queryClient.invalidateQueries({ queryKey: ['superadmin-support-tickets'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['superadmin-support-ticket', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['support-stats'] });
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Failed to update ticket status';
+      toast.error(message);
     },
   });
 };

@@ -1,283 +1,438 @@
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
-import { toast } from 'react-hot-toast';
+import { api } from '@/lib/api';
+import { useParams } from 'next/navigation';
+import toast from 'react-hot-toast';
 
 // Types
-export interface TenantRole {
+export interface Role {
   id: string;
   name: string;
   description?: string;
-  isTemplate: boolean;
+  color?: string;
   isActive: boolean;
+  isSystem: boolean;
   isDefault: boolean;
+  priority: number;
   createdAt: string;
   updatedAt: string;
   userCount: number;
-  permissions: Array<{
-    id: string;
-    name: string;
-    description?: string;
-    module: string;
-    action: string;
-  }>;
+  permissions: RolePermission[];
 }
 
-export interface TenantRoleFilters {
-  status: 'all' | 'active' | 'inactive';
-  type: 'all' | 'template' | 'custom';
-  search: string;
-}
-
-export interface TenantRoleStats {
-  total: number;
-  active: number;
-  inactive: number;
-  templates: number;
-}
-
-export interface TenantRolePagination {
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-}
-
-export interface TenantRoleResponse {
-  roles: TenantRole[];
-  pagination: TenantRolePagination;
-  stats: TenantRoleStats;
+export interface RolePermission {
+  id: string;
+  moduleKey: string;
+  moduleName: string;
+  canCreate: boolean;
+  canRead: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
+  canViewAll: boolean;
 }
 
 export interface CreateRoleData {
   name: string;
   description?: string;
-  permissions: string[];
+  color?: string;
+  permissions: RolePermission[];
 }
 
 export interface UpdateRoleData {
   name?: string;
   description?: string;
-  permissions?: string[];
+  color?: string;
+  isActive?: boolean;
+  permissions?: RolePermission[];
 }
 
-export interface ToggleRoleStatusData {
-  roleId: string;
+export interface RolesResponse {
+  roles: Role[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+  stats: {
+    total: number;
+    active: number;
+    inactive: number;
+  };
+  permissions: {
+    canView: boolean;
+    canCreate: boolean;
+    canUpdate: boolean;
+    canDelete: boolean;
+  };
+}
+
+export interface Module {
+  moduleKey: string;
+  moduleName: string;
+  description?: string;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
   isActive: boolean;
 }
 
-// API functions
-const fetchTenantRoles = async (
-  tenantSlug: string,
-  params: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    filters?: TenantRoleFilters;
-  }
-): Promise<TenantRoleResponse> => {
-  const searchParams = new URLSearchParams();
-  
-  if (params.page) searchParams.append('page', params.page.toString());
-  if (params.limit) searchParams.append('limit', params.limit.toString());
-  if (params.search) searchParams.append('search', params.search);
-  
-  if (params.filters) {
-    if (params.filters.status !== 'all') searchParams.append('status', params.filters.status);
-    if (params.filters.type !== 'all') searchParams.append('type', params.filters.type);
+// Validation schemas
+export const validateCreateRole = (data: CreateRoleData): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (!data.name || data.name.trim().length === 0) {
+    errors.push('Role name is required');
+  } else if (data.name.trim().length < 2) {
+    errors.push('Role name must be at least 2 characters long');
+  } else if (data.name.trim().length > 50) {
+    errors.push('Role name must be less than 50 characters');
   }
 
-        const response = await api.get(`/tenant/${tenantSlug}/roles?${searchParams.toString()}`);
-  return response.data;
-};
-
-const createTenantRole = async (tenantSlug: string, data: CreateRoleData): Promise<{ role: TenantRole }> => {
-      const response = await api.post(`/tenant/${tenantSlug}/roles`, data);
-  return response.data;
-};
-
-const updateTenantRole = async (tenantSlug: string, roleId: string, data: UpdateRoleData): Promise<{ role: TenantRole }> => {
-      const response = await api.put(`/tenant/${tenantSlug}/roles/${roleId}`, data);
-  return response.data;
-};
-
-const deleteTenantRole = async (tenantSlug: string, roleId: string): Promise<void> => {
-      await api.delete(`/tenant/${tenantSlug}/roles/${roleId}`);
-};
-
-const toggleTenantRoleStatus = async (tenantSlug: string, data: ToggleRoleStatusData): Promise<{ role: TenantRole }> => {
-  const response = await api.patch(`/api/tenant/${tenantSlug}/roles/${data.roleId}/status`, {
-    isActive: data.isActive
-  });
-  return response.data;
-};
-
-const fetchTenantRole = async (tenantSlug: string, roleId: string): Promise<{ role: TenantRole }> => {
-      const response = await api.get(`/tenant/${tenantSlug}/roles/${roleId}`);
-  return response.data;
-};
-
-const fetchTenantPermissions = async (tenantSlug: string): Promise<{
-  modules: Array<{
-    name: string;
-    description?: string;
-    permissions: Array<{
-      id: string;
-      name: string;
-      description?: string;
-      module: string;
-      submodule?: string;
-      action: string;
-    }>;
-  }>;
-  totalPermissions: number;
-  totalModules: number;
-}> => {
-      const response = await api.get(`/tenant/${tenantSlug}/permissions`);
-  return response.data;
-};
-
-// React Query hooks
-export const useTenantRoles = (
-  tenantSlug: string,
-  params: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    filters?: TenantRoleFilters;
+  if (data.description && data.description.length > 200) {
+    errors.push('Description must be less than 200 characters');
   }
-) => {
+
+  if (!data.color || !/^#[0-9A-F]{6}$/i.test(data.color)) {
+    errors.push('Valid color is required');
+  }
+
+  if (!data.permissions || data.permissions.length === 0) {
+    errors.push('At least one permission is required');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
+export const validateUpdateRole = (data: UpdateRoleData): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (data.name !== undefined) {
+    if (!data.name || data.name.trim().length === 0) {
+      errors.push('Role name is required');
+    } else if (data.name.trim().length < 2) {
+      errors.push('Role name must be at least 2 characters long');
+    } else if (data.name.trim().length > 50) {
+      errors.push('Role name must be less than 50 characters');
+    }
+  }
+
+  if (data.description && data.description.length > 200) {
+    errors.push('Description must be less than 200 characters');
+  }
+
+  if (data.color && !/^#[0-9A-F]{6}$/i.test(data.color)) {
+    errors.push('Valid color is required');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
+// Main hook
+export const useTenantRolesAPI = () => {
+  const params = useParams();
+  const tenantSlug = params.tenantSlug as string;
   const queryClient = useQueryClient();
 
-  const query = useQuery({
-    queryKey: ['tenant-roles', tenantSlug, params],
-    queryFn: () => fetchTenantRoles(tenantSlug, params),
-    enabled: !!tenantSlug,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-  });
-
-  const setPage = (page: number) => {
-    queryClient.setQueryData(['tenant-roles', tenantSlug, params], (old: any) => {
-      if (old) {
-        return {
-          ...old,
-          pagination: {
-            ...old.pagination,
-            page
+  // Fetch roles with pagination and filters
+  const useRoles = (page: number = 1, limit: number = 10, search?: string, status?: string) => {
+    return useQuery({
+      queryKey: ['tenant-roles', tenantSlug, page, limit, search, status],
+      queryFn: async (): Promise<RolesResponse> => {
+        const response = await api.get(`/tenant/${tenantSlug}/roles`, {
+          params: {
+            page,
+            limit,
+            search: search || undefined,
+            status: status !== 'all' ? status : undefined
           }
-        };
-      }
-      return old;
+        });
+        return response.data.data;
+      },
+      enabled: !!tenantSlug,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes
     });
   };
 
-  const setPageSize = (limit: number) => {
-    queryClient.setQueryData(['tenant-roles', tenantSlug, params], (old: any) => {
-      if (old) {
-        return {
-          ...old,
-          pagination: {
-            ...old.pagination,
-            limit
+  // Fetch all roles for dropdowns
+  const useAllRoles = () => {
+    return useQuery({
+      queryKey: ['tenant-all-roles', tenantSlug],
+      queryFn: async (): Promise<Role[]> => {
+        const response = await api.get(`/tenant/${tenantSlug}/roles`, {
+          params: { page: 1, limit: 1000 }
+        });
+        return response.data.data.roles;
+      },
+      enabled: !!tenantSlug,
+      staleTime: 10 * 60 * 1000, // 10 minutes
+    });
+  };
+
+  // Fetch modules for permissions
+  const useModules = () => {
+    return useQuery({
+      queryKey: ['tenant-modules', tenantSlug],
+      queryFn: async (): Promise<Module[]> => {
+        const response = await api.get(`/tenant/${tenantSlug}/modules`);
+        return response.data.data.modules || [];
+      },
+      enabled: !!tenantSlug,
+      staleTime: 10 * 60 * 1000, // 10 minutes
+    });
+  };
+
+  // Fetch users for role assignment
+  const useUsers = () => {
+    return useQuery({
+      queryKey: ['tenant-users-for-assignment', tenantSlug],
+      queryFn: async (): Promise<User[]> => {
+        const response = await api.get(`/tenant/${tenantSlug}/users`, {
+          params: { page: 1, limit: 1000 }
+        });
+        return response.data.data.users || [];
+      },
+      enabled: !!tenantSlug,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    });
+  };
+
+  // Create role mutation
+  const useCreateRole = () => {
+    return useMutation({
+      mutationFn: async (roleData: CreateRoleData): Promise<Role> => {
+        // Validate data
+        const validation = validateCreateRole(roleData);
+        if (!validation.isValid) {
+          throw new Error(validation.errors.join(', '));
+        }
+
+        const response = await api.post(`/tenant/${tenantSlug}/roles`, roleData);
+        return response.data.data;
+      },
+      onSuccess: (newRole) => {
+        // Invalidate and refetch roles
+        queryClient.invalidateQueries({ queryKey: ['tenant-roles', tenantSlug] });
+        queryClient.invalidateQueries({ queryKey: ['tenant-all-roles', tenantSlug] });
+        
+        // Add to cache optimistically
+        queryClient.setQueryData(['tenant-roles', tenantSlug], (oldData: any) => {
+          if (oldData) {
+            return {
+              ...oldData,
+              roles: [newRole, ...oldData.roles],
+              stats: {
+                ...oldData.stats,
+                total: oldData.stats.total + 1,
+                active: newRole.isActive ? oldData.stats.active + 1 : oldData.stats.active
+              }
+            };
           }
-        };
+          return oldData;
+        });
+
+        toast.success('Role created successfully');
+      },
+      onError: (error: any) => {
+        toast.error(error.message || 'Failed to create role');
       }
-      return old;
+    });
+  };
+
+  // Update role mutation
+  const useUpdateRole = () => {
+    return useMutation({
+      mutationFn: async ({ roleId, roleData }: { roleId: string; roleData: UpdateRoleData }): Promise<Role> => {
+        // Validate data
+        const validation = validateUpdateRole(roleData);
+        if (!validation.isValid) {
+          throw new Error(validation.errors.join(', '));
+        }
+
+        const response = await api.put(`/tenant/${tenantSlug}/roles/${roleId}`, roleData);
+        return response.data.data;
+      },
+      onSuccess: (updatedRole) => {
+        // Invalidate and refetch roles
+        queryClient.invalidateQueries({ queryKey: ['tenant-roles', tenantSlug] });
+        queryClient.invalidateQueries({ queryKey: ['tenant-all-roles', tenantSlug] });
+        
+        // Update cache optimistically
+        queryClient.setQueryData(['tenant-roles', tenantSlug], (oldData: any) => {
+          if (oldData) {
+            return {
+              ...oldData,
+              roles: oldData.roles.map((role: Role) => 
+                role.id === updatedRole.id ? updatedRole : role
+              )
+            };
+          }
+          return oldData;
+        });
+
+        toast.success('Role updated successfully');
+      },
+      onError: (error: any) => {
+        toast.error(error.message || 'Failed to update role');
+      }
+    });
+  };
+
+  // Delete role mutation
+  const useDeleteRole = () => {
+    return useMutation({
+      mutationFn: async (roleId: string): Promise<void> => {
+        const response = await api.delete(`/tenant/${tenantSlug}/roles/${roleId}`);
+        return response.data;
+      },
+      onSuccess: (_, roleId) => {
+        // Invalidate and refetch roles
+        queryClient.invalidateQueries({ queryKey: ['tenant-roles', tenantSlug] });
+        queryClient.invalidateQueries({ queryKey: ['tenant-all-roles', tenantSlug] });
+        
+        // Remove from cache optimistically
+        queryClient.setQueryData(['tenant-roles', tenantSlug], (oldData: any) => {
+          if (oldData) {
+            const deletedRole = oldData.roles.find((role: Role) => role.id === roleId);
+            return {
+              ...oldData,
+              roles: oldData.roles.filter((role: Role) => role.id !== roleId),
+              stats: {
+                ...oldData.stats,
+                total: oldData.stats.total - 1,
+                active: deletedRole?.isActive ? oldData.stats.active - 1 : oldData.stats.active
+              }
+            };
+          }
+          return oldData;
+        });
+
+        toast.success('Role deleted successfully');
+      },
+      onError: (error: any) => {
+        toast.error(error.message || 'Failed to delete role');
+      }
+    });
+  };
+
+  // Bulk delete roles mutation
+  const useBulkDeleteRoles = () => {
+    return useMutation({
+      mutationFn: async (roleIds: string[]): Promise<void> => {
+        const response = await api.post(`/tenant/${tenantSlug}/roles/bulk-delete`, {
+          roleIds
+        });
+        return response.data;
+      },
+      onSuccess: (_, roleIds) => {
+        // Invalidate and refetch roles
+        queryClient.invalidateQueries({ queryKey: ['tenant-roles', tenantSlug] });
+        queryClient.invalidateQueries({ queryKey: ['tenant-all-roles', tenantSlug] });
+        
+        toast.success(`${roleIds.length} roles deleted successfully`);
+      },
+      onError: (error: any) => {
+        toast.error(error.message || 'Failed to delete roles');
+      }
+    });
+  };
+
+  // Toggle role status mutation
+  const useToggleRoleStatus = () => {
+    return useMutation({
+      mutationFn: async ({ roleId, isActive }: { roleId: string; isActive: boolean }): Promise<Role> => {
+        const response = await api.patch(`/tenant/${tenantSlug}/roles/${roleId}/status`, {
+          isActive
+        });
+        return response.data.data;
+      },
+      onSuccess: (updatedRole) => {
+        // Invalidate and refetch roles
+        queryClient.invalidateQueries({ queryKey: ['tenant-roles', tenantSlug] });
+        queryClient.invalidateQueries({ queryKey: ['tenant-all-roles', tenantSlug] });
+        
+        toast.success(`Role ${updatedRole.isActive ? 'activated' : 'deactivated'} successfully`);
+      },
+      onError: (error: any) => {
+        toast.error(error.message || 'Failed to update role status');
+      }
+    });
+  };
+
+  // Assign role to user mutation
+  const useAssignRole = () => {
+    return useMutation({
+      mutationFn: async ({ userId, roleId }: { userId: string; roleId: string }): Promise<void> => {
+        const response = await api.post(`/tenant/${tenantSlug}/roles/${roleId}/assign`, {
+          userId
+        });
+        return response.data;
+      },
+      onSuccess: () => {
+        // Invalidate and refetch roles and users
+        queryClient.invalidateQueries({ queryKey: ['tenant-roles', tenantSlug] });
+        queryClient.invalidateQueries({ queryKey: ['tenant-all-roles', tenantSlug] });
+        queryClient.invalidateQueries({ queryKey: ['tenant-users-for-assignment', tenantSlug] });
+        
+        toast.success('Role assigned successfully');
+      },
+      onError: (error: any) => {
+        toast.error(error.message || 'Failed to assign role');
+      }
+    });
+  };
+
+  // Remove role from user mutation
+  const useRemoveRole = () => {
+    return useMutation({
+      mutationFn: async ({ userId, roleId }: { userId: string; roleId: string }): Promise<void> => {
+        const response = await api.delete(`/tenant/${tenantSlug}/roles/${roleId}/assign/${userId}`);
+        return response.data;
+      },
+      onSuccess: () => {
+        // Invalidate and refetch roles and users
+        queryClient.invalidateQueries({ queryKey: ['tenant-roles', tenantSlug] });
+        queryClient.invalidateQueries({ queryKey: ['tenant-all-roles', tenantSlug] });
+        queryClient.invalidateQueries({ queryKey: ['tenant-users-for-assignment', tenantSlug] });
+        
+        toast.success('Role removed successfully');
+      },
+      onError: (error: any) => {
+        toast.error(error.message || 'Failed to remove role');
+      }
     });
   };
 
   return {
-    roles: query.data?.roles,
-    stats: query.data?.stats,
-    pagination: query.data?.pagination,
-    isLoading: query.isLoading,
-    error: query.error,
-    refetch: query.refetch,
-    setPage,
-    setPageSize
+    // Queries
+    useRoles,
+    useAllRoles,
+    useModules,
+    useUsers,
+    
+    // Mutations
+    useCreateRole,
+    useUpdateRole,
+    useDeleteRole,
+    useBulkDeleteRoles,
+    useToggleRoleStatus,
+    useAssignRole,
+    useRemoveRole,
+    
+    // Validation
+    validateCreateRole,
+    validateUpdateRole
   };
-};
-
-export const useTenantRole = (tenantSlug: string, roleId: string) => {
-  return useQuery({
-    queryKey: ['tenant-role', tenantSlug, roleId],
-    queryFn: () => fetchTenantRole(tenantSlug, roleId),
-    enabled: !!tenantSlug && !!roleId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-};
-
-export const useTenantPermissions = (tenantSlug: string) => {
-  return useQuery({
-    queryKey: ['tenant-permissions', tenantSlug],
-    queryFn: () => fetchTenantPermissions(tenantSlug),
-    enabled: !!tenantSlug,
-    staleTime: 10 * 60 * 1000, // 10 minutes
-  });
-};
-
-export const useCreateRole = (tenantSlug: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (data: CreateRoleData) => createTenantRole(tenantSlug, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tenant-roles', tenantSlug] });
-      toast.success('Role created successfully');
-    },
-    onError: (error: any) => {
-      console.error('Error creating role:', error);
-      toast.error(error.response?.data?.message || 'Failed to create role');
-    }
-  });
-};
-
-export const useUpdateRole = (tenantSlug: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ roleId, data }: { roleId: string; data: UpdateRoleData }) =>
-      updateTenantRole(tenantSlug, roleId, data),
-    onSuccess: (_, { roleId }) => {
-      queryClient.invalidateQueries({ queryKey: ['tenant-roles', tenantSlug] });
-      queryClient.invalidateQueries({ queryKey: ['tenant-role', tenantSlug, roleId] });
-      toast.success('Role updated successfully');
-    },
-    onError: (error: any) => {
-      console.error('Error updating role:', error);
-      toast.error(error.response?.data?.message || 'Failed to update role');
-    }
-  });
-};
-
-export const useDeleteRole = (tenantSlug: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (roleId: string) => deleteTenantRole(tenantSlug, roleId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tenant-roles', tenantSlug] });
-      toast.success('Role deleted successfully');
-    },
-    onError: (error: any) => {
-      console.error('Error deleting role:', error);
-      toast.error(error.response?.data?.message || 'Failed to delete role');
-    }
-  });
-};
-
-export const useToggleRoleStatus = (tenantSlug: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (data: ToggleRoleStatusData) => toggleTenantRoleStatus(tenantSlug, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tenant-roles', tenantSlug] });
-      toast.success('Role status updated successfully');
-    },
-    onError: (error: any) => {
-      console.error('Error toggling role status:', error);
-      toast.error(error.response?.data?.message || 'Failed to update role status');
-    }
-  });
 }; 

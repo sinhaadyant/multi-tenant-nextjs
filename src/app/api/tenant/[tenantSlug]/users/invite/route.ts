@@ -1,231 +1,269 @@
 import { NextRequest } from 'next/server';
-import { withTenantAuth, AuthenticatedRequest } from '@/lib/authMiddleware';
+import { prisma } from '@/lib/prisma';
+import { verifyToken } from '@/lib/jwt';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 import { createAuditLogFromRequest } from '@/lib/audit';
-import { prisma } from '@/lib/prisma';
+import { asyncHandler } from '@/lib/errorHandler';
 import { z } from 'zod';
-import { randomBytes } from 'crypto';
+import crypto from 'crypto';
+// import { sendEmail } from '@/lib/email'; // Commented out as email service might not be configured
 
-// Validation schemas
+// Validation schema for user invitation
 const inviteUserSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  email: z.string().email('Invalid email address'),
-  roleIds: z.array(z.string()).max(1, 'Only one role can be assigned per user').optional(),
-  expiresIn: z.number().optional().default(7 * 24 * 60 * 60 * 1000) // 7 days in milliseconds
+  email: z.string().email('Please enter a valid email address'),
+  name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
+  roleId: z.string().min(1, 'Role is required'),
+  message: z.string().optional(),
 });
 
-const resendInviteSchema = z.object({
-  invitationId: z.string()
-});
-
-// POST /api/tenant/[tenantSlug]/users/invite - Invite a new user
-export const POST = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
+export const POST = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
   const { tenantSlug } = await params;
   
-  try {
-    const userId = req.user!.id;
-    const tenantId = req.user!.tenantId;
-    const body = await req.json();
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔍 User invitation request for tenant:', tenantSlug);
+  }
 
-    // Validate request body
-    const validationResult = inviteUserSchema.safeParse(body);
-    if (!validationResult.success) {
-      return createErrorResponse('Validation failed', 400, validationResult.error.errors);
+  // Get authorization header
+  const authHeader = req.headers.get('authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return createErrorResponse('Authorization header is required', 401);
+  }
+
+  const token = authHeader.substring(7);
+
+  // Verify the token
+  let decoded;
+  try {
+    decoded = verifyToken(token);
+  } catch (error) {
+    return createErrorResponse('Invalid or expired token', 401);
+  }
+
+  if (!decoded || !decoded.id) {
+    return createErrorResponse('Invalid token payload', 401);
+  }
+
+  // Parse request body
+  const body = await req.json();
+  const validationResult = inviteUserSchema.safeParse(body);
+  
+  if (!validationResult.success) {
+    const errors = validationResult.error.errors.map(err => ({
+      field: err.path.join('.'),
+      message: err.message
+    }));
+    return createErrorResponse('Validation failed', 400, errors);
+  }
+
+  const { email, name, roleId, message } = validationResult.data;
+
+  try {
+    // Find the tenant
+    const tenant = await prisma.tenant.findUnique({
+      where: { 
+        slug: tenantSlug,
+        isActive: true
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        isActive: true,
+      }
+    });
+
+    if (!tenant) {
+      return createErrorResponse('Tenant not found or inactive', 404);
     }
 
-    const { name, email, roleIds, expiresIn } = validationResult.data;
+    // Verify the requesting user has permission to invite users
+    const requestingUser = await prisma.user.findUnique({
+      where: {
+        id: decoded.id,
+        tenantId: tenant.id,
+        isActive: true
+      },
+      include: {
+        userRoles: {
+          include: {
+            role: {
+              include: {
+                permissions: true
+              }
+            }
+          }
+        }
+      }
+    });
 
-    // Check if user already exists
+    if (!requestingUser) {
+      return createErrorResponse('User not found in this tenant', 404);
+    }
+
+    // Check if user has permission to invite users
+    const hasInvitePermission = requestingUser.userRoles.some(userRole => 
+      userRole.role.permissions.some(permission => 
+        permission.moduleKey === 'users' && permission.canCreate
+      )
+    );
+
+    if (!hasInvitePermission) {
+      return createErrorResponse('You do not have permission to invite users', 403);
+    }
+
+    // Normalize email
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check if user already exists in this tenant
     const existingUser = await prisma.user.findFirst({
       where: {
-        email,
-        tenantId
+        email: normalizedEmail,
+        tenantId: tenant.id
       }
     });
 
     if (existingUser) {
-      return createErrorResponse('User with this email already exists', 400);
+      return createErrorResponse('A user with this email already exists in this tenant', 409);
     }
 
-    // Check if invitation already exists
+    // Check if there's already a pending invitation for this email
     const existingInvitation = await prisma.userInvitation.findFirst({
       where: {
-        email,
-        tenantId,
-        status: 'pending'
+        email: normalizedEmail,
+        tenantId: tenant.id,
+        status: 'pending',
+        expiresAt: {
+          gt: new Date()
+        }
       }
     });
 
     if (existingInvitation) {
-      return createErrorResponse('Invitation already sent to this email', 400);
+      return createErrorResponse('A pending invitation already exists for this email', 409);
     }
 
-    // Generate invitation token
-    const token = randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + expiresIn);
-
-    // Create invitation
-    const invitation = await prisma.userInvitation.create({
-      data: {
-        email,
-        name,
-        token,
-        expiresAt,
-        tenantId,
-        invitedBy: userId,
-        status: 'pending'
+    // Verify the role exists and belongs to this tenant
+    const role = await prisma.role.findUnique({
+      where: {
+        id: roleId,
+        tenantId: tenant.id
       }
     });
 
-    // Create audit log
-    await createAuditLogFromRequest(req, {
-      id: req.user!.id,
-      email: req.user!.email,
-      role: req.user!.role as 'user' | 'superadmin',
-      tenantId: req.user!.tenantId
-    }, 'users.invite', {
-      invitationId: invitation.id,
-      email: invitation.email,
-      expiresAt: invitation.expiresAt
+    if (!role) {
+      return createErrorResponse('Role not found in this tenant', 404);
+    }
+
+    // Generate invitation token
+    const invitationToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
+
+    // Create the invitation
+    const invitation = await prisma.userInvitation.create({
+      data: {
+        email: normalizedEmail,
+        name: name.trim(),
+        tenantId: tenant.id,
+        roleId: roleId,
+        invitedById: requestingUser.id,
+        token: invitationToken,
+        expiresAt: expiresAt,
+        message: message?.trim(),
+        status: 'pending'
+      },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true
+          }
+        },
+        role: {
+          select: {
+            id: true,
+            name: true,
+            description: true
+          }
+        },
+        invitedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
     });
 
-    // TODO: Send invitation email
-    // For now, we'll just return the invitation data
-    // In a real implementation, you would send an email with the invitation link
+    // Generate invitation URL for development (skip email sending for now)
+    const invitationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/${tenantSlug}/signup?token=${invitationToken}`;
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ Invitation created for:', normalizedEmail);
+      console.log('🔗 Invitation URL:', invitationUrl);
+    }
+
+    // TODO: Send invitation email when email service is configured
+    // try {
+    //   await sendEmail({
+    //     to: normalizedEmail,
+    //     subject: `You've been invited to join ${tenant.name}`,
+    //     template: 'user-invitation',
+    //     data: {
+    //       inviteeName: name,
+    //       tenantName: tenant.name,
+    //       roleName: role.name,
+    //       inviterName: requestingUser.name,
+    //       invitationUrl: invitationUrl,
+    //       message: message || '',
+    //       expiryDays: 7
+    //     }
+    //   });
+    // } catch (emailError) {
+    //   console.error('❌ Failed to send invitation email:', emailError);
+    // }
+
+    // Create audit log
+    await createAuditLogFromRequest(
+      req,
+      { id: requestingUser.id, email: requestingUser.email, role: 'user' },
+      'tenant.user_invited',
+      {
+        invitedEmail: normalizedEmail,
+        invitedName: name,
+        roleId: roleId,
+        roleName: role.name,
+        tenantId: tenant.id,
+        tenantSlug: tenant.slug,
+        invitationId: invitation.id
+      }
+    );
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ User invitation created successfully:', invitation.id);
+    }
 
     return createSuccessResponse({
       invitation: {
         id: invitation.id,
         email: invitation.email,
         name: invitation.name,
+        role: invitation.role,
+        tenant: invitation.tenant,
+        invitedBy: invitation.invitedBy,
         expiresAt: invitation.expiresAt,
-        status: invitation.status
+        status: invitation.status,
+        createdAt: invitation.createdAt,
+        invitationUrl: invitationUrl
       }
-    }, 'User invitation sent successfully');
-  } catch (error: any) {
-    console.error('Error inviting user:', error);
-    return createErrorResponse('Failed to invite user', 500);
+    }, 'User invitation created successfully');
+
+  } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('❌ Error during user invitation:', error);
+    }
+    throw error;
   }
 });
-
-// PUT /api/tenant/[tenantSlug]/users/invite - Resend invitation
-export const PUT = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
-  const { tenantSlug } = await params;
-  
-  try {
-    const userId = req.user!.id;
-    const tenantId = req.user!.tenantId;
-    const body = await req.json();
-
-    // Validate request body
-    const validationResult = resendInviteSchema.safeParse(body);
-    if (!validationResult.success) {
-      return createErrorResponse('Validation failed', 400, validationResult.error.errors);
-    }
-
-    const { invitationId } = validationResult.data;
-
-    // Find the invitation
-    const invitation = await prisma.userInvitation.findFirst({
-      where: {
-        id: invitationId,
-        tenantId,
-        status: 'pending'
-      }
-    });
-
-    if (!invitation) {
-      return createErrorResponse('Invitation not found or already used', 404);
-    }
-
-    // Check if invitation is expired
-    if (invitation.expiresAt < new Date()) {
-      return createErrorResponse('Invitation has expired', 400);
-    }
-
-    // Generate new token and extend expiry
-    const newToken = randomBytes(32).toString('hex');
-    const newExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-
-    // Update invitation
-    const updatedInvitation = await prisma.userInvitation.update({
-      where: { id: invitationId },
-      data: {
-        token: newToken,
-        expiresAt: newExpiresAt,
-        updatedAt: new Date()
-      }
-    });
-
-    // Create audit log
-    await createAuditLogFromRequest(req, {
-      id: req.user!.id,
-      email: req.user!.email,
-      role: req.user!.role as 'user' | 'superadmin',
-      tenantId: req.user!.tenantId
-    }, 'users.resend_invite', {
-      invitationId: updatedInvitation.id,
-      email: updatedInvitation.email
-    });
-
-    // TODO: Send new invitation email
-
-    return createSuccessResponse({
-      invitation: {
-        id: updatedInvitation.id,
-        email: updatedInvitation.email,
-        name: updatedInvitation.name,
-        expiresAt: updatedInvitation.expiresAt,
-        status: updatedInvitation.status
-      }
-    }, 'Invitation resent successfully');
-  } catch (error: any) {
-    console.error('Error resending invitation:', error);
-    return createErrorResponse('Failed to resend invitation', 500);
-  }
-});
-
-// GET /api/tenant/[tenantSlug]/users/invite - Get pending invitations
-export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
-  const { tenantSlug } = await params;
-  
-  try {
-    const userId = req.user!.id;
-    const tenantId = req.user!.tenantId;
-
-    // Get pending invitations
-    const invitations = await prisma.userInvitation.findMany({
-      where: {
-        tenantId,
-        status: 'pending'
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-
-    // Create audit log
-    await createAuditLogFromRequest(req, {
-      id: req.user!.id,
-      email: req.user!.email,
-      role: req.user!.role as 'user' | 'superadmin',
-      tenantId: req.user!.tenantId
-    }, 'users.list_invitations', {
-      count: invitations.length
-    });
-
-    return createSuccessResponse({
-      invitations: invitations.map(inv => ({
-        id: inv.id,
-        email: inv.email,
-        name: inv.name,
-        expiresAt: inv.expiresAt,
-        status: inv.status,
-        createdAt: inv.createdAt
-      }))
-    }, 'Invitations retrieved successfully');
-  } catch (error: any) {
-    console.error('Error fetching invitations:', error);
-    return createErrorResponse('Failed to fetch invitations', 500);
-  }
-}); 

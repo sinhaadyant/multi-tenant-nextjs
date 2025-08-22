@@ -160,8 +160,8 @@ export const useImportData = () => {
     onSuccess: (data) => {
       toast.success(data.message || 'Data imported successfully');
       // Invalidate relevant caches
-      queryClient.invalidateQueries({ queryKey: ['tenants'] });
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['tenants'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['users'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['backupHistory'] });
     },
     onError: (error: any) => {

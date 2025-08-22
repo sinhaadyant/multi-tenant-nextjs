@@ -78,10 +78,10 @@ export const useInsertSampleData = () => {
     },
     onSuccess: () => {
       // Invalidate and refetch relevant queries
-      queryClient.invalidateQueries({ queryKey: ['tenants'] });
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['tenants'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['users'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['data-counts'] });
-      queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'], exact: false });
     },
   });
 };
@@ -97,10 +97,10 @@ export const useClearData = () => {
     },
     onSuccess: () => {
       // Invalidate and refetch relevant queries
-      queryClient.invalidateQueries({ queryKey: ['tenants'] });
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['tenants'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['users'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['data-counts'] });
-      queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'], exact: false });
     },
   });
 };

@@ -47,10 +47,10 @@ const UserPage: React.FC = () => {
     
     const users = usersData.users;
     return {
-      total: usersData.totalRecords || users.length,
-      active: users.filter((user: any) => user.status === 'active').length,
-      inactive: users.filter((user: any) => user.status === 'inactive').length,
-      pending: users.filter((user: any) => user.status === 'pending').length,
+      total: usersData.pagination?.totalRecords || users.length,
+      active: users.filter((user: any) => user.isActive).length,
+      inactive: users.filter((user: any) => !user.isActive).length,
+      pending: 0, // Assuming no pending status for now
     };
   }, [usersData]);
 
@@ -115,60 +115,57 @@ const UserPage: React.FC = () => {
   }, []);
 
   const handleDeleteUser = useCallback(async (user: any) => {
-    const confirmed = await confirm({
+    confirm({
       title: 'Delete User',
       message: `Are you sure you want to delete ${user.name || user.email}? This action cannot be undone.`,
       confirmText: 'Delete',
       cancelText: 'Cancel',
-      variant: 'destructive',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteUserMutation.mutateAsync(user.id);
+          refetch();
+        } catch (error) {
+          console.error('Failed to delete user:', error);
+        }
+      },
     });
-
-    if (confirmed) {
-      try {
-        await deleteUserMutation.mutateAsync(user.id);
-        refetch();
-      } catch (error) {
-        console.error('Failed to delete user:', error);
-      }
-    }
   }, [confirm, deleteUserMutation, refetch]);
 
   const handleToggleStatus = useCallback(async (user: any) => {
-    const newStatus = user.status === 'active' ? 'inactive' : 'active';
-    const action = newStatus === 'active' ? 'activate' : 'deactivate';
+    const newStatus = !user.isActive;
+    const action = newStatus ? 'activate' : 'deactivate';
     
-    const confirmed = await confirm({
+    confirm({
       title: `${action.charAt(0).toUpperCase() + action.slice(1)} User`,
       message: `Are you sure you want to ${action} ${user.name || user.email}?`,
       confirmText: action.charAt(0).toUpperCase() + action.slice(1),
       cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          await toggleStatusMutation.mutateAsync({ id: user.id, isActive: newStatus });
+          refetch();
+        } catch (error) {
+          console.error(`Failed to ${action} user:`, error);
+        }
+      },
     });
-
-    if (confirmed) {
-      try {
-        await toggleStatusMutation.mutateAsync({ userId: user.id, status: newStatus });
-        refetch();
-      } catch (error) {
-        console.error(`Failed to ${action} user:`, error);
-      }
-    }
   }, [confirm, toggleStatusMutation, refetch]);
 
   const handleResetPassword = useCallback(async (user: any) => {
-    const confirmed = await confirm({
+    confirm({
       title: 'Reset Password',
       message: `Are you sure you want to reset the password for ${user.name || user.email}?`,
       confirmText: 'Reset',
       cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          await resetPasswordMutation.mutateAsync(user.id);
+        } catch (error) {
+          console.error('Failed to reset password:', error);
+        }
+      },
     });
-
-    if (confirmed) {
-      try {
-        await resetPasswordMutation.mutateAsync(user.id);
-      } catch (error) {
-        console.error('Failed to reset password:', error);
-      }
-    }
   }, [confirm, resetPasswordMutation]);
 
   const handleExportUsers = useCallback(async () => {
@@ -291,20 +288,20 @@ const UserPage: React.FC = () => {
       <UserTable
         users={usersData?.users || []}
         loading={isLoading}
-        onView={handleViewUser}
-        onEdit={handleEditUser}
-        onDelete={handleDeleteUser}
-        onToggleStatus={handleToggleStatus}
-        onResetPassword={handleResetPassword}
-        currentPage={filters.page}
-        totalPages={usersData?.totalPages || 1}
-        totalRecords={usersData?.totalRecords || 0}
-        pageSize={filters.limit}
+        pagination={{
+          page: filters.page || 1,
+          limit: filters.limit || 10,
+          totalPages: usersData?.pagination?.totalPages || 1,
+          totalRecords: usersData?.pagination?.totalRecords || 0,
+        }}
         onPageChange={handlePageChange}
         onPageSizeChange={handlePageSizeChange}
-        sortBy={filters.sortBy}
-        sortOrder={filters.sortOrder}
         onSortingChange={handleSortingChange}
+        onViewUser={handleViewUser}
+        onEditUser={handleEditUser}
+        onDeleteUser={handleDeleteUser}
+        onToggleStatus={handleToggleStatus}
+        onResetPassword={handleResetPassword}
       />
 
       {/* Create User Modal */}

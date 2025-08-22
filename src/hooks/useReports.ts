@@ -150,12 +150,12 @@ export const useGenerateReport = () => {
       const response = await api.post('/superadmin/reports', data);
       return response.data.data;
     },
-    onSuccess: (data) => {
-      toast.success(data.message || 'Report generation initiated successfully');
-      // Invalidate reports cache to refresh the list
-      queryClient.invalidateQueries({ queryKey: ['reports'] });
-      queryClient.invalidateQueries({ queryKey: ['reports-overview'] });
-    },
+            onSuccess: (data) => {
+          toast.success(data.message || 'Report generation initiated successfully');
+          // Invalidate reports cache to refresh the list
+          queryClient.invalidateQueries({ queryKey: ['reports'], exact: false });
+          queryClient.invalidateQueries({ queryKey: ['reports-overview'] });
+        },
     onError: (error: any) => {
       const errorMessage = error.response?.data?.message || 'Failed to generate report';
       toast.error(errorMessage);
