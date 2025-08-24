@@ -217,6 +217,32 @@ export async function PATCH(
       return createErrorResponse('Notification not found', 404);
     }
 
+    // Parse metadata to get target information
+    let metadata: any = {};
+    if (notification.metadata) {
+      try {
+        metadata = typeof notification.metadata === 'string' 
+          ? JSON.parse(notification.metadata) 
+          : notification.metadata;
+      } catch (error) {
+        console.warn('Failed to parse notification metadata:', error);
+      }
+    }
+
+    // Extract target information from metadata
+    const selectedTargets = metadata.selectedTargets || [];
+    const targetUserIds = selectedTargets
+      .filter((target: any) => target.type === 'user')
+      .map((target: any) => target.id);
+
+    console.log('🔍 Sending notification with targets:', {
+      notificationId: id,
+      targetType: notification.targetType,
+      targetUserIds,
+      targetTenantId: notification.targetTenantId,
+      selectedTargets
+    });
+
     // Update notification status to sent
     const updatedNotification = await prisma.notification.update({
       where: { id: id },
@@ -242,16 +268,104 @@ export async function PATCH(
       },
     });
 
-    // Create audit log
-    await createAuditLog({
-      action: 'notification_sent',
-      superAdminId: authResult.user.id,
-      resourceType: 'NOTIFICATION',
-      resourceId: notification.id,
-      details: `Sent notification: ${notification.title}`,
-    });
+    // Deliver notifications to users
+    try {
+      console.log('📨 Starting notification delivery...');
+      console.log('🔍 Delivery parameters:', {
+        notificationId: notification.id,
+        targetType: notification.targetType,
+        targetUserIds,
+        targetTenantId: notification.targetTenantId
+      });
 
-    return createSuccessResponse({ notification: updatedNotification }, 'Notification sent successfully');
+      const { deliverNotificationToUsers } = await import('@/lib/notificationUtils');
+      
+      const deliveryResult = await deliverNotificationToUsers(
+        notification.id,
+        notification.targetType,
+        targetUserIds,
+        notification.targetTenantId || undefined
+      );
+
+      console.log('📨 Notification delivery result:', deliveryResult);
+
+      if (!deliveryResult.success) {
+        console.error('❌ Notification delivery failed:', deliveryResult.errors);
+      }
+
+      if (deliveryResult.deliveredCount === 0) {
+        console.warn('⚠️ No notifications were delivered to users');
+      }
+
+      // Send notification via Socket.io if available
+      if (deliveryResult.deliveredCount > 0 && global.sendNotification) {
+        console.log('🔌 Broadcasting notification via Socket.io...');
+        
+        const socketNotification = {
+          id: notification.id,
+          title: notification.title,
+          message: notification.message,
+          type: notification.type,
+          priority: notification.priority,
+          createdAt: notification.createdAt,
+          createdBy: {
+            id: authResult.user.id,
+            name: authResult.user.name,
+            email: authResult.user.email
+          }
+        };
+
+        switch (notification.targetType) {
+          case 'specific_users':
+            if (targetUserIds && targetUserIds.length > 0) {
+              console.log('🔌 Broadcasting to specific users:', targetUserIds);
+              global.sendNotification('user', targetUserIds, socketNotification);
+            }
+            break;
+          case 'entire_tenant':
+            if (notification.targetTenantId) {
+              global.sendNotification('tenant', [notification.targetTenantId], socketNotification);
+            }
+            break;
+          case 'superadmin':
+            global.sendNotification('superadmin', [], socketNotification);
+            break;
+          case 'all':
+            global.sendNotification('all', [], socketNotification);
+            break;
+        }
+      }
+    } catch (deliveryError: any) {
+      console.error('❌ Error delivering notifications:', deliveryError);
+      console.error('❌ Error details:', {
+        message: deliveryError.message,
+        stack: deliveryError.stack,
+        name: deliveryError.name
+      });
+      // Don't fail the request if delivery fails
+    }
+
+    // Create audit log
+    try {
+      await createAuditLog({
+        action: 'notification_sent',
+        superAdminId: authResult.user.id,
+        resourceType: 'NOTIFICATION',
+        resourceId: notification.id,
+        details: `Sent notification: ${notification.title} to ${targetUserIds.length} users`,
+      });
+    } catch (auditError) {
+      console.error('❌ Error creating audit log:', auditError);
+      // Don't fail the request if audit log fails
+    }
+
+    return createSuccessResponse({ 
+      notification: updatedNotification,
+      deliveryResult: {
+        deliveredCount: targetUserIds.length,
+        targetUserIds
+      }
+    }, 'Notification sent successfully');
   } catch (error: any) {
     console.error('Error sending notification:', error);
     return createErrorResponse('Internal server error', 500);

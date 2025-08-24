@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { createAuditLogFromRequest } from '@/lib/audit';
 import { asyncHandler } from '@/lib/errorHandler';
 import { z } from 'zod';
+import { notifySuperAdmin } from '@/lib/supportNotificationHelper';
 
 // Validation schemas
 const supportTicketSchema = z.object({
@@ -29,7 +30,8 @@ const supportFiltersSchema = z.object({
   category: z.enum(['general', 'technical', 'billing', 'feature-request', 'bug-report']).optional(),
   search: z.string().optional(),
   sortBy: z.enum(['createdAt', 'updatedAt', 'title', 'status', 'priority']).default('createdAt'),
-  sortOrder: z.enum(['asc', 'desc']).default('desc')
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+  userId: z.string().optional()
 });
 
 export const GET = asyncHandler(async (req: NextRequest) => {
@@ -84,6 +86,7 @@ export const GET = asyncHandler(async (req: NextRequest) => {
       { description: { contains: filters.search, mode: 'insensitive' } },
     ];
   }
+  if (filters.userId) where.userId = filters.userId;
 
   // Check if user has permission to view all tickets or only their own
   const userRoles = await prisma.userRole.findMany({
@@ -298,6 +301,19 @@ export const POST = asyncHandler(async (req: NextRequest) => {
       category,
       priority
     }
+  );
+
+  // Create notification for superadmin
+  await notifySuperAdmin(
+    ticket.id,
+    ticket.title,
+    user.id,
+    user.email,
+    user.name,
+    tenant.id,
+    tenant.slug,
+    'created',
+    `New support ticket "${title}" created by ${user.name}`
   );
 
   return createSuccessResponse({

@@ -3,6 +3,7 @@ import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 import { prisma } from '@/lib/prisma';
 import { requireSuperAdmin } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit';
+import { deliverNotificationToUsers } from '@/lib/notificationUtils';
 
 export async function GET(req: NextRequest) {
   let filters: any;
@@ -232,7 +233,7 @@ export async function POST(req: NextRequest) {
       metadata: body.metadata ? JSON.stringify(body.metadata) : null,
       createdBy: authResult.user.id,
       createdByType: 'superadmin',
-      status: body.scheduledAt ? 'scheduled' : 'draft',
+      status: body.status || (body.scheduledAt ? 'scheduled' : 'draft'),
     };
 
     // Handle targetTenantId based on targetType
@@ -270,6 +271,84 @@ export async function POST(req: NextRequest) {
         },
       },
     });
+
+    // Deliver notifications to users and send via WebSocket if status is 'sent'
+    if (notificationData.status === 'sent') {
+      try {
+        console.log('📨 Delivering notification immediately (status: sent)');
+        console.log('🔍 Target info:', {
+          targetType: body.targetType,
+          targetUserIds: body.targetUserIds,
+          targetTenantId: body.targetTenantId
+        });
+
+        // Use the new utility function for robust notification delivery
+        const deliveryResult = await deliverNotificationToUsers(
+          notification.id,
+          body.targetType,
+          body.targetUserIds,
+          body.targetTenantId
+        );
+
+        console.log('📨 Delivery result:', deliveryResult);
+
+        if (!deliveryResult.success) {
+          console.error('❌ Notification delivery failed:', deliveryResult.errors);
+          // Log the errors but don't fail the request
+        }
+
+        if (deliveryResult.deliveredCount === 0) {
+          console.warn('⚠️ No notifications were delivered to users');
+        }
+
+        // Send notification via Socket.io
+        if (deliveryResult.deliveredCount > 0 && global.sendNotification) {
+          console.log('🔌 Broadcasting notification via Socket.io...');
+          
+          // Prepare notification data for Socket.io
+          const socketNotification = {
+            id: notification.id,
+            title: notification.title,
+            message: notification.message,
+            type: notification.type,
+            priority: notification.priority,
+            createdAt: notification.createdAt,
+            createdBy: {
+              id: authResult.user.id,
+              name: authResult.user.name,
+              email: authResult.user.email
+            }
+          };
+
+          // Broadcast based on target type and delivery result
+          switch (body.targetType) {
+            case 'specific_users':
+              if (body.targetUserIds && body.targetUserIds.length > 0) {
+                console.log('🔌 Broadcasting to specific users:', body.targetUserIds);
+                global.sendNotification('user', body.targetUserIds, socketNotification);
+              }
+              break;
+            case 'entire_tenant':
+              if (body.targetTenantId) {
+                global.sendNotification('tenant', [body.targetTenantId], socketNotification);
+              }
+              break;
+            case 'multiple_tenants':
+              // Handle multiple tenants if needed
+              break;
+            case 'superadmin':
+              global.sendNotification('superadmin', [], socketNotification);
+              break;
+            case 'all':
+              global.sendNotification('all', [], socketNotification);
+              break;
+          }
+        }
+      } catch (wsError) {
+        console.error('WebSocket broadcast error:', wsError);
+        // Don't fail the request if WebSocket fails
+      }
+    }
 
     // Create audit log
     await createAuditLog({

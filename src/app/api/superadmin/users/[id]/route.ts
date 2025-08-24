@@ -8,6 +8,8 @@ import { createAuditLogFromRequest } from '@/lib/audit';
 
 // GET /api/superadmin/users/[id] - Get user details
 export const GET = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+  const { id } = params;
+  
   if (process.env.NODE_ENV === 'development') {
     console.log('👤 Fetching user details for ID:', id);
   }
@@ -63,6 +65,8 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
 
 // PUT /api/superadmin/users/[id] - Update user
 export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+  const { id } = params;
+  
   if (process.env.NODE_ENV === 'development') {
     console.log('👤 Updating user ID:', id);
   }
@@ -146,6 +150,8 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: {
 
 // DELETE /api/superadmin/users/[id] - Delete user
 export const DELETE = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
+  const { id } = params;
+  
   if (process.env.NODE_ENV === 'development') {
     console.log('👤 Deleting user ID:', id);
   }

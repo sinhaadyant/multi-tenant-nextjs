@@ -10,20 +10,31 @@ import { existsSync } from 'fs';
 
 // File upload configuration
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILES_PER_UPLOAD = 10;
 const ALLOWED_MIME_TYPES = [
   'image/jpeg',
   'image/png',
   'image/gif',
   'image/webp',
+  'image/svg+xml',
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.ms-excel',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   'text/plain',
   'text/csv',
   'application/zip',
-  'application/x-rar-compressed'
+  'application/x-rar-compressed',
+  'application/x-7z-compressed'
+];
+
+const ALLOWED_EXTENSIONS = [
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg',
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+  '.txt', '.csv', '.zip', '.rar', '.7z'
 ];
 
 export const POST = asyncHandler(async (req: NextRequest) => {
@@ -93,8 +104,8 @@ export const POST = asyncHandler(async (req: NextRequest) => {
       return createErrorResponse('No files provided', 400);
     }
 
-    if (files.length > 10) {
-      return createErrorResponse('Maximum 10 files allowed per upload', 400);
+    if (files.length > MAX_FILES_PER_UPLOAD) {
+      return createErrorResponse(`Maximum ${MAX_FILES_PER_UPLOAD} files allowed per upload`, 400);
     }
 
     const uploadResults = [];
@@ -113,7 +124,13 @@ export const POST = asyncHandler(async (req: NextRequest) => {
 
       // Validate file type
       if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-        return createErrorResponse(`File type ${file.type} is not allowed`, 400);
+        return createErrorResponse(`File type ${file.type} is not allowed. Allowed types: ${ALLOWED_EXTENSIONS.join(', ')}`, 400);
+      }
+
+      // Additional validation for file extension
+      const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+      if (!ALLOWED_EXTENSIONS.includes(fileExtension)) {
+        return createErrorResponse(`File extension ${fileExtension} is not allowed. Allowed extensions: ${ALLOWED_EXTENSIONS.join(', ')}`, 400);
       }
 
       // Generate unique filename

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { SupportTicket } from '@/hooks/useTenantSupportTickets';
 import { useTenantSupportTicketComments } from '@/hooks/useTenantSupportTickets';
+import TenantSupportTicketReplies from './TenantSupportTicketReplies';
 import { useParams } from 'next/navigation';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 
@@ -293,47 +294,10 @@ const TenantSupportTicketDetails: React.FC<TenantSupportTicketDetailsProps> = ({
               </div>
             </div>
           ) : (
-            <div className="p-6">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Comments</h3>
-              
-              {commentsLoading ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-500 dark:text-gray-400">Loading comments...</p>
-                </div>
-              ) : commentsData?.comments && commentsData.comments.length > 0 ? (
-                <div className="space-y-4">
-                  {commentsData.comments.map((comment: any) => (
-                    <div key={comment.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                      <div className="flex items-start space-x-3">
-                        <div className="w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                          <User className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                              {comment.author.name}
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                              {format(new Date(comment.createdAt), 'MMM d, yyyy at h:mm a')}
-                            </p>
-                          </div>
-                          <div className="prose prose-sm dark:prose-invert max-w-none">
-                            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                              {comment.content}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500 dark:text-gray-400">No comments yet</p>
-                </div>
-              )}
-            </div>
+            <TenantSupportTicketReplies 
+              ticketId={ticket.id} 
+              tenantSlug={tenantSlug} 
+            />
           )}
         </div>
       </div>

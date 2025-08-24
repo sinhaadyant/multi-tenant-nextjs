@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireSuperAdmin } from '@/middleware/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 
 export interface SearchResult {
   id: string;
@@ -16,8 +16,11 @@ export interface SearchResult {
 export async function GET(request: NextRequest) {
   try {
     const authResult = await requireSuperAdmin(request);
-    if (authResult instanceof NextResponse) {
-      return authResult;
+    if (!authResult.success) {
+      return NextResponse.json(
+        { error: authResult.error || 'Authentication failed' },
+        { status: 401 }
+      );
     }
 
     const { searchParams } = new URL(request.url);
@@ -37,33 +40,38 @@ export async function GET(request: NextRequest) {
       const users = await prisma.user.findMany({
         where: {
           OR: [
-            { name: { contains: searchTerm, mode: 'insensitive' } },
-            { email: { contains: searchTerm, mode: 'insensitive' } },
+            { name: { contains: searchTerm } },
+            { email: { contains: searchTerm } },
           ],
         },
         include: {
           tenant: {
             select: { name: true, slug: true },
           },
-          role: {
-            select: { name: true },
+          userRoles: {
+            include: {
+              role: {
+                select: { name: true },
+              },
+            },
           },
         },
         take: limit,
       });
 
       users.forEach((user) => {
+        const primaryRole = user.userRoles?.[0]?.role?.name || 'No Role';
         results.push({
           id: user.id,
           type: 'user',
           title: user.name,
           subtitle: user.email,
-          description: `${user.role?.name || 'No Role'} • ${user.tenant?.name || 'No Tenant'}`,
+          description: `${primaryRole} • ${user.tenant?.name || 'No Tenant'}`,
           url: `/superadmin/users/${user.id}`,
           icon: '🧑‍💼',
           metadata: {
             tenant: user.tenant?.name,
-            role: user.role?.name,
+            role: primaryRole,
             isActive: user.isActive,
           },
         });
@@ -75,9 +83,9 @@ export async function GET(request: NextRequest) {
       const tenants = await prisma.tenant.findMany({
         where: {
           OR: [
-            { name: { contains: searchTerm, mode: 'insensitive' } },
-            { slug: { contains: searchTerm, mode: 'insensitive' } },
-            { description: { contains: searchTerm, mode: 'insensitive' } },
+            { name: { contains: searchTerm } },
+            { slug: { contains: searchTerm } },
+            { description: { contains: searchTerm } },
           ],
         },
         take: limit,
@@ -106,8 +114,8 @@ export async function GET(request: NextRequest) {
       const tickets = await prisma.supportTicket.findMany({
         where: {
           OR: [
-            { title: { contains: searchTerm, mode: 'insensitive' } },
-            { description: { contains: searchTerm, mode: 'insensitive' } },
+            { title: { contains: searchTerm } },
+            { description: { contains: searchTerm } },
           ],
         },
         include: {
@@ -145,8 +153,8 @@ export async function GET(request: NextRequest) {
       const auditLogs = await prisma.auditLog.findMany({
         where: {
           OR: [
-            { action: { contains: searchTerm, mode: 'insensitive' } },
-            { details: { contains: searchTerm, mode: 'insensitive' } },
+            { action: { contains: searchTerm } },
+            { details: { contains: searchTerm } },
           ],
         },
         include: {
@@ -207,6 +215,11 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Search API error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
     return NextResponse.json(
       { error: 'Search failed', results: [], total: 0 },
       { status: 500 }

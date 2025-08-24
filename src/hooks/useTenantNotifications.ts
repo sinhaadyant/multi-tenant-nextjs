@@ -1,294 +1,159 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
-import { toast } from 'react-hot-toast';
+import { api } from '@/lib/api';
+import { useReduxAuth } from './useReduxAuth';
 
-// Types
 export interface TenantNotification {
   id: string;
   title: string;
   message: string;
   type: 'info' | 'warning' | 'error' | 'success' | 'announcement';
-  status: 'draft' | 'sent' | 'scheduled' | 'cancelled';
   priority: 'low' | 'medium' | 'high' | 'urgent';
-  scheduledAt?: Date;
-  sentAt?: Date;
-  createdAt: Date;
-  updatedAt: Date;
+  targetType: 'all_tenant_users' | 'specific_users';
+  targetUserIds?: string[];
+  status: 'draft' | 'sent' | 'scheduled';
+  scheduledAt?: string;
+  createdAt: string;
+  updatedAt: string;
   createdBy: {
     id: string;
     name: string;
     email: string;
   };
   recipientsCount: number;
-  recipients: Array<{
-    id: string;
-    name: string;
-    email: string;
-  }>;
+  readCount: number;
 }
 
-export interface UserNotification {
-  id: string;
-  notificationId: string;
-  title: string;
-  message: string;
-  type: 'info' | 'warning' | 'error' | 'success' | 'announcement';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'unread' | 'read';
-  readAt?: Date;
-  createdAt: Date;
-  notificationCreatedAt: Date;
-  createdBy: {
-    id: string;
-    name: string;
-    email: string;
-  };
-}
-
-export interface NotificationFilters {
-  search?: string;
-  type?: string;
-  status?: string;
-}
-
-export interface NotificationStats {
-  total: number;
-  draft: number;
-  sent: number;
-  scheduled: number;
-  cancelled: number;
-}
-
-export interface NotificationResponse {
+export interface TenantNotificationsResponse {
   notifications: TenantNotification[];
-  stats: NotificationStats;
   pagination: {
     page: number;
     limit: number;
     total: number;
     totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
   };
-}
-
-export interface UserNotificationResponse {
-  notifications: UserNotification[];
-  pagination: {
-    page: number;
-    limit: number;
+  stats: {
     total: number;
-    totalPages: number;
+    draft: number;
+    sent: number;
+    scheduled: number;
   };
-  unreadCount: number;
-  lastUpdated: string;
+  permissions: {
+    canView: boolean;
+    canCreate: boolean;
+    canUpdate: boolean;
+    canDelete: boolean;
+  };
 }
 
 export interface CreateNotificationData {
   title: string;
   message: string;
   type: 'info' | 'warning' | 'error' | 'success' | 'announcement';
-  priority?: 'low' | 'medium' | 'high' | 'urgent';
-  scheduledAt?: Date;
-  recipientIds?: string[];
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  targetType: 'all_tenant_users' | 'specific_users';
+  targetUserIds?: string[];
+  scheduledAt?: string;
+  status: 'draft' | 'sent' | 'scheduled';
 }
 
-export interface MarkReadData {
-  notificationIds?: string[];
-  markAllAsRead?: boolean;
-}
 
-// API functions
-const fetchTenantNotifications = async (
-  tenantSlug: string,
-  params: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    filters?: NotificationFilters;
-    sortBy?: string;
-    sortOrder?: string;
-  }
-): Promise<NotificationResponse> => {
-  const searchParams = new URLSearchParams();
-  
-  if (params.page) searchParams.append('page', params.page.toString());
-  if (params.limit) searchParams.append('limit', params.limit.toString());
-  if (params.search) searchParams.append('search', params.search);
-  if (params.filters?.type) searchParams.append('type', params.filters.type);
-  if (params.filters?.status) searchParams.append('status', params.filters.status);
-  if (params.sortBy) searchParams.append('sortBy', params.sortBy);
-  if (params.sortOrder) searchParams.append('sortOrder', params.sortOrder);
 
-  const response = await api.get(`/tenant/${tenantSlug}/notifications?${searchParams.toString()}`);
-  return response.data;
-};
-
-const fetchUserNotifications = async (
-  tenantSlug: string,
-  params: {
-    page?: number;
-    limit?: number;
-    status?: string;
-    type?: string;
-    sortBy?: string;
-    sortOrder?: string;
-  }
-): Promise<UserNotificationResponse> => {
-  const searchParams = new URLSearchParams();
-  
-  if (params.page) searchParams.append('page', params.page.toString());
-  if (params.limit) searchParams.append('limit', params.limit.toString());
-  if (params.status) searchParams.append('status', params.status);
-  if (params.type) searchParams.append('type', params.type);
-  if (params.sortBy) searchParams.append('sortBy', params.sortBy);
-  if (params.sortOrder) searchParams.append('sortOrder', params.sortOrder);
-
-  const response = await api.get(`/tenant/${tenantSlug}/notifications/my?${searchParams.toString()}`);
-  return response.data;
-};
-
-const createTenantNotification = async (tenantSlug: string, data: CreateNotificationData): Promise<{ notification: TenantNotification }> => {
-  const response = await api.post(`/tenant/${tenantSlug}/notifications`, data);
-  return response.data;
-};
-
-const markNotificationsAsRead = async (tenantSlug: string, data: MarkReadData): Promise<{ message: string }> => {
-  const response = await api.patch(`/tenant/${tenantSlug}/notifications/my/mark-read`, data);
-  return response.data;
-};
-
-// React Query hooks
+// Hook for fetching tenant notifications list
 export const useTenantNotifications = (
-  tenantSlug: string,
-  params: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    filters?: NotificationFilters;
-    sortBy?: string;
-    sortOrder?: string;
-  } = {}
+  page: number = 1,
+  limit: number = 10,
+  search?: string,
+  sortBy?: string,
+  sortOrder?: 'asc' | 'desc',
+  type?: string,
+  status?: string,
+  priority?: string
 ) => {
-  const queryClient = useQueryClient();
+  const { tenant } = useReduxAuth();
+  const tenantSlug = tenant?.slug || 'riyo';
 
-  const query = useQuery({
-    queryKey: ['tenant-notifications', tenantSlug, params],
-    queryFn: () => fetchTenantNotifications(tenantSlug, params),
+  return useQuery({
+    queryKey: ['tenant-notifications', tenantSlug, page, limit, search, sortBy, sortOrder, type, status, priority],
+    queryFn: async (): Promise<TenantNotificationsResponse> => {
+      if (!tenantSlug) throw new Error('Tenant slug is required');
+
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        ...(search && { search }),
+        ...(sortBy && { sortBy }),
+        ...(sortOrder && { sortOrder }),
+        ...(type && { type }),
+        ...(status && { status }),
+        ...(priority && { priority })
+      });
+
+      const response = await api.get(`/tenant/${tenantSlug}/notifications?${params}`);
+      return response.data;
+    },
     enabled: !!tenantSlug,
     staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
   });
-
-  const setPage = (page: number) => {
-    queryClient.setQueryData(['tenant-notifications', tenantSlug, params], (old: any) => {
-      if (!old) return old;
-      return {
-        ...old,
-        pagination: { ...old.pagination, page }
-      };
-    });
-  };
-
-  const setPageSize = (limit: number) => {
-    queryClient.setQueryData(['tenant-notifications', tenantSlug, params], (old: any) => {
-      if (!old) return old;
-      return {
-        ...old,
-        pagination: { ...old.pagination, limit }
-      };
-    });
-  };
-
-  return {
-    notifications: query.data?.notifications,
-    stats: query.data?.stats,
-    pagination: query.data?.pagination,
-    isLoading: query.isLoading,
-    error: query.error,
-    refetch: query.refetch,
-    setPage,
-    setPageSize
-  };
 };
 
-export const useUserNotifications = (
-  tenantSlug: string,
-  params: {
-    page?: number;
-    limit?: number;
-    status?: string;
-    type?: string;
-    sortBy?: string;
-    sortOrder?: string;
-  } = {}
-) => {
-  const queryClient = useQueryClient();
-
-  const query = useQuery({
-    queryKey: ['user-notifications', tenantSlug, params],
-    queryFn: () => fetchUserNotifications(tenantSlug, params),
-    enabled: !!tenantSlug,
-    staleTime: 2 * 60 * 1000, // 2 minutes (shorter for user notifications)
-    gcTime: 5 * 60 * 1000, // 5 minutes
-  });
-
-  const setPage = (page: number) => {
-    queryClient.setQueryData(['user-notifications', tenantSlug, params], (old: any) => {
-      if (!old) return old;
-      return {
-        ...old,
-        pagination: { ...old.pagination, page }
-      };
-    });
-  };
-
-  const setPageSize = (limit: number) => {
-    queryClient.setQueryData(['user-notifications', tenantSlug, params], (old: any) => {
-      if (!old) return old;
-      return {
-        ...old,
-        pagination: { ...old.pagination, limit }
-      };
-    });
-  };
-
-  return {
-    notifications: query.data?.notifications,
-    pagination: query.data?.pagination,
-    isLoading: query.isLoading,
-    error: query.error,
-    refetch: query.refetch,
-    setPage,
-    setPageSize
-  };
-};
-
-export const useCreateNotification = (tenantSlug: string) => {
+// Hook for creating a new notification
+export const useCreateTenantNotification = () => {
+  const { tenant } = useReduxAuth();
+  const tenantSlug = tenant?.slug || 'riyo';
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: CreateNotificationData) => createTenantNotification(tenantSlug, data),
+    mutationFn: async (data: CreateNotificationData): Promise<{ notification: TenantNotification }> => {
+      if (!tenantSlug) throw new Error('Tenant slug is required');
+
+      const response = await api.post(`/tenant/${tenantSlug}/notifications`, data);
+      return response.data;
+    },
     onSuccess: () => {
+      // Invalidate and refetch notifications list
       queryClient.invalidateQueries({ queryKey: ['tenant-notifications', tenantSlug] });
-      queryClient.invalidateQueries({ queryKey: ['user-notifications', tenantSlug] });
-      toast.success('Notification created successfully');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to create notification');
-    }
   });
 };
 
-export const useMarkNotificationsAsRead = (tenantSlug: string) => {
+
+
+// Hook for fetching user's own notifications (existing functionality)
+export const useUserNotifications = () => {
+  const { tenant } = useReduxAuth();
+  const tenantSlug = tenant?.slug || 'riyo';
+
+  return useQuery({
+    queryKey: ['user-notifications', tenantSlug],
+    queryFn: async () => {
+      if (!tenantSlug) throw new Error('Tenant slug is required');
+
+      const response = await api.get(`/tenant/${tenantSlug}/notifications/my`);
+      return response.data;
+    },
+    enabled: !!tenantSlug,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+};
+
+// Hook for marking notifications as read
+export const useMarkNotificationsAsRead = () => {
+  const { tenant } = useReduxAuth();
+  const tenantSlug = tenant?.slug || 'riyo';
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: MarkReadData) => markNotificationsAsRead(tenantSlug, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['user-notifications', tenantSlug] });
-      toast.success('Notifications marked as read');
+    mutationFn: async (data: { notificationIds?: string[], markAllAsRead?: boolean }): Promise<{ message: string }> => {
+      if (!tenantSlug) throw new Error('Tenant slug is required');
+
+      const response = await api.patch(`/tenant/${tenantSlug}/notifications/my/mark-read`, data);
+      return response.data;
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to mark notifications as read');
-    }
+    onSuccess: () => {
+      // Invalidate user notifications
+      queryClient.invalidateQueries({ queryKey: ['user-notifications', tenantSlug] });
+    },
   });
 }; 

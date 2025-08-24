@@ -1,14 +1,20 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { useNotifications, useMarkNotificationAsRead } from "@/hooks/useNotifications";
+import { useNotificationSocket } from "@/hooks/useNotificationSocket";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "react-hot-toast";
+import notificationSocket from "@/lib/socket";
 
 export default function NotificationDropdown() {
   const [isOpen, setIsOpen] = useState(false);
-  const { data: notificationsData, isLoading } = useNotifications({ 
+  const { user } = useAuth();
+  
+  const { data: notificationsData, isLoading, refetch } = useNotifications({ 
     limit: 10,
     status: ['sent'] // Only show sent notifications in header
   });
@@ -16,6 +22,56 @@ export default function NotificationDropdown() {
 
   const notifications = notificationsData?.notifications || [];
   const unreadCount = notificationsData?.unreadCount || 0;
+
+  // Initialize notification socket for superadmin
+  const { isConnected } = useNotificationSocket({
+    userId: user?.id || '',
+    userType: 'superadmin',
+    enabled: !!user?.id
+  });
+
+  // Handle real-time notifications
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // Listen for new notifications
+    const handleNewNotification = (notification: any) => {
+      console.log('📨 New notification received via WebSocket (SuperAdmin):', notification);
+      
+      // Show toast notification
+      toast.success(`${notification.title}: ${notification.message}`, {
+        duration: 5000,
+        position: 'top-right',
+        style: {
+          background: '#fff',
+          color: '#333',
+          border: '1px solid #e5e7eb',
+          borderRadius: '8px',
+          padding: '16px',
+          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+        },
+      });
+
+      // Refetch notifications to update the list
+      refetch();
+    };
+
+    // Listen for notification count updates
+    const handleCountUpdate = (data: { unreadCount: number }) => {
+      console.log('📊 Notification count updated via WebSocket (SuperAdmin):', data);
+      // The refetch will update the count automatically
+    };
+
+    // Set up event listeners
+    notificationSocket.on('new_notification', handleNewNotification);
+    notificationSocket.on('notification_count_update', handleCountUpdate);
+
+    // Cleanup
+    return () => {
+      notificationSocket.off('new_notification', handleNewNotification);
+      notificationSocket.off('notification_count_update', handleCountUpdate);
+    };
+  }, [user?.id, refetch]);
 
   function toggleDropdown() {
     setIsOpen(!isOpen);
@@ -47,6 +103,7 @@ export default function NotificationDropdown() {
     if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} hr ago`;
     return date.toLocaleDateString();
   };
+  
   return (
     <div className="relative">
       <button
@@ -57,6 +114,9 @@ export default function NotificationDropdown() {
           <span className="absolute right-0 top-0.5 z-10 h-2 w-2 rounded-full bg-orange-400 flex">
             <span className="absolute inline-flex w-full h-full bg-orange-400 rounded-full opacity-75 animate-ping"></span>
           </span>
+        )}
+        {!isConnected && (
+          <span className="absolute -right-1 -top-1 z-10 h-3 w-3 rounded-full bg-gray-400" title="WebSocket disconnected"></span>
         )}
         <svg
           className="fill-current"
@@ -80,7 +140,12 @@ export default function NotificationDropdown() {
       >
         <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100 dark:border-gray-700">
           <h5 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-            Notification
+            Notifications
+            {unreadCount > 0 && (
+              <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
+                ({unreadCount} unread)
+              </span>
+            )}
           </h5>
           <button
             onClick={toggleDropdown}
@@ -171,6 +236,25 @@ export default function NotificationDropdown() {
 
         </ul>
 
+        {notifications && notifications.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+              <span>
+                Showing {notifications.length} notifications
+                {!isConnected && (
+                  <span className="ml-2 text-orange-500">(offline)</span>
+                )}
+              </span>
+              <button
+                onClick={() => refetch()}
+                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                title="Refresh notifications"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
+        )}
       </Dropdown>
     </div>
   );

@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { createAuditLogFromRequest } from '@/lib/audit';
 import { asyncHandler } from '@/lib/errorHandler';
 import { z } from 'zod';
+import { notifyTicketCreator, notifyOtherUsers, notifySuperAdmin } from '@/lib/supportNotificationHelper';
 
 // Validation schemas
 const commentSchema = z.object({
@@ -247,6 +248,46 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
       ticketId: ticketId,
       commentId: comment.id
     }
+  );
+
+  // Create notifications for the reply
+  const hasAttachments = attachments && attachments.length > 0;
+  const attachmentText = hasAttachments ? ` with ${attachments.length} attachment(s)` : '';
+  
+  // Only send notifications if someone other than the ticket creator is replying
+  if (user.id !== ticket.userId) {
+    // Notify ticket creator about the reply from someone else
+    await notifyTicketCreator(
+      ticketId,
+      ticket.title,
+      user.id,
+      tenant.id,
+      'replied',
+      `New reply${attachmentText} from ${user.name} on support ticket "${ticket.title}"`
+    );
+
+    // Notify other users with support permissions about the reply
+    await notifyOtherUsers(
+      ticketId,
+      ticket.title,
+      user.id,
+      tenant.id,
+      'replied',
+      `New reply${attachmentText} from ${user.name} on support ticket "${ticket.title}"`
+    );
+  }
+
+  // Notify superadmin about the reply (if it's from a tenant user)
+  await notifySuperAdmin(
+    ticketId,
+    ticket.title,
+    user.id,
+    user.email,
+    user.name,
+    tenant.id,
+    tenant.slug,
+    'replied',
+    `New reply${attachmentText} from ${user.name} on support ticket "${ticket.title}"`
   );
 
   return createSuccessResponse({ comment }, 'Comment added successfully', 201);

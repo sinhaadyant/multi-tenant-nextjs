@@ -5,6 +5,7 @@ import { SidebarProvider } from '@/context/SidebarContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { ToastProvider } from '@/context/ToastContext';
 import { ConfirmModalProvider } from '@/components/common/ConfirmModalProvider';
+import { GlobalNotificationProvider } from '@/context/GlobalNotificationContext';
 
 import Providers from '@/providers/Providers';
 import Script from 'next/script';
@@ -26,7 +27,9 @@ export default function RootLayout({
             <ToastProvider>
               <SidebarProvider>
                 <ConfirmModalProvider>
-                  {children}
+                  <GlobalNotificationProvider>
+                    {children}
+                  </GlobalNotificationProvider>
                 </ConfirmModalProvider>
               </SidebarProvider>
             </ToastProvider>

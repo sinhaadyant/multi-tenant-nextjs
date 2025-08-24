@@ -2,32 +2,62 @@
 import React, { useState, useEffect } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
-import { useUserNotifications, useMarkNotificationsAsRead } from "@/hooks/useTenantNotifications";
+import { useHeaderNotifications, useMarkHeaderNotificationsAsRead } from "@/hooks/useHeaderNotifications";
 import { useParams } from "next/navigation";
+import { useReduxAuth } from "@/hooks/useReduxAuth";
+import { useGlobalNotifications } from "@/context/GlobalNotificationContext";
+import { useSocketIO } from "@/hooks/useSocketIO";
 import { toast } from "react-hot-toast";
 
 export default function TenantNotificationDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const params = useParams();
   const tenantSlug = params.tenantSlug as string;
+  const { user, tenant } = useReduxAuth();
 
-  // Fetch user notifications with real-time updates
+  // Fetch header notifications for display (no real-time updates)
   const { 
-    notifications, 
+    data: headerNotificationsData, 
     isLoading, 
-    refetch,
-    pagination 
-  } = useUserNotifications(tenantSlug, {
-    limit: 10,
-    sortBy: 'createdAt',
-    sortOrder: 'desc'
-  });
+    refetch
+  } = useHeaderNotifications(10);
+  
+  // Use global notification context for real-time updates
+  const { unreadCount: globalUnreadCount, isConnected: globalIsConnected, refreshNotifications } = useGlobalNotifications();
+  
+  const notifications = headerNotificationsData?.data?.notifications || [];
+  // Use global unread count for real-time updates, fallback to local data
+  const unreadCount = globalUnreadCount !== undefined ? globalUnreadCount : (headerNotificationsData?.data?.unreadCount || 0);
+  
+  // Track previous unread count to show notification indicator
+  const [prevUnreadCount, setPrevUnreadCount] = useState(unreadCount);
+  const [showNewNotificationIndicator, setShowNewNotificationIndicator] = useState(false);
+
+  // Initialize Socket.io connection
+  const { isConnected: socketConnected } = useSocketIO({ enabled: !!user?.id });
+
+  // Debug unread count changes
+  useEffect(() => {
+    console.log('📊 Header Notification Count Debug:', {
+      globalUnreadCount,
+      localUnreadCount: headerNotificationsData?.data?.unreadCount,
+      finalUnreadCount: unreadCount,
+      isConnected: globalIsConnected,
+      socketConnected,
+      hasNotifications: notifications.length > 0
+    });
+  }, [globalUnreadCount, headerNotificationsData?.data?.unreadCount, unreadCount, globalIsConnected, socketConnected, notifications.length]);
+
+  // Optimized updates - sync with global context
+  useEffect(() => {
+    if (globalUnreadCount !== undefined && globalUnreadCount !== headerNotificationsData?.data?.unreadCount) {
+      console.log('🔄 Global context update: Refreshing header notifications');
+      refetch();
+    }
+  }, [globalUnreadCount, headerNotificationsData?.data?.unreadCount, refetch]);
 
   // Mark notification as read mutation
-  const markReadMutation = useMarkNotificationsAsRead(tenantSlug);
-
-  // Get unread count
-  const unreadCount = notifications?.filter(n => n.status === 'unread').length || 0;
+  const markReadMutation = useMarkHeaderNotificationsAsRead();
 
   // Auto-refresh notifications every 30 seconds when dropdown is open
   useEffect(() => {
@@ -39,6 +69,21 @@ export default function TenantNotificationDropdown() {
       return () => clearInterval(interval);
     }
   }, [isOpen, refetch]);
+
+  // Detect new notifications and show indicator (using global context)
+  useEffect(() => {
+    if (unreadCount > prevUnreadCount && prevUnreadCount > 0) {
+      console.log('📨 New notification detected in dropdown!');
+      setShowNewNotificationIndicator(true);
+      
+      // Hide indicator after 3 seconds
+      setTimeout(() => {
+        setShowNewNotificationIndicator(false);
+      }, 3000);
+    }
+    
+    setPrevUnreadCount(unreadCount);
+  }, [unreadCount, prevUnreadCount]);
 
   function toggleDropdown() {
     setIsOpen(!isOpen);
@@ -125,12 +170,18 @@ export default function TenantNotificationDropdown() {
         onClick={toggleDropdown}
       >
         {unreadCount > 0 && (
-          <span className="absolute -right-1 -top-1 z-10 h-5 w-5 rounded-full bg-red-500 flex items-center justify-center">
-            <span className="text-xs text-white font-medium">
+          <span className="absolute -right-1 -top-1 z-10 h-5 w-5 rounded-full bg-red-500 flex items-center justify-center shadow-lg">
+            <span className="text-xs text-white font-bold">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
             <span className="absolute inline-flex w-full h-full bg-red-500 rounded-full opacity-75 animate-ping"></span>
           </span>
+        )}
+        {!globalIsConnected && (
+          <span className="absolute -right-1 -top-1 z-10 h-3 w-3 rounded-full bg-gray-400" title="Real-time notifications disconnected"></span>
+        )}
+        {showNewNotificationIndicator && (
+          <span className="absolute -right-1 -top-1 z-10 h-3 w-3 rounded-full bg-green-500 animate-pulse" title="New notification received!"></span>
         )}
         <svg
           className="fill-current"
@@ -163,6 +214,16 @@ export default function TenantNotificationDropdown() {
             )}
           </h5>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                console.log('🔄 Manual refresh triggered');
+                refetch();
+              }}
+              className="text-xs text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
+              title="Refresh notifications"
+            >
+              🔄
+            </button>
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllAsRead}
@@ -283,7 +344,10 @@ export default function TenantNotificationDropdown() {
           <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
             <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
               <span>
-                Showing {notifications.length} of {pagination?.total || 0} notifications
+                Showing {notifications.length} notifications
+                {!globalIsConnected && !socketConnected && (
+                  <span className="ml-2 text-orange-500">(offline)</span>
+                )}
               </span>
               <button
                 onClick={() => refetch()}

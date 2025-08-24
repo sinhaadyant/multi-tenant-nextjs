@@ -1,36 +1,48 @@
 import { NextRequest } from 'next/server';
 import { withTenantAuth, AuthenticatedRequest } from '@/lib/authMiddleware';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
+import { createAuditLogFromRequest } from '@/lib/audit';
 import { prisma } from '@/lib/prisma';
+import { checkTenantPermission } from '@/lib/permissions';
 import { z } from 'zod';
+import notificationServer from '@/lib/websocket-server';
 
 // Validation schemas
 const createNotificationSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
-  message: z.string().min(1, 'Message is required'),
-  type: z.enum(['info', 'success', 'warning', 'error']).default('info'),
-  priority: z.enum(['low', 'medium', 'high', 'urgent']).default('medium'),
-  targetUsers: z.array(z.string()).optional(),
-  scheduledAt: z.string().optional(),
-  expiresAt: z.string().optional()
+  title: z.string().min(1, 'Title is required').max(200, 'Title too long'),
+  message: z.string().min(1, 'Message is required').max(1000, 'Message too long'),
+  type: z.enum(['info', 'warning', 'error', 'success', 'announcement']),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']),
+  targetType: z.enum(['all_tenant_users', 'specific_users']),
+  targetUserIds: z.array(z.string()).optional(),
+  scheduledAt: z.string().datetime().optional(),
+  status: z.enum(['draft', 'sent', 'scheduled']).default('draft')
 });
 
 const updateNotificationSchema = z.object({
-  title: z.string().min(1, 'Title is required').optional(),
-  message: z.string().min(1, 'Message is required').optional(),
-  type: z.enum(['info', 'success', 'warning', 'error']).optional(),
+  title: z.string().min(1, 'Title is required').max(200, 'Title too long').optional(),
+  message: z.string().min(1, 'Message is required').max(1000, 'Message too long').optional(),
+  type: z.enum(['info', 'warning', 'error', 'success', 'announcement']).optional(),
   priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
-  isRead: z.boolean().optional(),
-  isActive: z.boolean().optional()
+  targetType: z.enum(['all_tenant_users', 'specific_users']).optional(),
+  targetUserIds: z.array(z.string()).optional(),
+  scheduledAt: z.string().datetime().optional(),
+  status: z.enum(['draft', 'sent', 'scheduled']).optional()
 });
 
-// GET /api/tenant/[tenantSlug]/notifications - Get notifications for tenant
+// GET /api/tenant/[tenantSlug]/notifications - Get notifications list
 export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
   const { tenantSlug } = await params;
   
   try {
     const userId = req.user!.id;
     const tenantId = req.user!.tenantId;
+
+    // Check permissions
+    const hasViewPermission = await checkTenantPermission(req.user!, tenantId!, 'notifications.view');
+    if (!hasViewPermission) {
+      return createErrorResponse('Insufficient permissions to view notifications', 403);
+    }
 
     // Parse query parameters
     const url = new URL(req.url);
@@ -40,20 +52,20 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
     const sortBy = url.searchParams.get('sortBy') || 'createdAt';
     const sortOrder = url.searchParams.get('sortOrder') || 'desc';
     const type = url.searchParams.get('type') || '';
+    const status = url.searchParams.get('status') || '';
     const priority = url.searchParams.get('priority') || '';
-    const isRead = url.searchParams.get('isRead') || '';
-    const isActive = url.searchParams.get('isActive') || '';
 
-         // Build where clause - only show notifications from this tenant
-     const where: any = {
-       targetTenantId: tenantId
-     };
+    // Build where clause
+    const where: any = {
+      targetTenantId: tenantId,
+      isActive: true
+    };
 
     // Add search filter
     if (search) {
       where.OR = [
-        { title: { contains: search } },
-        { message: { contains: search } }
+        { title: { contains: search, mode: 'insensitive' } },
+        { message: { contains: search, mode: 'insensitive' } }
       ];
     }
 
@@ -62,19 +74,14 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
       where.type = type;
     }
 
+    // Add status filter
+    if (status) {
+      where.status = status;
+    }
+
     // Add priority filter
     if (priority) {
       where.priority = priority;
-    }
-
-    // Add read status filter
-    if (isRead !== '') {
-      where.isRead = isRead === 'true';
-    }
-
-    // Add active status filter
-    if (isActive !== '') {
-      where.isActive = isActive === 'true';
     }
 
     // Build order by clause
@@ -84,7 +91,7 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
     // Calculate pagination
     const skip = (page - 1) * limit;
 
-    // Fetch notifications with pagination and stats
+    // Fetch notifications with pagination
     const [notifications, totalNotifications] = await Promise.all([
       prisma.notification.findMany({
         where,
@@ -92,22 +99,17 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
         take: limit,
         orderBy,
         include: {
-          superAdmin: {
+          userNotifications: {
             select: {
               id: true,
-              name: true,
-              email: true
+              userId: true,
+              isRead: true,
+              readAt: true
             }
           },
-          userNotifications: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
+          _count: {
+            select: {
+              userNotifications: true
             }
           }
         }
@@ -116,24 +118,26 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
     ]);
 
     // Calculate statistics
-    const notificationStats = {
+    const stats = await prisma.notification.groupBy({
+      by: ['status'],
+      where: { targetTenantId: tenantId, isActive: true },
+      _count: {
+        status: true
+      }
+    });
+
+    const statsMap = {
       total: totalNotifications,
-      unread: await prisma.userNotification.count({
-        where: { 
-          notification: { targetTenantId: tenantId },
-          isRead: false
-        }
-      }),
-      read: await prisma.userNotification.count({
-        where: { 
-          notification: { targetTenantId: tenantId },
-          isRead: true
-        }
-      }),
-      active: await prisma.notification.count({
-        where: { ...where, isActive: true }
-      })
+      draft: 0,
+      sent: 0,
+      scheduled: 0
     };
+
+    stats.forEach((stat) => {
+      if (stat._count && stat.status) {
+        statsMap[stat.status as keyof typeof statsMap] = stat._count.status;
+      }
+    });
 
     // Format response
     const formattedNotifications = notifications.map(notification => ({
@@ -142,15 +146,14 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
       message: notification.message,
       type: notification.type,
       priority: notification.priority,
-      isRead: notification.isRead,
-      isActive: notification.isActive,
+      targetType: notification.targetType,
+      status: notification.status,
       scheduledAt: notification.scheduledAt,
-      expiresAt: notification.expiresAt,
       createdAt: notification.createdAt,
       updatedAt: notification.updatedAt,
-      createdBy: notification.superAdmin,
-      targetUsers: notification.userNotifications.map(un => un.user),
-      targetUserCount: notification.userNotifications.length
+      createdBy: notification.createdBy,
+      recipientsCount: notification._count.userNotifications,
+      readCount: notification.userNotifications.filter(un => un.isRead).length
     }));
 
     return createSuccessResponse({
@@ -163,12 +166,12 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
         hasNext: page * limit < totalNotifications,
         hasPrev: page > 1
       },
-      stats: notificationStats,
+      stats: statsMap,
       permissions: {
-        canView: true, // All authenticated users can view notifications in their tenant
-        canCreate: true, // Simplified for now
-        canUpdate: true,
-        canDelete: true
+        canView: hasViewPermission,
+        canCreate: await checkTenantPermission(req.user!, tenantId!, 'notifications.create'),
+        canUpdate: await checkTenantPermission(req.user!, tenantId!, 'notifications.update'),
+        canDelete: await checkTenantPermission(req.user!, tenantId!, 'notifications.delete')
       }
     }, 'Notifications retrieved successfully');
 
@@ -189,53 +192,118 @@ export const POST = withTenantAuth(async (req: AuthenticatedRequest, { params }:
     const userId = req.user!.id;
     const tenantId = req.user!.tenantId;
 
+    // Check create permission
+    const hasCreatePermission = await checkTenantPermission(req.user!, tenantId!, 'notifications.create');
+    if (!hasCreatePermission) {
+      return createErrorResponse('Insufficient permissions to create notifications', 403);
+    }
+
     const body = await req.json();
     const validatedData = createNotificationSchema.parse(body);
 
+    // Validate target users if specific users are selected
+    if (validatedData.targetType === 'specific_users') {
+      if (!validatedData.targetUserIds || validatedData.targetUserIds.length === 0) {
+        return createErrorResponse('Target user IDs are required for specific users', 400);
+      }
+
+      // Verify all target users belong to the same tenant
+      const targetUsers = await prisma.user.findMany({
+        where: {
+          id: { in: validatedData.targetUserIds },
+          tenantId: tenantId
+        },
+        select: { id: true }
+      });
+
+      if (targetUsers.length !== validatedData.targetUserIds.length) {
+        return createErrorResponse('Some target users do not belong to this tenant', 400);
+      }
+    }
+
     // Create notification
-    const newNotification = await prisma.notification.create({
+    const notification = await prisma.notification.create({
       data: {
         title: validatedData.title,
         message: validatedData.message,
         type: validatedData.type,
         priority: validatedData.priority,
-                 targetTenantId: tenantId,
-         createdByType: 'user',
-         metadata: JSON.stringify({
-           createdByUserId: userId,
-           createdByUser: {
-             id: req.user!.id,
-             email: req.user!.email
-           }
-         }),
-        isActive: true,
-        isRead: false,
+        targetType: validatedData.targetType,
         scheduledAt: validatedData.scheduledAt ? new Date(validatedData.scheduledAt) : null,
-        expiresAt: validatedData.expiresAt ? new Date(validatedData.expiresAt) : null
+        status: validatedData.status,
+        targetTenantId: tenantId,
+        createdBy: null,
+        createdByType: 'tenant_admin'
       }
     });
 
-         // Create user notification records if target users are specified
-     if (validatedData.targetUsers && validatedData.targetUsers.length > 0) {
-       const userNotifications = validatedData.targetUsers.map(targetUserId => ({
-         notificationId: newNotification.id,
-         userId: targetUserId,
-         isRead: false
-       }));
+    // Create user notifications if status is 'sent'
+    if (validatedData.status === 'sent') {
+      let targetUsers: string[] = [];
 
-       await prisma.userNotification.createMany({
-         data: userNotifications
-       });
-     }
+      if (validatedData.targetType === 'all_tenant_users') {
+        // Get all active users in the tenant
+        const tenantUsers = await prisma.user.findMany({
+          where: {
+            tenantId: tenantId,
+            isActive: true
+          },
+          select: { id: true }
+        });
+        targetUsers = tenantUsers.map(user => user.id);
+      } else if (validatedData.targetType === 'specific_users' && validatedData.targetUserIds) {
+        targetUsers = validatedData.targetUserIds;
+      }
+
+      // Create user notifications
+      if (targetUsers.length > 0) {
+        const userNotifications = targetUsers.map(userId => ({
+          notificationId: notification.id,
+          userId: userId,
+          isActive: true
+        }));
+
+        await prisma.userNotification.createMany({
+          data: userNotifications
+        });
+
+        // Broadcast via WebSocket
+        try {
+          const wsNotification = {
+            id: notification.id,
+            title: notification.title,
+            message: notification.message,
+            type: notification.type as any,
+            priority: notification.priority,
+            createdAt: notification.createdAt,
+            createdBy: notification.createdBy
+          };
+
+          if (validatedData.targetType === 'all_tenant_users') {
+            await notificationServer.broadcastNotification(wsNotification, 'tenant', [tenantId]);
+          } else if (validatedData.targetType === 'specific_users' && validatedData.targetUserIds) {
+            await notificationServer.broadcastNotification(wsNotification, 'user', validatedData.targetUserIds);
+          }
+        } catch (wsError) {
+          console.error('WebSocket broadcast error:', wsError);
+        }
+      }
+    }
+
+    // Create audit log
+    await createAuditLogFromRequest(req, req.user! as any, 'notification.created', {
+      details: `Created notification: ${notification.title}`,
+      resource: 'notification',
+      resourceId: notification.id
+    });
 
     return createSuccessResponse({
       notification: {
-        id: newNotification.id,
-        title: newNotification.title,
-        message: newNotification.message,
-        type: newNotification.type,
-        priority: newNotification.priority,
-        createdAt: newNotification.createdAt
+        id: notification.id,
+        title: notification.title,
+        type: notification.type,
+        status: notification.status,
+        createdAt: notification.createdAt
       }
     }, 'Notification created successfully');
 
@@ -251,99 +319,3 @@ export const POST = withTenantAuth(async (req: AuthenticatedRequest, { params }:
   }
 });
 
-// PUT /api/tenant/[tenantSlug]/notifications - Bulk actions
-export const PUT = withTenantAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
-  const { tenantSlug } = await params;
-  
-  try {
-    const userId = req.user!.id;
-    const tenantId = req.user!.tenantId;
-
-    const body = await req.json();
-    const { action, notificationIds, data } = body;
-
-         // Verify all notifications belong to the tenant
-     const notifications = await prisma.notification.findMany({
-       where: {
-         id: { in: notificationIds },
-         targetTenantId: tenantId
-       }
-     });
-
-    if (notifications.length !== notificationIds.length) {
-      return createErrorResponse('Some notifications not found or do not belong to this tenant', 400);
-    }
-
-    let result;
-    switch (action) {
-             case 'mark_read':
-         result = await prisma.userNotification.updateMany({
-           where: { 
-             notificationId: { in: notificationIds },
-             userId: userId
-           },
-           data: { isRead: true }
-         });
-         break;
-       case 'mark_unread':
-         result = await prisma.userNotification.updateMany({
-           where: { 
-             notificationId: { in: notificationIds },
-             userId: userId
-           },
-           data: { isRead: false }
-         });
-         break;
-             case 'activate':
-         result = await prisma.notification.updateMany({
-           where: { id: { in: notificationIds }, targetTenantId: tenantId },
-           data: { isActive: true }
-         });
-         break;
-       case 'deactivate':
-         result = await prisma.notification.updateMany({
-           where: { id: { in: notificationIds }, targetTenantId: tenantId },
-           data: { isActive: false }
-         });
-         break;
-       case 'delete':
-         // Delete user notifications first
-         await prisma.userNotification.deleteMany({
-           where: { notificationId: { in: notificationIds } }
-         });
-         
-         result = await prisma.notification.deleteMany({
-           where: { id: { in: notificationIds }, targetTenantId: tenantId }
-         });
-         break;
-      case 'update':
-        if (!data) {
-          return createErrorResponse('Update data is required for update action', 400);
-        }
-        const validatedData = updateNotificationSchema.parse(data);
-                 result = await prisma.notification.updateMany({
-           where: { id: { in: notificationIds }, targetTenantId: tenantId },
-           data: validatedData
-         });
-        break;
-      default:
-        return createErrorResponse('Invalid action', 400);
-    }
-
-    return createSuccessResponse({
-      action,
-      affectedNotifications: result.count,
-      notificationIds
-    }, `Bulk action '${action}' completed successfully`);
-
-  } catch (error: any) {
-    console.error('Error performing bulk action:', error);
-    if (error.name === 'ZodError') {
-      return createErrorResponse('Validation error: ' + error.errors[0].message, 400);
-    }
-    return createErrorResponse(
-      error.message || 'Failed to perform bulk action',
-      error.status || 500
-    );
-  }
-});

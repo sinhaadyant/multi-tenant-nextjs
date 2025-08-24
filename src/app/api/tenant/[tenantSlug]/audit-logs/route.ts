@@ -11,6 +11,32 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
     const userId = req.user!.id;
     const tenantId = req.user!.tenantId;
 
+    // Check user permissions for audit logs
+    const userRoles = await prisma.userRole.findMany({
+      where: { userId },
+      include: {
+        role: {
+          include: {
+            permissions: {
+              where: { moduleKey: 'audit-logs' }
+            }
+          }
+        }
+      }
+    });
+
+    const hasViewPermission = userRoles.some(userRole => 
+      userRole.role.permissions.some(permission => permission.canRead)
+    );
+
+    const hasViewAllPermission = userRoles.some(userRole => 
+      userRole.role.permissions.some(permission => permission.canViewAll)
+    );
+
+    if (!hasViewPermission) {
+      return createErrorResponse('You do not have permission to view audit logs', 403);
+    }
+
     // Parse query parameters
     const url = new URL(req.url);
     const page = parseInt(url.searchParams.get('page') || '1');
@@ -25,6 +51,11 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
     const where: any = {
       tenantId: tenantId
     };
+
+    // If user doesn't have viewAll permission, only show their own audit logs
+    if (!hasViewAllPermission) {
+      where.userId = userId;
+    }
 
     // Add search filter
     if (search) {
@@ -72,6 +103,10 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
       prisma.auditLog.count({ where })
     ]);
 
+    console.log('🔍 API Debug - Found logs:', logs.length);
+    console.log('🔍 API Debug - Total logs:', totalLogs);
+    console.log('🔍 API Debug - Where clause:', where);
+
     // Calculate statistics
     const logStats = {
       total: totalLogs,
@@ -116,6 +151,9 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
       }))
     };
 
+    console.log('🔍 API Debug - Stats:', stats);
+    console.log('🔍 API Debug - Action breakdown:', actionBreakdown);
+
     // Format response
     const formattedLogs = logs.map(log => ({
       id: log.id,
@@ -131,7 +169,7 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
       user: log.user
     }));
 
-    return createSuccessResponse({
+    const responseData = {
       auditLogs: formattedLogs,
       pagination: {
         page,
@@ -143,11 +181,18 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
       },
       stats: stats,
       permissions: {
-        canView: true, // All authenticated users can view audit logs in their tenant
-        canExport: true,
-        canDelete: true
+        canView: hasViewPermission,
+        canViewAll: hasViewAllPermission,
+        canExport: hasViewPermission,
+        canDelete: false, // Disable delete for audit logs
+        canCreate: false, // Disable create for audit logs
+        canUpdate: false  // Disable update for audit logs
       }
-    }, 'Audit logs retrieved successfully');
+    };
+
+    console.log('🔍 API Debug - Final response data:', responseData);
+
+    return createSuccessResponse(responseData, 'Audit logs retrieved successfully');
 
   } catch (error: any) {
     console.error('Error fetching audit logs:', error);

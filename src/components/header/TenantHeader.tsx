@@ -127,6 +127,9 @@ const TenantHeader: React.FC = () => {
         {/* Theme Toggle */}
         <ThemeToggleButton />
 
+        {/* Notifications */}
+        <TenantNotificationDropdown />
+
         {/* User Menu */}
         <div className="relative">
           <button

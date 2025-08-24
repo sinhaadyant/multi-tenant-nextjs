@@ -1,12 +1,14 @@
 "use client";
 
 import React from 'react';
-import { TicketForm } from '@/components/support-tickets/TicketForm';
+import TenantSupportTicketForm from '@/components/tenant/support/TenantSupportTicketForm';
 
-export default function TenantNewSupportTicketPage() {
+export default function NewSupportTicketPage() {
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <TicketForm mode="create" />
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+      <div className="max-w-4xl mx-auto px-4">
+        <TenantSupportTicketForm mode="create" />
+      </div>
     </div>
   );
 }

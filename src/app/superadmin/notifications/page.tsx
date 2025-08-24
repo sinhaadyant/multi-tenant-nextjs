@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from 'react';
-import { useNotifications, useDeleteNotification, useSendNotification, useMarkNotificationAsRead } from '@/hooks/useNotifications';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useNotifications, useDeleteNotification, useSendNotification, useMarkNotificationAsRead, useCreateNotification } from '@/hooks/useNotifications';
 import { Notification, NotificationFilters } from '@/hooks/useNotifications';
-import { Plus, Search, Filter, Edit, Trash2, Send, Eye, Calendar, Users, AlertCircle, Info, Bell, X } from 'lucide-react';
+import { useUsers } from '@/hooks/useUsers';
+import { Plus, Search, Filter, Edit, Trash2, Send, Eye, Calendar, Users, AlertCircle, Info, Bell, X, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 import ConfirmModal from '@/components/common/ConfirmModal';
@@ -83,6 +84,24 @@ export default function NotificationsPage() {
   const deleteMutation = useDeleteNotification();
   const sendMutation = useSendNotification();
   const markAsReadMutation = useMarkNotificationAsRead();
+  const createMutation = useCreateNotification();
+  
+  // Get users for sample notification
+  const { data: usersData, isLoading: usersLoading, error: usersError } = useUsers({ limit: 1000 });
+  
+  // Find anil@cc.com user
+  const anilUser = useMemo(() => {
+    if (!usersData?.users) return null;
+    return usersData.users.find(user => user.email === 'anil@cc.com');
+  }, [usersData]);
+
+  // Debug logging
+  useEffect(() => {
+    console.log('🔍 Debug - Users data:', usersData);
+    console.log('🔍 Debug - Users loading:', usersLoading);
+    console.log('🔍 Debug - Users error:', usersError);
+    console.log('🔍 Debug - Anil user found:', anilUser);
+  }, [usersData, usersLoading, usersError, anilUser]);
 
   const handleSearch = () => {
     setFilters(prev => ({
@@ -142,6 +161,43 @@ export default function NotificationsPage() {
     }
   };
 
+  const handleSendSampleNotification = async () => {
+    console.log('🔍 Debug - Button clicked!');
+    console.log('🔍 Debug - Anil user:', anilUser);
+    console.log('🔍 Debug - Create mutation pending:', createMutation.isPending);
+    
+    try {
+      if (!anilUser) {
+        console.log('🔍 Debug - Anil user not found, showing error toast');
+        toast.error('User anil@cc.com not found');
+        return;
+      }
+      
+      console.log('🔍 Debug - Creating sample notification...');
+      
+      // Create and send sample notification
+      const sampleNotification = {
+        title: 'Sample Notification',
+        message: 'This is a sample notification sent from the superadmin panel to test the notification system.',
+        type: 'info' as const,
+        priority: 'medium' as const,
+        targetType: 'specific_users' as const,
+        targetUserIds: [anilUser.id],
+        status: 'sent'
+      };
+
+      console.log('🔍 Debug - Sample notification data:', sampleNotification);
+
+      await createMutation.mutateAsync(sampleNotification);
+      console.log('🔍 Debug - Sample notification sent successfully');
+      toast.success('Sample notification sent to anil@cc.com successfully!');
+      refetch(); // Refresh the notifications list
+    } catch (error) {
+      console.error('🔍 Debug - Error sending sample notification:', error);
+      toast.error('Failed to send sample notification');
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -173,12 +229,27 @@ export default function NotificationsPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Notifications</h1>
           <p className="text-gray-600 dark:text-gray-400">Manage system notifications</p>
         </div>
-        <Link href="/superadmin/notifications/create">
-          <Button className="flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            Create Notification
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={handleSendSampleNotification}
+            disabled={createMutation.isPending || !anilUser}
+            className="flex items-center gap-2"
+          >
+            <Zap className="w-4 h-4" />
+            Send Sample to anil@cc.com
+            {createMutation.isPending && <span className="text-xs text-blue-500">(Sending...)</span>}
+            {!anilUser && usersData && <span className="text-xs text-red-500">(User not found)</span>}
+            {usersLoading && <span className="text-xs text-gray-500">(Loading users...)</span>}
+            {usersError && <span className="text-xs text-red-500">(Error loading users)</span>}
           </Button>
-        </Link>
+          <Link href="/superadmin/notifications/create">
+            <Button className="flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              Create Notification
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Stats */}

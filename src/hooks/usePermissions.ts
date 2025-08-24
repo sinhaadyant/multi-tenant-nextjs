@@ -23,7 +23,7 @@ import {
   type UserPermissions,
 } from '@/store/slices/permissionsSlice';
 import { useParams } from 'next/navigation';
-import axios from 'axios';
+import { api } from '@/lib/api';
 import { simpleStorage } from '@/lib/simpleStorage';
 
 export const usePermissions = () => {
@@ -60,11 +60,7 @@ export const usePermissions = () => {
         return;
       }
 
-      const response = await axios.get(`/api/tenant/${tenantSlug}/permissions/current-user`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const response = await api.get(`/tenant/${tenantSlug}/permissions/current-user`);
 
       if (response.data.success) {
         const permissionsData = response.data;

@@ -98,7 +98,7 @@ export const useUser = (id: string) => {
     queryKey: ['user', id],
     queryFn: async () => {
       const response = await api.get(`/superadmin/users/${id}`);
-      return response.data.data.user; // Extract data from the API response wrapper
+      return response.data.data; // Return the full data object
     },
     enabled: !!id,
   });

@@ -4,8 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, User, Shield, Key, Settings, AlertTriangle, Loader2 } from 'lucide-react';
 import { useUser, useUpdateUser, useResetUserPassword, useToggleUserStatus } from '@/hooks/useUsers';
-import { useRoles } from '@/hooks/useRolesAPI';
-import { usePermissions } from '@/hooks/usePermissions';
+import { useRoles } from '@/hooks/useRoles';
+import { usePermissions } from '@/hooks/useSuperadminPermissions';
 import Button from '@/components/ui/button/Button';
 import Badge from '@/components/ui/badge/Badge';
 import { useConfirmModalContext } from '@/components/common/ConfirmModalProvider';
@@ -48,8 +48,8 @@ const UserDetailPage: React.FC<UserDetailPageProps> = ({ userId }) => {
 
   // Update form data when user data loads
   useEffect(() => {
-    if (userData?.data?.user) {
-      const user = userData.data.user;
+    if (userData?.user) {
+      const user = userData.user;
       setFormData({
         name: user.name || '',
         email: user.email || '',
@@ -59,7 +59,7 @@ const UserDetailPage: React.FC<UserDetailPageProps> = ({ userId }) => {
     }
   }, [userData]);
 
-  const user = userData?.data?.user;
+  const user = userData?.user;
   const roles = rolesData?.roles || [];
   const permissions = permissionsData?.permissions || [];
 

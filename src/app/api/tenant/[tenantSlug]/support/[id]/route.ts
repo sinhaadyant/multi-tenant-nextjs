@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { createAuditLogFromRequest } from '@/lib/audit';
 import { asyncHandler } from '@/lib/errorHandler';
 import { z } from 'zod';
+import { notifyTicketCreator, notifyOtherUsers, notifySuperAdmin } from '@/lib/supportNotificationHelper';
 
 // Validation schemas
 const updateTicketSchema = z.object({
@@ -269,6 +270,44 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: P
       changes: Object.keys(updateData)
     }
   );
+
+  // Create notifications based on what was updated
+  if (Object.keys(updateData).length > 0) {
+    // Only send notifications if someone other than the ticket creator is updating
+    if (user.id !== existingTicket.userId) {
+      if (updateData.status === 'closed') {
+        // Notify ticket creator that ticket was closed by someone else
+        await notifyTicketCreator(
+          ticketId,
+          updatedTicket.title,
+          user.id,
+          tenant.id,
+          'closed',
+          `Support ticket "${updatedTicket.title}" has been closed by ${user.name}`
+        );
+      } else {
+        // Notify ticket creator about other updates by someone else
+        await notifyTicketCreator(
+          ticketId,
+          updatedTicket.title,
+          user.id,
+          tenant.id,
+          'updated',
+          `Support ticket "${updatedTicket.title}" has been updated by ${user.name}`
+        );
+      }
+
+      // Notify other users with support permissions about the update
+      await notifyOtherUsers(
+        ticketId,
+        updatedTicket.title,
+        user.id,
+        tenant.id,
+        'updated',
+        `Support ticket "${updatedTicket.title}" has been updated by ${user.name}`
+      );
+    }
+  }
 
   return createSuccessResponse({ ticket: updatedTicket }, 'Support ticket updated successfully');
 });
