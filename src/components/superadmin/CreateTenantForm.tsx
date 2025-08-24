@@ -10,7 +10,7 @@ import { Eye, EyeOff, Check, X, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
 
 import { createTenantSchema, CreateTenantData } from '@/lib/validations/superadmin';
-import { useCheckEmail } from '@/hooks/useTenantsAPI';
+import { useCheckEmail, useCreateTenant } from '@/hooks/useTenantsAPI';
 
 type CreateTenantFormData = CreateTenantData;
 
@@ -207,54 +207,26 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
     return () => clearTimeout(debounceTimer);
   }, [checkSubdomain]);
 
-  // Create tenant mutation - memoized callbacks
-  const mutationFn = useCallback(async (data: CreateTenantFormData) => {
-    // Map tenantType to plan values
-    const getPlanFromTenantType = (tenantType: string) => {
-      switch (tenantType) {
-        case 'SaaS':
-          return 'starter';
-        case 'Enterprise':
-          return 'enterprise';
-        case 'Custom':
-          return 'professional';
-        default:
-          return 'starter';
-      }
-    };
+  // Create tenant mutation using the proper hook
+  const createTenantMutation = useCreateTenant();
 
-    const response = await api.post('/superadmin/tenants', {
-      tenant: {
-        name: data.tenantName,
-        companyName: data.companyName,
-        slug: data.subdomain,
-        domain: `${data.subdomain}.example.com`,
-        description: `${data.companyName} - ${data.tenantType} tenant`,
-        plan: getPlanFromTenantType(data.tenantType),
-        region: data.country,
-        features: ['analytics', 'api', 'sso'],
-        isActive: data.status,
-        metadata: {
-          industryType: data.industryType,
-          address: data.address,
-          country: data.country
-        }
-      },
-      admin: {
-        name: data.adminFullName,
-        email: data.adminEmail,
-        password: data.adminPassword,
-        contactNumber: data.adminMobile,
-        isActive: true
-      }
-    });
-    return response.data;
+  // Map tenantType to plan values
+  const getPlanFromTenantType = useCallback((tenantType: string) => {
+    switch (tenantType) {
+      case 'SaaS':
+        return 'starter';
+      case 'Enterprise':
+        return 'enterprise';
+      case 'Custom':
+        return 'professional';
+      default:
+        return 'starter';
+    }
   }, []);
 
   const handleMutationSuccess = useCallback((data: any) => {
     setFormError(null); // Clear any previous form errors
     setSubdomainSuggestions([]); // Clear suggestions
-    toast.success('Tenant and Admin User created successfully!');
     onSuccess(data);
   }, [onSuccess]);
 
@@ -312,12 +284,6 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
       setError(fieldError.field as any, { message: fieldError.message });
     }
   }, [setError, generateSubdomainSuggestions, watchedSubdomain]);
-
-  const createTenantMutation = useMutation({
-    mutationFn,
-    onSuccess: handleMutationSuccess,
-    onError
-  });
 
     const getPasswordStrength = useCallback((password: string) => {
     if (!password) return { score: 0, label: 'Very Weak', color: 'text-red-500', bgColor: 'bg-red-500', requirements: [] };
@@ -424,8 +390,33 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
     }
     
     console.log('Form validation passed, submitting...');
-    createTenantMutation.mutate(data);
-  }, [subdomainAvailable, passwordStrength.score, setError, createTenantMutation, createTenantMutation.isPending, isSubmitting]);
+    
+    // Prepare the data in the format expected by the API
+    const tenantData = {
+      tenant: {
+        name: data.tenantName,
+        slug: data.subdomain,
+        domain: `${data.subdomain}.example.com`,
+        description: `${data.companyName} - ${data.tenantType} tenant`,
+        plan: getPlanFromTenantType(data.tenantType),
+        region: data.country,
+        features: ['analytics', 'api', 'sso'],
+        isActive: data.status
+      },
+      admin: {
+        name: data.adminFullName,
+        email: data.adminEmail,
+        password: data.adminPassword,
+        contactNumber: data.adminMobile,
+        isActive: true
+      }
+    };
+    
+    createTenantMutation.mutate(tenantData, {
+      onSuccess: handleMutationSuccess,
+      onError
+    });
+  }, [subdomainAvailable, passwordStrength.score, setError, createTenantMutation, createTenantMutation.isPending, isSubmitting, getPlanFromTenantType, handleMutationSuccess, onError]);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">

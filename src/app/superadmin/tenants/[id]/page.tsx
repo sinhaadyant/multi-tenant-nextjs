@@ -78,7 +78,7 @@ export default function TenantDetailsPage() {
   const [selectedLog, setSelectedLog] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // API hooks
+  // API hooks with conditional loading
   const { data: tenantData, isLoading: tenantLoading, error: tenantError } = useTenant(tenantId);
   let { data: usersData, isLoading: usersLoading, error: usersError } = useTenantUsers(tenantId, userFilters);
   let { data: activityData, isLoading: activityLoading, error: activityError } = useTenantActivityLogs(tenantId, activityFilters);

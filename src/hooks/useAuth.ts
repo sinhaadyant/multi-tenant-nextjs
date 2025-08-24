@@ -52,6 +52,10 @@ export const useAuth = () => {
     // Clear Redux state
     dispatch(setLogout());
     dispatch(clearPermissions());
+    
+    // Reset loading and error states
+    setIsLoading(false);
+    setError(null);
   }, [dispatch]);
 
   // Check authentication status on mount
@@ -217,6 +221,9 @@ export const useAuth = () => {
     } finally {
       // Always clear auth data
       clearAuth();
+      
+      // Reset loading state immediately after clearing auth
+      setIsLoading(false);
 
       if (showToast) {
         toast.success('Logged out successfully');

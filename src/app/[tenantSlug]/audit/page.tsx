@@ -2,12 +2,12 @@
 
 import React, { useState } from 'react';
 import { Download, AlertTriangle, CheckCircle, XCircle, Activity } from 'lucide-react';
-import { useAuditLogs, AuditLog } from '@/hooks/useAuditLogs';
-import AuditLogsTable from '@/components/superadmin/AuditLogsTable';
-import AuditLogsFilters from '@/components/superadmin/AuditLogsFilters';
-import AuditLogDetailsModal from '@/components/superadmin/AuditLogDetailsModal';
+import { useTenantAuditLogs, AuditLog } from '@/hooks/useTenantAuditLogs';
+import TenantAuditLogsTable from '@/components/tenant/TenantAuditLogsTable';
+import TenantAuditLogsFilters from '@/components/tenant/TenantAuditLogsFilters';
+import TenantAuditLogDetailsModal from '@/components/tenant/TenantAuditLogDetailsModal';
 
-export default function AuditLogsPage() {
+export default function TenantAuditLogsPage() {
   const {
     auditLogs,
     stats,
@@ -19,7 +19,7 @@ export default function AuditLogsPage() {
     updateFilters,
     goToPage,
     exportLogs,
-  } = useAuditLogs();
+  } = useTenantAuditLogs();
 
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -46,7 +46,6 @@ export default function AuditLogsPage() {
 
   const handleClearFilters = () => {
     updateFilters({
-      tenantName: '',
       userEmail: '',
       actionType: '',
       startDate: '',
@@ -67,7 +66,7 @@ export default function AuditLogsPage() {
   };
 
   const getActionStats = () => {
-    if (!stats) return { create: 0, update: 0, delete: 0, login: 0, other: 0 };
+    if (!stats || !stats.actionBreakdown) return { create: 0, update: 0, delete: 0, login: 0, other: 0 };
     
     const actionStats = { create: 0, update: 0, delete: 0, login: 0, other: 0 };
     
@@ -117,7 +116,7 @@ export default function AuditLogsPage() {
             Audit Logs
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Monitor system activity and user actions across all tenants
+            Monitor system activity and user actions within your tenant
           </p>
         </div>
         <div className="flex gap-3">
@@ -200,7 +199,7 @@ export default function AuditLogsPage() {
       </div>
 
       {/* Action Breakdown */}
-      {stats && stats.actionBreakdown.length > 0 && (
+      {stats && stats.actionBreakdown && stats.actionBreakdown.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             Action Breakdown (Last 30 Days)
@@ -221,7 +220,7 @@ export default function AuditLogsPage() {
       )}
 
       {/* Filters */}
-      <AuditLogsFilters
+      <TenantAuditLogsFilters
         filters={filters}
         onFiltersChange={handleFiltersChange}
         onClearFilters={handleClearFilters}
@@ -229,7 +228,7 @@ export default function AuditLogsPage() {
       />
 
       {/* Data Table */}
-      <AuditLogsTable
+      <TenantAuditLogsTable
         logs={auditLogs}
         loading={loading}
         onViewLog={handleViewLog}
@@ -242,7 +241,7 @@ export default function AuditLogsPage() {
       />
 
       {/* Log Details Modal */}
-      <AuditLogDetailsModal
+      <TenantAuditLogDetailsModal
         log={selectedLog}
         isOpen={isModalOpen}
         onClose={handleCloseModal}

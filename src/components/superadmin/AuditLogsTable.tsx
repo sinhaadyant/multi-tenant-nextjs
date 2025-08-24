@@ -202,6 +202,11 @@ const AuditLogsTable: React.FC<AuditLogsTableProps> = ({
                           <div className="text-xs text-gray-400 dark:text-gray-500">
                             {log.superAdmin ? 'Super Admin' : 'User'}
                           </div>
+                          {log.superAdmin && (
+                            <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                              Super Administrator
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}

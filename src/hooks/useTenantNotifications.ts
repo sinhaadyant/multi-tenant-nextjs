@@ -78,6 +78,8 @@ export interface UserNotificationResponse {
     total: number;
     totalPages: number;
   };
+  unreadCount: number;
+  lastUpdated: string;
 }
 
 export interface CreateNotificationData {

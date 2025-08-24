@@ -76,7 +76,7 @@ export async function checkTenantPermission(
       
       for (const rolePermission of role.permissions) {
         if (possibleModuleKeys.includes(rolePermission.moduleKey)) {
-          // Check the specific action
+          // Check the specific action - be more strict about permissions
           switch (action) {
             case 'view':
             case 'read':
@@ -96,11 +96,8 @@ export async function checkTenantPermission(
               if (rolePermission.canViewAll) return true;
               break;
             default:
-              // If no specific action or unknown action, check if user has any permission
-              if (rolePermission.canRead || rolePermission.canCreate || 
-                  rolePermission.canUpdate || rolePermission.canDelete) {
-                return true;
-              }
+              // For unknown actions, only return true if explicitly granted
+              return false;
           }
         }
       }

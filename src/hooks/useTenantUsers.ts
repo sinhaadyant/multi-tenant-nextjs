@@ -43,6 +43,13 @@ export interface TenantUserResponse {
     total: number;
     totalPages: number;
   };
+  permissions: {
+    canView: boolean;
+    canViewAll: boolean;
+    canCreate: boolean;
+    canUpdate: boolean;
+    canDelete: boolean;
+  };
 }
 
 export interface CreateUserData {
@@ -83,22 +90,22 @@ const fetchTenantUsers = async (
   if (params.sortOrder) searchParams.append('sortOrder', params.sortOrder);
 
   const response = await api.get(`/tenant/${tenantSlug}/users?${searchParams.toString()}`);
-  return response.data;
+  return response.data.data;
 };
 
 const fetchTenantUser = async (tenantSlug: string, userId: string): Promise<{ user: TenantUser }> => {
   const response = await api.get(`/tenant/${tenantSlug}/users/${userId}`);
-  return response.data;
+  return response.data.data;
 };
 
 const createTenantUser = async (tenantSlug: string, data: CreateUserData): Promise<{ user: TenantUser }> => {
   const response = await api.post(`/tenant/${tenantSlug}/users`, data);
-  return response.data;
+  return response.data.data;
 };
 
 const updateTenantUser = async (tenantSlug: string, userId: string, data: UpdateUserData): Promise<{ user: TenantUser }> => {
   const response = await api.put(`/tenant/${tenantSlug}/users/${userId}`, data);
-  return response.data;
+  return response.data.data;
 };
 
 const deleteTenantUser = async (tenantSlug: string, userId: string): Promise<void> => {
@@ -110,17 +117,17 @@ const bulkUserOperations = async (
   data: { userIds: string[]; action: string; roleIds?: string[] }
 ): Promise<any> => {
   const response = await api.patch(`/tenant/${tenantSlug}/users`, data);
-  return response.data;
+  return response.data.data;
 };
 
 const toggleUserStatus = async (tenantSlug: string, userId: string, isActive: boolean): Promise<any> => {
   const response = await api.patch(`/tenant/${tenantSlug}/users/${userId}`, { isActive });
-  return response.data;
+  return response.data.data;
 };
 
 const fetchTenantRoles = async (tenantSlug: string): Promise<any> => {
   const response = await api.get(`/tenant/${tenantSlug}/roles`);
-  return response.data;
+  return response.data.data;
 };
 
 const exportUsers = async (tenantSlug: string, filters: any): Promise<Blob> => {

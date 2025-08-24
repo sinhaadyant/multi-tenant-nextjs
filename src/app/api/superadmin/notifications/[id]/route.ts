@@ -16,6 +16,8 @@ export async function GET(
       return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
     }
 
+    const { id } = params;
+    
     const notification = await prisma.notification.findUnique({
       where: { id: id },
       include: {
@@ -64,6 +66,7 @@ export async function PUT(
       return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
     }
 
+    const { id } = params;
     const body = await request.json();
 
     // Check if notification exists
@@ -158,6 +161,8 @@ export async function DELETE(
       return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
     }
 
+    const { id } = params;
+    
     // Check if notification exists
     const notification = await prisma.notification.findUnique({
       where: { id: id }
@@ -200,6 +205,7 @@ export async function PATCH(
       return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
     }
 
+    const { id } = params;
     const body = await request.json();
 
     // Check if notification exists

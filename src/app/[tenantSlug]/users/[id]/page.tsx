@@ -2,17 +2,12 @@
 
 import React from 'react';
 import { useParams } from 'next/navigation';
-import UserDetailPage from '@/components/superadmin/UserDetailPage';
-import { UserErrorBoundaryWrapper } from '@/components/superadmin/UserErrorBoundary';
+import TenantUserDetailPage from '@/components/tenant/TenantUserDetailPage';
 
 export default function UserDetailRoute() {
   const params = useParams();
   const userId = params.id as string;
 
-  return (
-    <UserErrorBoundaryWrapper>
-      <UserDetailPage userId={userId} />
-    </UserErrorBoundaryWrapper>
-  );
+  return <TenantUserDetailPage userId={userId} />;
 }
 

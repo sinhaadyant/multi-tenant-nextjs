@@ -239,8 +239,8 @@ const TenantSidebar: React.FC = () => {
         'audit-logs': `/${tenantSlug}/audit`,
         'audit': `/${tenantSlug}/audit`,
         'notifications': `/${tenantSlug}/notifications`,
-        'support': `/${tenantSlug}/support-tickets`,
-        'support-tickets': `/${tenantSlug}/support-tickets`,
+        'support': `/${tenantSlug}/support`,
+        'support-tickets': `/${tenantSlug}/support`,
         'reports-analytics': `/${tenantSlug}/reports`,
         'reports': `/${tenantSlug}/reports`,
         'profile': `/${tenantSlug}/profile`,
@@ -285,12 +285,7 @@ const TenantSidebar: React.FC = () => {
           { 
             id: "allTickets", 
             label: "All Tickets", 
-            path: `/${tenantSlug}/support-tickets`
-          },
-          { 
-            id: "createTicket", 
-            label: "Create Ticket", 
-            path: `/${tenantSlug}/support-tickets/new`
+            path: `/${tenantSlug}/support`
           }
         ];
       }

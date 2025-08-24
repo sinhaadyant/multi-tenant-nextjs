@@ -63,7 +63,18 @@ export const GET = asyncHandler(async (req: NextRequest) => {
 
     // Build orderBy clause
     const orderBy: any = {};
-    orderBy[sortBy] = sortOrder;
+    
+    // Map frontend field names to database field names
+    const fieldMapping: Record<string, string> = {
+      name: 'name',
+      createdAt: 'createdAt',
+      userCount: 'createdAt' // Default fallback for userCount sorting
+    };
+    
+    const dbField = fieldMapping[sortBy] || sortBy;
+    orderBy[dbField] = sortOrder;
+
+
 
     const roles = await prisma.role.findMany({
       where,
@@ -116,7 +127,7 @@ export const GET = asyncHandler(async (req: NextRequest) => {
       })
     }));
 
-    await createAuditLogFromRequest(req, authResult, 'role.list', {
+    await createAuditLogFromRequest(req, authResult.user, 'role.list', {
       rolesCount: transformedRoles.length,
       tenantId,
       roleType,
@@ -198,8 +209,11 @@ export const POST = asyncHandler(async (req: NextRequest) => {
     });
 
     if (existingRole) {
-      return createErrorResponse('Role name already exists', 409, [
-        { field: 'name', message: 'Role name already exists' }
+      const errorMessage = isGlobal 
+        ? 'A global role with this name already exists'
+        : 'A role with this name already exists for this tenant';
+      return createErrorResponse(errorMessage, 409, [
+        { field: 'name', message: errorMessage }
       ]);
     }
 
@@ -287,7 +301,7 @@ export const POST = asyncHandler(async (req: NextRequest) => {
       }))
     };
 
-    await createAuditLogFromRequest(req, authResult, 'role.create', {
+    await createAuditLogFromRequest(req, authResult.user, 'role.create', {
       roleId: result.id,
       roleName: result.name,
       isGlobal: result.isGlobal,

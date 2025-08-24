@@ -192,9 +192,6 @@ const RoleForm: React.FC<RoleFormProps> = ({
 
           {/* Description */}
           <div>
-            <label htmlFor="roleDescription" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Description
-            </label>
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Description

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
@@ -75,16 +75,9 @@ interface Role {
   color?: string;
 }
 
-interface CreateUserForm {
-  name: string;
-  email: string;
-  password: string;
-  contactNumber: string;
-  roleIds: string[];
-}
-
 const TenantUsersClient: React.FC = () => {
   const params = useParams();
+  const router = useRouter();
   const tenantSlug = params.tenantSlug as string;
   const { user, hasPermission } = useReduxAuth();
   const queryClient = useQueryClient();
@@ -94,15 +87,7 @@ const TenantUsersClient: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [showAddModal, setShowAddModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [formData, setFormData] = useState<CreateUserForm>({
-    name: '',
-    email: '',
-    password: '',
-    contactNumber: '',
-    roleIds: []
-  });
 
   // Fetch users with React Query
   const {
@@ -147,31 +132,6 @@ const TenantUsersClient: React.FC = () => {
     },
     enabled: !!tenantSlug && hasPermission('roles', 'read'),
     staleTime: 10 * 60 * 1000, // 10 minutes
-  });
-
-  // Create user mutation
-  const createUserMutation = useMutation({
-    mutationFn: async (userData: CreateUserForm) => {
-      const token = localStorage.getItem('tenant_auth_token') || localStorage.getItem('auth_token');
-      const response = await axios.post(`/api/tenant/${tenantSlug}/users`, userData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tenant-users'] });
-      setShowAddModal(false);
-      setFormData({
-        name: '',
-        email: '',
-        password: '',
-        contactNumber: '',
-        roleIds: []
-      });
-    }
   });
 
   // Delete user mutation
@@ -254,48 +214,6 @@ const TenantUsersClient: React.FC = () => {
     console.log('Bulk action:', action);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleRoleChange = (roleId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      roleIds: prev.roleIds.includes(roleId) 
-        ? prev.roleIds.filter(id => id !== roleId)
-        : [roleId] // Only allow one role
-    }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name || !formData.email || !formData.password) {
-      alert('Please fill in all required fields');
-      return;
-    }
-    try {
-      await createUserMutation.mutateAsync(formData);
-    } catch (error) {
-      console.error('Error creating user:', error);
-      alert('Failed to create user. Please try again.');
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      email: '',
-      password: '',
-      contactNumber: '',
-      roleIds: []
-    });
-    setShowAddModal(false);
-  };
-
   if (error) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -338,11 +256,11 @@ const TenantUsersClient: React.FC = () => {
               Invite User
             </button>
             <button 
-              onClick={() => setShowAddModal(true)}
-              className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+              onClick={() => router.push(`/${tenantSlug}/users/new`)}
+              className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
             >
               <UserPlus className="w-4 h-4 mr-2" />
-              Add User
+              Create User
             </button>
           </div>
         )}
@@ -499,8 +417,19 @@ const TenantUsersClient: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end space-x-2">
+                          <button 
+                            onClick={() => router.push(`/${tenantSlug}/users/${user.id}`)}
+                            className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                            title="View Details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
                           {permissions?.canUpdate && (
-                            <button className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
+                            <button 
+                              onClick={() => router.push(`/${tenantSlug}/users/${user.id}`)}
+                              className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
+                              title="Edit User"
+                            >
                               <Edit className="w-4 h-4" />
                             </button>
                           )}
@@ -509,6 +438,7 @@ const TenantUsersClient: React.FC = () => {
                               onClick={() => handleDeleteUser(user.id)}
                               className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                               disabled={deleteUserMutation.isPending}
+                              title="Delete User"
                             >
                               {deleteUserMutation.isPending ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -578,132 +508,6 @@ const TenantUsersClient: React.FC = () => {
           </>
         )}
       </div>
-
-      {/* Add User Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add New User</h3>
-              <button
-                onClick={resetForm}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Name *
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Email *
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Password *
-                </label>
-                <input
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                  required
-                  minLength={8}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Contact Number
-                </label>
-                <input
-                  type="tel"
-                  name="contactNumber"
-                  value={formData.contactNumber}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Role
-                </label>
-                <div className="space-y-2">
-                  {rolesData?.map((role) => (
-                    <label key={role.id} className="flex items-center">
-                      <input
-                        type="radio"
-                        name="role"
-                        checked={formData.roleIds.includes(role.id)}
-                        onChange={() => handleRoleChange(role.id)}
-                        className="mr-2"
-                      />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">
-                        {role.name}
-                        {role.description && (
-                          <span className="text-gray-500 dark:text-gray-400 ml-1">
-                            - {role.description}
-                          </span>
-                        )}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-3 pt-4">
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={createUserMutation.isPending}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
-                >
-                  {createUserMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    'Create User'
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Invite User Modal */}
       {showInviteModal && (

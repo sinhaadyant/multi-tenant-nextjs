@@ -198,17 +198,16 @@ export const POST = withTenantAuth(async (req: AuthenticatedRequest, { params }:
     const body = await req.json();
     const validatedData = createRoleSchema.parse(body);
 
-    // Check if role name already exists in tenant
+    // Check if role name already exists (considering the unique constraint on name + isGlobal)
     const existingRole = await prisma.role.findFirst({
       where: {
         name: validatedData.name,
-        tenantId: tenantId,
-        isGlobal: false
+        isGlobal: false // Check for any non-global role with this name
       }
     });
 
     if (existingRole) {
-      return createErrorResponse('Role with this name already exists in this tenant', 400);
+      return createErrorResponse(`Role with name "${validatedData.name}" already exists. Please choose a different name.`, 400);
     }
 
     // Create role
@@ -270,9 +269,16 @@ export const POST = withTenantAuth(async (req: AuthenticatedRequest, { params }:
 
   } catch (error: any) {
     console.error('Error creating role:', error);
+    
+    // Handle specific database constraint errors
+    if (error.code === 'P2002' && error.meta?.target?.includes('roles_name_isGlobal_key')) {
+      return createErrorResponse(`Role with name "${validatedData.name}" already exists. Please choose a different name.`, 400);
+    }
+    
     if (error.name === 'ZodError') {
       return createErrorResponse('Validation error: ' + error.errors[0].message, 400);
     }
+    
     return createErrorResponse(
       error.message || 'Failed to create role',
       error.status || 500

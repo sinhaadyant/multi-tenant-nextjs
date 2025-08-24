@@ -33,6 +33,15 @@ export const GET = withTenantAuth(async (
       where.isRead = false;
     }
 
+    // Add type filter if specified
+    if (filters.type && filters.type.length > 0) {
+      where.notification = {
+        type: {
+          in: filters.type
+        }
+      };
+    }
+
     // Calculate pagination
     const skip = (filters.page - 1) * filters.limit;
     const take = filters.limit;
@@ -96,6 +105,15 @@ export const GET = withTenantAuth(async (
       },
     }));
 
+    // Get unread count for the user
+    const unreadCount = await prisma.userNotification.count({
+      where: {
+        userId: user.id,
+        isActive: true,
+        isRead: false,
+      },
+    });
+
     const response = {
       notifications,
       pagination: {
@@ -104,6 +122,8 @@ export const GET = withTenantAuth(async (
         total,
         totalPages: Math.ceil(total / filters.limit),
       },
+      unreadCount,
+      lastUpdated: new Date().toISOString(),
     };
 
     return createSuccessResponse(response, 'User notifications retrieved successfully');

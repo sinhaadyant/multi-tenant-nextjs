@@ -93,6 +93,29 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
       })
     };
 
+    // Calculate action breakdown
+    const actionBreakdown = await prisma.auditLog.groupBy({
+      by: ['action'],
+      where,
+      _count: {
+        action: true
+      },
+      orderBy: {
+        _count: {
+          action: 'desc'
+        }
+      },
+      take: 10
+    });
+
+    const stats = {
+      ...logStats,
+      actionBreakdown: actionBreakdown.map(item => ({
+        action: item.action,
+        count: item._count.action
+      }))
+    };
+
     // Format response
     const formattedLogs = logs.map(log => ({
       id: log.id,
@@ -109,7 +132,7 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
     }));
 
     return createSuccessResponse({
-      logs: formattedLogs,
+      auditLogs: formattedLogs,
       pagination: {
         page,
         limit,
@@ -118,7 +141,7 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
         hasNext: page * limit < totalLogs,
         hasPrev: page > 1
       },
-      stats: logStats,
+      stats: stats,
       permissions: {
         canView: true, // All authenticated users can view audit logs in their tenant
         canExport: true,

@@ -35,14 +35,23 @@ export interface TenantFilters {
 }
 
 export interface CreateTenantData {
-  name: string;
-  slug: string;
-  admin_email: string;
-  domain?: string;
-  description?: string;
-  plan?: string;
-  region?: string;
-  features?: string[];
+  tenant: {
+    name: string;
+    slug: string;
+    domain?: string;
+    description?: string;
+    plan?: string;
+    region?: string;
+    features?: string[];
+    isActive?: boolean;
+  };
+  admin: {
+    name: string;
+    email: string;
+    password: string;
+    contactNumber?: string;
+    isActive?: boolean;
+  };
 }
 
 export interface TenantUser {
@@ -158,6 +167,7 @@ export const useTenantUsers = (tenantId: string, filters: {
     enabled: !!tenantId,
     staleTime: 2 * 60 * 1000, // 2 minutes
     retry: 1,
+    refetchOnWindowFocus: false, // Prevent refetch on window focus
   });
 };
 
@@ -386,6 +396,7 @@ export const useTenantActivityLogs = (tenantId: string, filters: {
     },
     enabled: !!tenantId,
     staleTime: 2 * 60 * 1000, // 2 minutes
+    refetchOnWindowFocus: false, // Prevent refetch on window focus
   });
 }; 
 

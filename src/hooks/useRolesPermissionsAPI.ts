@@ -177,7 +177,7 @@ export const useRolesPermissionsAPI = () => {
         }
         
         setRoles(Array.isArray(rolesData) ? rolesData : []);
-        return response.data;
+        return response.data.data;
       } else {
         throw new Error(response.data.message || 'Failed to fetch roles');
       }
@@ -315,7 +315,7 @@ export const useRolesPermissionsAPI = () => {
         }
         
         setUsers(usersData);
-        return response.data;
+        return response.data.data;
       } else {
         throw new Error(response.data.message || 'Failed to fetch users');
       }
@@ -333,7 +333,7 @@ export const useRolesPermissionsAPI = () => {
       const response = await api.post('/superadmin/roles', roleData);
       
       if (response.data.success) {
-        return response.data.role;
+        return response.data.data.role;
       } else {
         throw new Error(response.data.message || 'Failed to create role');
       }
@@ -352,6 +352,11 @@ export const useRolesPermissionsAPI = () => {
         queryClient.invalidateQueries({ queryKey: ['roles', selectedTenant.id] });
         queryClient.invalidateQueries({ queryKey: ['tenant-roles', selectedTenant.slug] });
       }
+      
+      // Force refetch the current roles for the selected tenant
+      if (selectedTenant) {
+        fetchAllRolesForTenant(selectedTenant.id);
+      }
     },
     onError: (err: any) => {
       setError(err.message || 'Failed to create role');
@@ -364,7 +369,7 @@ export const useRolesPermissionsAPI = () => {
       const response = await api.put(`/superadmin/roles/${roleId}`, roleData);
       
       if (response.data.success) {
-        return response.data.role;
+        return response.data.data.role;
       } else {
         throw new Error(response.data.message || 'Failed to update role');
       }
@@ -397,7 +402,7 @@ export const useRolesPermissionsAPI = () => {
       const response = await api.delete(`/superadmin/roles/${roleId}`);
       
       if (response.data.success) {
-        return response.data;
+        return response.data.data;
       } else {
         throw new Error(response.data.message || 'Failed to delete role');
       }
@@ -441,7 +446,7 @@ export const useRolesPermissionsAPI = () => {
       const response = await api.post(`/superadmin/roles/${roleId}/permissions`, { permissions });
       
       if (response.data.success) {
-        return response.data;
+        return response.data.data;
       } else {
         throw new Error(response.data.message || 'Failed to update role permissions');
       }
@@ -490,7 +495,7 @@ export const useRolesPermissionsAPI = () => {
       });
       
       if (response.data.success) {
-        return response.data;
+        return response.data.data;
       } else {
         throw new Error(response.data.message || 'Failed to assign roles');
       }

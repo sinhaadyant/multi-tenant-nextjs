@@ -93,6 +93,15 @@ export const TenantDashboardOverviewCards: React.FC<TenantDashboardOverviewCards
     },
   ];
 
+  // Debug permissions in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('TenantDashboardOverviewCards - Permissions received:', permissions);
+    console.log('TenantDashboardOverviewCards - Stats cards:', statsCards.map(card => ({
+      title: card.title,
+      permission: card.permission
+    })));
+  }
+
   // Filter cards based on permissions
   const visibleCards = statsCards.filter(stat => stat.permission);
 

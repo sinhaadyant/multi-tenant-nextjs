@@ -104,17 +104,18 @@ export interface DashboardData {
 // API functions
 const fetchDashboardStats = async (tenantSlug: string, range: string = '7d'): Promise<DashboardStats> => {
   const response = await api.get(`/tenant/${tenantSlug}/dashboard/stats?range=${range}`);
-  return response.data;
+  // The API returns { success, data, message } format, so we need to access response.data.data
+  return response.data.data;
 };
 
 const fetchSystemHealth = async (tenantSlug: string) => {
   const response = await api.get(`/tenant/${tenantSlug}/dashboard/system-health`);
-  return response.data;
+  return response.data.data;
 };
 
 const fetchRecentActivity = async (tenantSlug: string, limit: number = 10, type: string = 'all') => {
   const response = await api.get(`/tenant/${tenantSlug}/dashboard/activity?limit=${limit}&type=${type}`);
-  return response.data;
+  return response.data.data;
 };
 
 // React Query hooks

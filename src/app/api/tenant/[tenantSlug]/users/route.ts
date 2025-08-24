@@ -4,6 +4,7 @@ import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
 import { createAuditLogFromRequest } from '@/lib/audit';
 import { prisma } from '@/lib/prisma';
 import { hashPassword } from '@/lib/jwt';
+import { checkTenantPermission } from '@/lib/permissions';
 import { z } from 'zod';
 
 // Validation schemas
@@ -150,6 +151,13 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
       lastActivityAt: user.auditLogs[0]?.createdAt || null
     }));
 
+    // Check user permissions for user management
+    const canView = await checkTenantPermission(req.user!, tenantId, 'users.view');
+    const canViewAll = await checkTenantPermission(req.user!, tenantId, 'users.viewAll');
+    const canCreate = await checkTenantPermission(req.user!, tenantId, 'users.create');
+    const canUpdate = await checkTenantPermission(req.user!, tenantId, 'users.update');
+    const canDelete = await checkTenantPermission(req.user!, tenantId, 'users.delete');
+
     return createSuccessResponse({
       users: formattedUsers,
       pagination: {
@@ -162,11 +170,11 @@ export const GET = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
       },
       stats: userStats,
       permissions: {
-        canView: true, // All authenticated users can view users in their tenant
-        canViewAll: true,
-        canCreate: true, // Simplified for now
-        canUpdate: true,
-        canDelete: true
+        canView,
+        canViewAll,
+        canCreate,
+        canUpdate,
+        canDelete
       }
     }, 'Users retrieved successfully');
 
@@ -186,6 +194,12 @@ export const POST = withTenantAuth(async (req: AuthenticatedRequest, { params }:
   try {
     const userId = req.user!.id;
     const tenantId = req.user!.tenantId;
+
+    // Check create permission
+    const hasCreatePermission = await checkTenantPermission(req.user!, tenantId, 'users.create');
+    if (!hasCreatePermission) {
+      return createErrorResponse('Insufficient permissions to create users', 403);
+    }
 
     const body = await req.json();
     const validatedData = createUserSchema.parse(body);
@@ -274,6 +288,27 @@ export const PUT = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
 
     const body = await req.json();
     const validatedData = bulkActionSchema.parse(body);
+
+    // Check permissions based on action
+    let hasPermission = false;
+    switch (validatedData.action) {
+      case 'activate':
+      case 'deactivate':
+        hasPermission = await checkTenantPermission(req.user!, tenantId, 'users.update');
+        break;
+      case 'delete':
+        hasPermission = await checkTenantPermission(req.user!, tenantId, 'users.delete');
+        break;
+      case 'assignRoles':
+        hasPermission = await checkTenantPermission(req.user!, tenantId, 'users.update');
+        break;
+      default:
+        hasPermission = false;
+    }
+
+    if (!hasPermission) {
+      return createErrorResponse(`Insufficient permissions to perform '${validatedData.action}' action on users`, 403);
+    }
 
     // Verify all users belong to the tenant
     const users = await prisma.user.findMany({

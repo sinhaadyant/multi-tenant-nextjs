@@ -3,8 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
 import { 
   Shield, 
   Users, 
@@ -24,175 +22,266 @@ import {
   Eye,
   Download,
   Upload,
-  RefreshCw
+  RefreshCw,
+  MoreHorizontal,
+  Calendar,
+  Globe,
+  Building
 } from 'lucide-react';
-
-interface Role {
-  id: string;
-  name: string;
-  description?: string;
-  color?: string;
-  isActive: boolean;
-  isSystem: boolean;
-  isDefault: boolean;
-  priority: number;
-  createdAt: string;
-  updatedAt: string;
-  permissions: Permission[];
-  users: User[];
-  userCount: number;
-}
-
-interface Permission {
-  moduleKey: string;
-  moduleName?: string;
-  canCreate: boolean;
-  canRead: boolean;
-  canUpdate: boolean;
-  canDelete: boolean;
-  canViewAll: boolean;
-}
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-}
-
-interface Module {
-  moduleKey: string;
-  moduleName: string;
-  description?: string;
-}
-
-interface RolesResponse {
-  roles: Role[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-    hasNext: boolean;
-    hasPrev: boolean;
-  };
-  stats: {
-    total: number;
-    active: number;
-    inactive: number;
-  };
-  permissions: {
-    canView: boolean;
-    canCreate: boolean;
-    canUpdate: boolean;
-    canDelete: boolean;
-  };
-}
-
-interface CreateRoleForm {
-  name: string;
-  description: string;
-  color: string;
-  permissions: Permission[];
-}
+import Button from '@/components/ui/button/Button';
+import Input from '@/components/form/input/InputField';
+import { useTenantRolesAPI, Role, CreateRoleData, UpdateRoleData } from '@/hooks/useTenantRolesAPI';
+import { useConfirmModalContext } from '@/components/common/ConfirmModalProvider';
+import CreateRoleModal from './roles/CreateRoleModal';
+import EditRoleModal from './roles/EditRoleModal';
+import ViewRoleModal from './roles/ViewRoleModal';
+import DeleteRoleModal from './roles/DeleteRoleModal';
+import RoleAssignmentModal from './roles/RoleAssignmentModal';
+import RoleAssignmentTable from './roles/RoleAssignmentTable';
+import { ErrorComponent } from '@/components/superadmin/ErrorComponent';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
+import { Checkbox } from '@/components/ui/Checkbox';
+import { Switch } from '@/components/ui/Switch';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 const TenantRolesClient: React.FC = () => {
   const params = useParams();
   const tenantSlug = params.tenantSlug as string;
   const { user, hasPermission } = useReduxAuth();
-  const queryClient = useQueryClient();
+  const { confirm } = useConfirmModalContext();
   
+  // State management
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [roleTypeFilter, setRoleTypeFilter] = useState<'all' | 'system' | 'custom'>('all');
+  const [sortBy, setSortBy] = useState<'name' | 'createdAt' | 'userCount'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [itemsPerPage] = useState(10);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
-  const [formData, setFormData] = useState<CreateRoleForm>({
-    name: '',
-    description: '',
-    color: '#3B82F6',
-    permissions: []
-  });
+  const [modalType, setModalType] = useState<'create' | 'edit' | 'view' | 'delete' | 'assign' | null>(null);
 
-  // Fetch roles with React Query
+  // API hooks
+  const {
+    useRoles,
+    useAllRoles,
+    useModules,
+    useUsers,
+    useCreateRole,
+    useUpdateRole,
+    useDeleteRole,
+    useBulkDeleteRoles,
+    useToggleRoleStatus,
+    useAssignRole,
+    useRemoveRole
+  } = useTenantRolesAPI();
+
+  // Queries
   const {
     data: rolesData,
     isLoading,
     error,
     refetch
-  } = useQuery({
-    queryKey: ['tenant-roles', tenantSlug, currentPage, pageSize, searchTerm, statusFilter],
-    queryFn: async (): Promise<RolesResponse> => {
-      const token = localStorage.getItem('tenant_auth_token') || localStorage.getItem('auth_token');
-      const response = await axios.get(`/api/tenant/${tenantSlug}/roles`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
-        params: {
-          page: currentPage,
-          limit: pageSize,
-          search: searchTerm || undefined,
-          status: statusFilter !== 'all' ? statusFilter : undefined
-        }
-      });
-      return response.data.data;
-    },
-    enabled: !!tenantSlug && hasPermission('roles', 'read'),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
+  } = useRoles(currentPage, itemsPerPage, searchTerm, statusFilter);
 
-  // Fetch modules for permissions
-  const { data: modulesData } = useQuery({
-    queryKey: ['tenant-modules', tenantSlug],
-    queryFn: async (): Promise<Module[]> => {
-      const token = localStorage.getItem('tenant_auth_token') || localStorage.getItem('auth_token');
-      const response = await axios.get(`/api/tenant/${tenantSlug}/modules`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      return response.data.data.modules || [];
-    },
-    enabled: !!tenantSlug && hasPermission('modules', 'read'),
-    staleTime: 10 * 60 * 1000, // 10 minutes
-  });
+  const { data: allRoles } = useAllRoles();
+  const { data: modules } = useModules();
+  const { data: users } = useUsers();
 
-  // Fetch users for role assignment
-  const { data: usersData } = useQuery({
-    queryKey: ['tenant-users-for-assignment', tenantSlug],
-    queryFn: async (): Promise<User[]> => {
-      const token = localStorage.getItem('tenant_auth_token') || localStorage.getItem('auth_token');
-      const response = await axios.get(`/api/tenant/${tenantSlug}/users`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
-        params: { page: 1, limit: 100 }
-      });
-      return response.data.data.users || [];
-    },
-    enabled: !!tenantSlug && hasPermission('users', 'read'),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
+  // Mutations
+  const createRoleMutation = useCreateRole();
+  const updateRoleMutation = useUpdateRole();
+  const deleteRoleMutation = useDeleteRole();
+  const bulkDeleteMutation = useBulkDeleteRoles();
+  const toggleStatusMutation = useToggleRoleStatus();
+  const assignRoleMutation = useAssignRole();
+  const removeRoleMutation = useRemoveRole();
 
+  // Extract data
   const roles = rolesData?.roles || [];
   const pagination = rolesData?.pagination;
   const stats = rolesData?.stats;
   const permissions = rolesData?.permissions;
-  const modules = modulesData || [];
-  const users = usersData || [];
 
-  const getRoleColor = (color?: string) => {
-    return color || '#3B82F6';
+  // Filter and sort roles
+  const filteredRoles = React.useMemo(() => {
+    let filtered = roles.filter((role: Role) => {
+      const matchesSearch = role.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (role.description && role.description.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesStatus = statusFilter === 'all' || 
+                           (statusFilter === 'active' && role.isActive) ||
+                           (statusFilter === 'inactive' && !role.isActive);
+      const matchesRoleType = roleTypeFilter === 'all' || 
+                             (roleTypeFilter === 'system' && role.isSystem) ||
+                             (roleTypeFilter === 'custom' && !role.isSystem);
+      return matchesSearch && matchesStatus && matchesRoleType;
+    });
+
+    // Sort roles
+    filtered.sort((a: Role, b: Role) => {
+      let aValue: any, bValue: any;
+      
+      switch (sortBy) {
+        case 'name':
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+          break;
+        case 'createdAt':
+          aValue = new Date(a.createdAt);
+          bValue = new Date(b.createdAt);
+          break;
+        case 'userCount':
+          aValue = a.userCount;
+          bValue = b.userCount;
+          break;
+        default:
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+      }
+
+      if (sortOrder === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+
+    return filtered;
+  }, [roles, searchTerm, statusFilter, roleTypeFilter, sortBy, sortOrder]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredRoles.length / itemsPerPage);
+  const paginatedRoles = filteredRoles.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Handle role actions
+  const handleCreateRole = async (roleData: CreateRoleData) => {
+    try {
+      await createRoleMutation.mutateAsync(roleData);
+      setModalType(null);
+    } catch (error: any) {
+      // Error is handled by the mutation
+    }
   };
 
-  const getStatusColor = (status: boolean) => {
-    return status
-      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+  const handleEditRole = async (roleData: UpdateRoleData) => {
+    if (!selectedRole) return;
+    
+    try {
+      await updateRoleMutation.mutateAsync({ roleId: selectedRole.id, roleData });
+      setModalType(null);
+      setSelectedRole(null);
+    } catch (error: any) {
+      // Error is handled by the mutation
+    }
   };
 
+  const handleDeleteRole = async () => {
+    if (!selectedRole) return;
+
+    try {
+      await deleteRoleMutation.mutateAsync(selectedRole.id);
+      setModalType(null);
+      setSelectedRole(null);
+    } catch (error: any) {
+      // Error is handled by the mutation
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedRoles.length === 0) return;
+
+    const confirmed = await confirm({
+      title: 'Delete Multiple Roles',
+      message: `Are you sure you want to delete ${selectedRoles.length} selected roles? This action cannot be undone.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'destructive'
+    });
+
+    if (confirmed) {
+      try {
+        await bulkDeleteMutation.mutateAsync(selectedRoles);
+        setSelectedRoles([]);
+      } catch (error: any) {
+        // Error is handled by the mutation
+      }
+    }
+  };
+
+  const handleToggleStatus = async (role: Role) => {
+    try {
+      await toggleStatusMutation.mutateAsync({ 
+        roleId: role.id, 
+        isActive: !role.isActive 
+      });
+    } catch (error: any) {
+      // Error is handled by the mutation
+    }
+  };
+
+  const handleViewRole = (role: Role) => {
+    setSelectedRole(role);
+    setModalType('view');
+  };
+
+  const handleEditClick = (role: Role) => {
+    // Prevent editing system roles
+    if (role.isSystem) {
+      // Show toast warning
+      return;
+    }
+    setSelectedRole(role);
+    setModalType('edit');
+  };
+
+  const handleDeleteClick = async (role: Role) => {
+    // Prevent deleting system roles
+    if (role.isSystem) {
+      // Show toast warning
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: 'Delete Role',
+      message: `Are you sure you want to delete the role "${role.name}"? This action cannot be undone.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'destructive'
+    });
+
+    if (confirmed) {
+      setSelectedRole(role);
+      setModalType('delete');
+    }
+  };
+
+  const handleAssignRole = (role: Role) => {
+    setSelectedRole(role);
+    setModalType('assign');
+  };
+
+  // Handle role selection
+  const handleRoleSelect = (roleId: string, checked: boolean) => {
+    setSelectedRoles(prev => 
+      checked 
+        ? [...prev, roleId]
+        : prev.filter(id => id !== roleId)
+    );
+  };
+
+  // Handle select all
+  const handleSelectAll = (checked: boolean) => {
+    setSelectedRoles(checked ? paginatedRoles.map(role => role.id) : []);
+  };
+
+  // Format date
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -201,210 +290,445 @@ const TenantRolesClient: React.FC = () => {
     });
   };
 
-  if (error) {
+  // Get role color
+  const getRoleColor = (color?: string) => {
+    return color || '#3B82F6';
+  };
+
+  // Get status color
+  const getStatusColor = (status: boolean) => {
+    return status
+      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+      : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+  };
+
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-            Error Loading Roles
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            {error instanceof Error ? error.message : 'Failed to load roles'}
-          </p>
-          <button
-            onClick={() => refetch()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Try Again
-          </button>
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <div className="space-y-4">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-16" />
+          ))}
         </div>
       </div>
     );
   }
 
+  if (error) {
+    return <ErrorComponent error={error} onRetry={refetch} />;
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Role Management</h1>
           <p className="text-gray-600 dark:text-gray-400">
             Manage roles and permissions within your tenant organization
           </p>
         </div>
-        {permissions?.canCreate && (
-          <button 
-            onClick={() => setShowAddModal(true)}
-            className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Create Role
-          </button>
-        )}
+        <div className="flex gap-2">
+          {permissions?.canCreate && (
+            <Button
+              onClick={() => setModalType('create')}
+              className="flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Create Role
+            </Button>
+          )}
+          {selectedRoles.length > 0 && permissions?.canDelete && (
+            <Button
+              onClick={handleBulkDelete}
+              variant="destructive"
+              className="flex items-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete Selected ({selectedRoles.length})
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Stats Cards */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                <Shield className="w-6 h-6 text-blue-600 dark:text-blue-300" />
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                  <Shield className="w-6 h-6 text-blue-600 dark:text-blue-300" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Roles</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Roles</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                  <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-300" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Roles</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.active}</p>
+                </div>
               </div>
-            </div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-                <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-300" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <div className="p-2 bg-red-100 dark:bg-red-900 rounded-lg">
+                  <XCircle className="w-6 h-6 text-red-600 dark:text-red-300" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Inactive Roles</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.inactive}</p>
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Roles</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.active}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-            <div className="flex items-center">
-              <div className="p-2 bg-red-100 dark:bg-red-900 rounded-lg">
-                <XCircle className="w-6 h-6 text-red-600 dark:text-red-300" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Inactive Roles</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.inactive}</p>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {/* Filters */}
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="w-5 h-5" />
+            Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+            {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
                 type="text"
                 placeholder="Search roles..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="pl-10"
               />
             </div>
+
+            {/* Status Filter */}
+            <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Role Type Filter */}
+            <Select value={roleTypeFilter} onValueChange={(value: any) => setRoleTypeFilter(value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="system">System</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Sort */}
+            <Select value={`${sortBy}-${sortOrder}`} onValueChange={(value: any) => {
+              const [field, order] = value.split('-');
+              setSortBy(field as any);
+              setSortOrder(order as any);
+            }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+                <SelectItem value="createdAt-desc">Newest First</SelectItem>
+                <SelectItem value="createdAt-asc">Oldest First</SelectItem>
+                <SelectItem value="userCount-desc">Most Users</SelectItem>
+                <SelectItem value="userCount-asc">Least Users</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-          >
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Roles Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-          </div>
-        ) : (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Roles ({filteredRoles.length})</span>
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <Users className="w-4 h-4" />
+              {roles.reduce((total, role) => total + role.userCount, 0)} total users
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Role
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Users
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Permissions
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Created
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {roles.map((role) => (
-                  <tr key={role.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={selectedRoles.length === paginatedRoles.length && paginatedRoles.length > 0}
+                      onCheckedChange={handleSelectAll}
+                    />
+                  </TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Users</TableHead>
+                  <TableHead>Permissions</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="w-20">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedRoles.map((role) => (
+                  <TableRow key={role.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedRoles.includes(role.id)}
+                        onCheckedChange={(checked) => handleRoleSelect(role.id, checked as boolean)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
                         <div 
-                          className="w-10 h-10 rounded-full flex items-center justify-center"
+                          className="w-3 h-3 rounded-full"
                           style={{ backgroundColor: getRoleColor(role.color) }}
+                        />
+                        <div>
+                          <div className="font-medium">{role.name}</div>
+                          {role.isDefault && (
+                            <Badge variant="secondary" className="text-xs">
+                              Default
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="max-w-xs truncate text-sm text-gray-600 dark:text-gray-400">
+                        {role.description || 'No description'}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-gray-400" />
+                        <span className="font-medium">{role.userCount}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Shield className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm">{role.permissions.length}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={role.isActive}
+                          onCheckedChange={() => handleToggleStatus(role)}
+                          disabled={!permissions?.canUpdate || role.isSystem}
+                        />
+                        <Badge variant={role.isActive ? "default" : "secondary"}>
+                          {role.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={role.isSystem ? "default" : "outline"}>
+                        {role.isSystem ? 'System' : 'Custom'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        {formatDate(role.createdAt)}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewRole(role)}
+                          title="View Role"
                         >
-                          <Shield className="w-5 h-5 text-white" />
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {role.name}
-                            {role.isSystem && (
-                              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                                System
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {role.description || 'No description'}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(role.isActive)}`}>
-                        {role.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {role.userCount} users
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {role.permissions.length} permissions
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {formatDate(role.createdAt)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end space-x-2">
+                          <Eye className="w-4 h-4" />
+                        </Button>
                         {permissions?.canUpdate && !role.isSystem && (
-                          <button className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditClick(role)}
+                            title="Edit Role"
+                          >
                             <Edit className="w-4 h-4" />
-                          </button>
+                          </Button>
                         )}
-                        {permissions?.canDelete && !role.isSystem && !role.isDefault && (
-                          <button className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
+                        {permissions?.canDelete && !role.isSystem && role.userCount === 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteClick(role)}
+                            title="Delete Role"
+                          >
                             <Trash2 className="w-4 h-4" />
-                          </button>
+                          </Button>
                         )}
-                        <button className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleAssignRole(role)}
+                          title="Assign Role"
+                        >
                           <UserCheck className="w-4 h-4" />
-                        </button>
+                        </Button>
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
-        )}
-      </div>
+
+          {paginatedRoles.length === 0 && (
+            <div className="text-center py-8">
+              <Shield className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                No roles found
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                {searchTerm || statusFilter !== 'all' || roleTypeFilter !== 'all'
+                  ? 'Try adjusting your search or filters'
+                  : 'Get started by creating your first role'
+                }
+              </p>
+              {permissions?.canCreate && !searchTerm && statusFilter === 'all' && roleTypeFilter === 'all' && (
+                <Button
+                  onClick={() => setModalType('create')}
+                  variant="primary"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create First Role
+                </Button>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-gray-700 dark:text-gray-300">
+            Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredRoles.length)} of {filteredRoles.length} results
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Modals */}
+      {modalType === 'create' && (
+        <CreateRoleModal
+          isOpen={true}
+          onClose={() => setModalType(null)}
+          onSubmit={handleCreateRole}
+          modules={modules || []}
+          loading={createRoleMutation.isPending}
+        />
+      )}
+
+      {modalType === 'edit' && selectedRole && (
+        <EditRoleModal
+          isOpen={true}
+          onClose={() => {
+            setModalType(null);
+            setSelectedRole(null);
+          }}
+          onSubmit={handleEditRole}
+          role={selectedRole}
+          modules={modules || []}
+          loading={updateRoleMutation.isPending}
+        />
+      )}
+
+      {modalType === 'view' && selectedRole && (
+        <ViewRoleModal
+          isOpen={true}
+          onClose={() => {
+            setModalType(null);
+            setSelectedRole(null);
+          }}
+          role={selectedRole}
+        />
+      )}
+
+      {modalType === 'delete' && selectedRole && (
+        <DeleteRoleModal
+          isOpen={true}
+          onClose={() => {
+            setModalType(null);
+            setSelectedRole(null);
+          }}
+          onConfirm={handleDeleteRole}
+          role={selectedRole}
+          loading={deleteRoleMutation.isPending}
+        />
+      )}
+
+      {modalType === 'assign' && selectedRole && (
+        <RoleAssignmentModal
+          isOpen={true}
+          onClose={() => {
+            setModalType(null);
+            setSelectedRole(null);
+          }}
+          role={selectedRole}
+          users={users || []}
+          onAssign={assignRoleMutation.mutate}
+          onRemove={removeRoleMutation.mutate}
+          loading={assignRoleMutation.isPending || removeRoleMutation.isPending}
+        />
+      )}
     </div>
   );
 };

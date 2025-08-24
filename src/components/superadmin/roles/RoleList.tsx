@@ -120,7 +120,12 @@ const RoleList: React.FC<RoleListProps> = ({
   // Handle status filter
   const handleStatusFilter = (status: 'all' | 'active' | 'inactive') => {
     setStatusFilter(status);
-    onFilter({ ...currentFilters, status, page: 1 });
+    // Only filter if status is not 'all', otherwise show all roles
+    if (status === 'all') {
+      onFilter({ ...currentFilters, status: undefined, page: 1 });
+    } else {
+      onFilter({ ...currentFilters, status, page: 1 });
+    }
     setCurrentPage(1);
   };
 
@@ -193,9 +198,7 @@ const RoleList: React.FC<RoleListProps> = ({
                 value={statusFilter}
                 onChange={(e) => {
                   const value = e.target.value as 'all' | 'active' | 'inactive';
-                  setStatusFilter(value);
-                  onFilter({ ...currentFilters, status: value, page: 1 });
-                  setCurrentPage(1);
+                  handleStatusFilter(value);
                 }}
                 className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-300 dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:focus:ring-brand-400 dark:focus:border-brand-400"
               >

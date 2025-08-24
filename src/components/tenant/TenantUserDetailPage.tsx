@@ -21,7 +21,8 @@ import {
   Eye,
   EyeOff,
   Lock,
-  RefreshCw
+  RefreshCw,
+  Activity
 } from 'lucide-react';
 import { useConfirmModalContext } from '@/components/common/ConfirmModalProvider';
 
@@ -580,22 +581,56 @@ const TenantUserDetailPage: React.FC<{ userId: string }> = ({ userId }) => {
           <div className="space-y-3">
             {user.recentActivity && user.recentActivity.length > 0 ? (
               user.recentActivity.map((activity, index) => (
-                <div key={index} className="border-l-4 border-blue-500 pl-4">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {activity.action}
-                  </p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">
-                    {activity.details}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-500">
-                    {formatDate(activity.createdAt)}
-                  </p>
+                <div key={index} className="border-l-4 border-blue-500 pl-4 py-2">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {activity.action}
+                      </p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                        {activity.details}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                        {formatDate(activity.createdAt)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        // Show activity details in a popup
+                        alert(`Activity Details:\n\nAction: ${activity.action}\nDetails: ${activity.details}\nTime: ${formatDate(activity.createdAt)}${activity.ipAddress ? `\nIP Address: ${activity.ipAddress}` : ''}`);
+                      }}
+                      className="ml-2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                      title="View Details"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))
             ) : (
-              <p className="text-gray-500 dark:text-gray-400 text-sm">
-                No recent activity
-              </p>
+              <div className="text-center py-8">
+                <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <svg
+                    className="w-6 h-6 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">
+                  No recent activity found
+                </p>
+                <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
+                  User activity will appear here
+                </p>
+              </div>
             )}
           </div>
         </div>

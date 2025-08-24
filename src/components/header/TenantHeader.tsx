@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import {
-  Bell, Search, User, Settings, LogOut, ChevronDown,
+  Search, User, Settings, LogOut, ChevronDown,
   Building2, Shield, Activity
 } from 'lucide-react';
 import Image from 'next/image';
@@ -12,6 +12,7 @@ import Link from 'next/link';
 import axios from 'axios';
 import { ThemeToggleButton } from '@/components/common/ThemeToggleButton';
 import { useSidebar } from '@/context/SidebarContext';
+import TenantNotificationDropdown from './TenantNotificationDropdown';
 
 const TenantHeader: React.FC = () => {
   const router = useRouter();
@@ -20,26 +21,12 @@ const TenantHeader: React.FC = () => {
   const { user, tenant, roles, hasRole, logout } = useReduxAuth();
   const { toggleMobileSidebar } = useSidebar();
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
 
   const handleLogout = async () => {
     try {
       console.log('🔍 Tenant logout initiated...');
       
-      // Call server-side logout API if possible
-      try {
-        await axios.post(`/api/tenant/${tenantSlug}/logout`, {}, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('tenant_auth_token') || localStorage.getItem('auth_token')}`
-          },
-          timeout: 3000 // 3 second timeout
-        });
-        console.log('✅ Server-side logout successful');
-      } catch (logoutError) {
-        console.warn('⚠️ Server-side logout failed, continuing with client-side cleanup:', logoutError);
-      }
-      
-      // Clear all auth data from Redux
+      // Clear all auth data from Redux first
       logout();
       
       // Clear all tokens from storage
@@ -57,14 +44,27 @@ const TenantHeader: React.FC = () => {
       // Clear any redirect paths
       sessionStorage.removeItem('redirectAfterLogin');
       
+      // Call server-side logout API if possible (non-blocking)
+      try {
+        await axios.post(`/api/tenant/${tenantSlug}/logout`, {}, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('tenant_auth_token') || localStorage.getItem('auth_token')}`
+          },
+          timeout: 2000 // 2 second timeout
+        });
+        console.log('✅ Server-side logout successful');
+      } catch (logoutError) {
+        console.warn('⚠️ Server-side logout failed, continuing with client-side cleanup:', logoutError);
+      }
+      
       console.log('✅ Tenant logout successful, redirecting to login...');
       
       // Show success message
       const { toast } = await import('react-hot-toast');
       toast.success('Logged out successfully');
       
-      // Redirect to tenant login page
-      router.push(`/${tenantSlug}/login`);
+      // Redirect to tenant login page immediately
+      router.replace(`/${tenantSlug}/login`);
     } catch (error) {
       console.error('❌ Error during tenant logout:', error);
       
@@ -73,7 +73,7 @@ const TenantHeader: React.FC = () => {
       toast.error('Error during logout, but you have been signed out');
       
       // Force redirect even if there's an error
-      router.push(`/${tenantSlug}/login`);
+      router.replace(`/${tenantSlug}/login`);
     }
   };
 
@@ -87,10 +87,7 @@ const TenantHeader: React.FC = () => {
     return roleNames[0] || 'User';
   };
 
-  const getNotificationCount = () => {
-    // This would be fetched from your notifications API
-    return 3; // Mock count
-  };
+
 
   return (
     <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between bg-white px-4 shadow-sm dark:bg-gray-900 dark:border-gray-800 border-b border-gray-200">
@@ -124,66 +121,8 @@ const TenantHeader: React.FC = () => {
           </div>
         )}
 
-        {/* Notifications */}
-        <div className="relative">
-          <button
-            onClick={() => setShowNotifications(!showNotifications)}
-            className="relative p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-          >
-            <Bell className="h-5 w-5" />
-            {getNotificationCount() > 0 && (
-              <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                {getNotificationCount()}
-              </span>
-            )}
-          </button>
-
-          {/* Notifications Dropdown */}
-          {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
-              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                  Notifications
-                </h3>
-              </div>
-              <div className="max-h-64 overflow-y-auto">
-                {/* Mock notifications */}
-                <div className="p-3 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700">
-                  <p className="text-sm text-gray-900 dark:text-white">
-                    New user registration request
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    2 minutes ago
-                  </p>
-                </div>
-                <div className="p-3 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700">
-                  <p className="text-sm text-gray-900 dark:text-white">
-                    System maintenance scheduled
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    1 hour ago
-                  </p>
-                </div>
-                <div className="p-3 hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <p className="text-sm text-gray-900 dark:text-white">
-                    Role permissions updated
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    3 hours ago
-                  </p>
-                </div>
-              </div>
-              <div className="p-3 border-t border-gray-200 dark:border-gray-700">
-                <Link
-                  href={`/${tenantSlug}/notifications`}
-                  className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                >
-                  View all notifications
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Dynamic Notifications */}
+        <TenantNotificationDropdown />
 
         {/* Theme Toggle */}
         <ThemeToggleButton />
@@ -271,12 +210,11 @@ const TenantHeader: React.FC = () => {
       </div>
 
       {/* Click outside to close dropdowns */}
-      {(showUserMenu || showNotifications) && (
+      {showUserMenu && (
         <div
           className="fixed inset-0 z-40"
           onClick={() => {
             setShowUserMenu(false);
-            setShowNotifications(false);
           }}
         />
       )}

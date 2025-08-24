@@ -102,15 +102,26 @@ export const useTenantAuditLogs = () => {
         throw new Error(response.data.message || 'Failed to fetch audit logs');
       }
 
-      const data: AuditLogsResponse = response.data;
+      const data: AuditLogsResponse = response.data.data;
 
       if (process.env.NODE_ENV === 'development') {
-        console.log('✅ Tenant audit logs fetched successfully:', data.auditLogs.length, 'logs');
+        console.log('🔍 Raw audit logs response:', data);
+        console.log('🔍 Response structure check:');
+        console.log('  - data.auditLogs:', data.auditLogs);
+        console.log('  - data.stats:', data.stats);
+        console.log('  - data.pagination:', data.pagination);
+        console.log('  - data.auditLogs?.length:', data.auditLogs?.length);
+        console.log('  - data.stats?.total:', data.stats?.total);
+        console.log('  - data.stats?.actionBreakdown:', data.stats?.actionBreakdown);
+      }
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ Tenant audit logs fetched successfully:', data.auditLogs?.length || 0, 'logs');
       }
       
-      setAuditLogs(data.auditLogs);
-      setStats(data.stats);
-      setPagination(data.pagination);
+      setAuditLogs(data.auditLogs || []);
+      setStats(data.stats || { total: 0, actionBreakdown: [] });
+      setPagination(data.pagination || { page: 1, limit: 50, totalPages: 1, totalRecords: 0 });
       setFilters(updatedFilters);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
