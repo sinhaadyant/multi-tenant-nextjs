@@ -12,6 +12,8 @@ import { login } from '@/services/authService';
 import { validateToken } from '@/lib/tokenValidation';
 import toast from 'react-hot-toast';
 import { useAuthRedirect } from '@/hooks/useAuthRedirect';
+import { AuthLanguageSwitcher } from '@/components/common/AuthLanguageSwitcher';
+import { useTranslation } from 'react-i18next';
 
 // Login form validation schema
 const loginSchema = z.object({
@@ -24,6 +26,11 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export default function SuperAdminLogin() {
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const { t } = useTranslation('auth');
+  
+  // Debug logging
+  console.log('SuperAdminLogin: Current language:', t.language);
+  console.log('SuperAdminLogin: Translation test:', t('superadminSignIn'));
   
   // Check if user is already authenticated and redirect if needed
   const { shouldRedirect, isLoading: authLoading } = useAuthRedirect({
@@ -150,7 +157,7 @@ export default function SuperAdminLogin() {
       <div className="mx-auto w-full max-w-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Checking authentication...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">{t('checkingAuthentication')}</p>
         </div>
       </div>
     );
@@ -162,7 +169,7 @@ export default function SuperAdminLogin() {
       <div className="mx-auto w-full max-w-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Redirecting to dashboard...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">{t('redirectingToDashboard')}</p>
         </div>
       </div>
     );
@@ -172,12 +179,17 @@ export default function SuperAdminLogin() {
 
   return (
     <div className="mx-auto w-full max-w-[400px]">
+      {/* Language Switcher */}
+      <div className="flex justify-end mb-4">
+        <AuthLanguageSwitcher />
+      </div>
+      
       <div className="mb-8 text-center">
         <h1 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">
-          SuperAdmin Sign In
+          {t('superadminSignIn')}
         </h1>
         <p className="text-base text-gray-600 dark:text-gray-400">
-          Welcome back! Please sign in to your account.
+          {t('welcomeBack')}
         </p>
       </div>
 
@@ -193,7 +205,7 @@ export default function SuperAdminLogin() {
             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
           </svg>
-          Continue with Google
+          {t('continueWithGoogle')}
         </button>
         
         <button
@@ -203,7 +215,7 @@ export default function SuperAdminLogin() {
           <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z"/>
           </svg>
-          Continue with Apple
+          {t('continueWithApple')}
         </button>
       </div>
 
@@ -213,7 +225,7 @@ export default function SuperAdminLogin() {
           <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
         </div>
         <div className="relative flex justify-center text-sm">
-          <span className="bg-white px-2 text-gray-500 dark:bg-gray-900 dark:text-gray-400">Or continue with email</span>
+          <span className="bg-white px-2 text-gray-500 dark:bg-gray-900 dark:text-gray-400">{t('orContinueWithEmail')}</span>
         </div>
       </div>
 
@@ -221,13 +233,13 @@ export default function SuperAdminLogin() {
         {/* Email Field */}
         <div>
           <label htmlFor="email" className="mb-2.5 block text-sm font-medium text-gray-900 dark:text-white">
-            Email
+            {t('email')}
           </label>
           <div className="relative">
             <input
               {...register('email')}
               type="email"
-              placeholder="Enter your email"
+              placeholder={t('enterYourEmail')}
               autoComplete="email"
               className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder:text-gray-500 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-400 dark:focus:border-brand-500"
             />
@@ -240,13 +252,13 @@ export default function SuperAdminLogin() {
         {/* Password Field */}
         <div>
           <label htmlFor="password" className="mb-2.5 block text-sm font-medium text-gray-900 dark:text-white">
-            Password
+            {t('password')}
           </label>
           <div className="relative">
             <input
               {...register('password')}
               type={showPassword ? 'text' : 'password'}
-              placeholder="Enter your password"
+              placeholder={t('enterYourPassword')}
               autoComplete="current-password"
               className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 pr-12 text-gray-900 placeholder:text-gray-500 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-400 dark:focus:border-brand-500"
             />
@@ -288,10 +300,10 @@ export default function SuperAdminLogin() {
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Signing in...
+              {t('signingIn')}
             </>
           ) : (
-            'Sign In'
+            t('signIn')
           )}
         </button>
 
@@ -301,7 +313,7 @@ export default function SuperAdminLogin() {
             href="/superadmin/forgot-password"
             className="text-sm text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
           >
-            Forgot your password?
+            {t('forgotPassword')}
           </a>
         </div>
       </form>

@@ -165,5 +165,6 @@
   "errorLoadingUsers": "Error loading users",
   "personalPreferenceSaved": "Personal preference is saved to your user profile",
   "fallbackToTenantDefault": "Falls back to tenant default if not set",
-  "changesApplyImmediately": "Changes apply immediately across the platform"
+  "changesApplyImmediately": "Changes apply immediately across the platform",
+  "quickActions": "Quick Actions"
 }

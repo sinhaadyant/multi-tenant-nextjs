@@ -9,6 +9,7 @@ import { setPermissions } from "@/store/slices/permissionsSlice";
 import TenantLogin from "@/components/auth/TenantLogin";
 import { Loader2 } from "lucide-react";
 import axios from "axios";
+import { AuthLanguageSwitcher } from "@/components/common/AuthLanguageSwitcher";
 
 const TenantLoginPage: React.FC = () => {
   const router = useRouter();
@@ -272,6 +273,11 @@ const TenantLoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      {/* Language Switcher */}
+      <div className="absolute top-4 right-4">
+        <AuthLanguageSwitcher />
+      </div>
+      
       <TenantLogin 
         tenantSlug={tenantSlug} 
         onLoginSuccess={handleLoginSuccess}

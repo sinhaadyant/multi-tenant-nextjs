@@ -7,12 +7,15 @@ import {
   ArrowRight
 } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslation } from 'react-i18next';
 
 export const QuickActions: React.FC = () => {
+  const { t } = useTranslation('superadmin');
+  
   const actions = [
     {
-      title: 'Create Tenant',
-      description: 'Add a new tenant to the platform',
+      title: t('quickActions.createTenant'),
+      description: t('quickActions.createTenantDesc'),
       icon: <Plus className="w-5 h-5" />,
       href: '/superadmin/tenants/new',
       color: 'bg-blue-500 hover:bg-blue-600',
@@ -20,8 +23,8 @@ export const QuickActions: React.FC = () => {
       iconBg: 'bg-blue-100 dark:bg-blue-900/30'
     },
     {
-      title: 'Manage Users',
-      description: 'View and manage all platform users',
+      title: t('quickActions.manageUsers'),
+      description: t('quickActions.manageUsersDesc'),
       icon: <Users className="w-5 h-5" />,
       href: '/superadmin/users',
       color: 'bg-green-500 hover:bg-green-600',
@@ -29,8 +32,8 @@ export const QuickActions: React.FC = () => {
       iconBg: 'bg-green-100 dark:bg-green-900/30'
     },
     {
-      title: 'Audit Logs',
-      description: 'Review system activity and changes',
+      title: t('quickActions.auditLogs'),
+      description: t('quickActions.auditLogsDesc'),
       icon: <ClipboardList className="w-5 h-5" />,
       href: '/superadmin/audit',
       color: 'bg-purple-500 hover:bg-purple-600',
@@ -38,8 +41,8 @@ export const QuickActions: React.FC = () => {
       iconBg: 'bg-purple-100 dark:bg-purple-900/30'
     },
     {
-      title: 'Tenant Management',
-      description: 'Manage existing tenants and settings',
+      title: t('quickActions.tenantManagement'),
+      description: t('quickActions.tenantManagementDesc'),
       icon: <Building2 className="w-5 h-5" />,
       href: '/superadmin/tenants',
       color: 'bg-orange-500 hover:bg-orange-600',
@@ -53,7 +56,7 @@ export const QuickActions: React.FC = () => {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Quick Actions
+            {t('quickActions.title')}
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
             Common administrative tasks

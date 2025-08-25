@@ -11,6 +11,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import axios from 'axios';
 import { ThemeToggleButton } from '@/components/common/ThemeToggleButton';
+import { HeaderLanguageSwitcher } from '@/components/common/HeaderLanguageSwitcher';
 import { useSidebar } from '@/context/SidebarContext';
 import TenantNotificationDropdown from './TenantNotificationDropdown';
 
@@ -123,6 +124,9 @@ const TenantHeader: React.FC = () => {
 
         {/* Dynamic Notifications */}
         <TenantNotificationDropdown />
+
+        {/* Language Switcher */}
+        <HeaderLanguageSwitcher />
 
         {/* Theme Toggle */}
         <ThemeToggleButton />

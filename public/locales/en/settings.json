@@ -94,5 +94,7 @@
   "backupFailed": "Backup Failed",
   "backupInProgress": "Backup In Progress",
   "backupScheduled": "Backup Scheduled",
-  "backupCancelled": "Backup Cancelled"
+  "backupCancelled": "Backup Cancelled",
+  "updatingLanguage": "Updating language...",
+  "changePassword": "Change Password"
 }

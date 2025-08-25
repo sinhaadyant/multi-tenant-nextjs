@@ -8,6 +8,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { requestPasswordReset } from '@/services/authService';
+import { AuthLanguageSwitcher } from '@/components/common/AuthLanguageSwitcher';
 
 // Forgot password form validation schema
 const forgotPasswordSchema = z.object({
@@ -87,6 +88,11 @@ export default function ForgotPassword() {
 
   return (
     <div className="flex flex-col flex-1 w-full">
+      {/* Language Switcher */}
+      <div className="flex justify-end mb-4">
+        <AuthLanguageSwitcher />
+      </div>
+      
       <div className="w-full max-w-md sm:pt-10 mx-auto mb-5">
         <Link
           href={`/${tenantSlug}/login`}

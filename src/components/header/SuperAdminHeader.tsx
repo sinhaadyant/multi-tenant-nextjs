@@ -17,6 +17,7 @@ import { useSidebar } from '@/context/SidebarContext';
 import GlobalSearch from './GlobalSearch';
 import NotificationDropdown from './NotificationDropdown';
 import { ThemeToggleButton } from '@/components/common/ThemeToggleButton';
+import { HeaderLanguageSwitcher } from '@/components/common/HeaderLanguageSwitcher';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -91,6 +92,9 @@ const SuperAdminHeader = () => {
             >
               <Search className="h-6 w-6" />
             </button>
+
+            {/* Language Switcher */}
+            <HeaderLanguageSwitcher />
 
             {/* Theme Toggle */}
             <ThemeToggleButton />

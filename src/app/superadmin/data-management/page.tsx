@@ -13,8 +13,10 @@ import {
   Clock
 } from 'lucide-react';
 import { useDataCounts } from '@/hooks/useDataManagement';
+import { useTranslation } from 'next-i18next';
 
 export default function DataManagementPage() {
+  const { t } = useTranslation('superadmin');
   const { data: dataCounts, isLoading: countsLoading } = useDataCounts();
 
   const getDataCounts = () => {
@@ -26,7 +28,7 @@ export default function DataManagementPage() {
 
   const managementOptions = [
     {
-      title: 'Insert Sample Data',
+      title: t('dataManagement.insertSampleData'),
       description: 'Generate sample tenants and users for testing purposes',
       icon: Database,
       href: '/superadmin/data-management/insert',
@@ -39,7 +41,7 @@ export default function DataManagementPage() {
       ]
     },
     {
-      title: 'Clear Data',
+      title: t('dataManagement.clearData'),
       description: 'Permanently delete data from the system',
       icon: Trash2,
       href: '/superadmin/data-management/clear',
@@ -85,7 +87,7 @@ export default function DataManagementPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Data Management
+            {t('dataManagement.title')}
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
             Manage system data for testing, development, and maintenance purposes

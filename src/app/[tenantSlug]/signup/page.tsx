@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
+import { AuthLanguageSwitcher } from '@/components/common/AuthLanguageSwitcher';
 
 const signupSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -204,6 +205,10 @@ export default function SuperAdminSignup() {
   if (tokenValid === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        {/* Language Switcher */}
+        <div className="absolute top-4 right-4">
+          <AuthLanguageSwitcher />
+        </div>
         <div className="max-w-md w-full space-y-8">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
@@ -217,6 +222,10 @@ export default function SuperAdminSignup() {
   if (tokenValid === false) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        {/* Language Switcher */}
+        <div className="absolute top-4 right-4">
+          <AuthLanguageSwitcher />
+        </div>
         <div className="max-w-md w-full space-y-8">
           <div className="text-center">
             <XCircle className="mx-auto h-12 w-12 text-red-500" />
@@ -242,6 +251,10 @@ export default function SuperAdminSignup() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      {/* Language Switcher */}
+      <div className="absolute top-4 right-4">
+        <AuthLanguageSwitcher />
+      </div>
       <div className="max-w-md w-full space-y-8">
         <div>
           <div className="text-center">

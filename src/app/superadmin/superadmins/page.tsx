@@ -10,71 +10,77 @@ import Button from '@/components/ui/button/Button';
 import Input from '@/components/form/input/InputField';
 import { format } from 'date-fns';
 import InviteSuperadminModal from '@/components/superadmin/InviteSuperadminModal';
+import { useTranslation } from 'next-i18next';
 
 // Memoized stats cards component for better performance
-const StatsCards = memo(({ stats, totalSuperadmins }: { stats: any; totalSuperadmins: number }) => (
-  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-      <div className="flex items-center">
-        <div className="p-2 bg-blue-100 rounded-lg dark:bg-blue-900">
-          <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-        </div>
-        <div className="ml-4">
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Superadmins</p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {stats.total}
-          </p>
+const StatsCards = memo(({ stats, totalSuperadmins }: { stats: any; totalSuperadmins: number }) => {
+  const { t } = useTranslation('superadmin');
+  
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+        <div className="flex items-center">
+          <div className="p-2 bg-blue-100 rounded-lg dark:bg-blue-900">
+            <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div className="ml-4">
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('stats.totalSuperadmins')}</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              {stats.total}
+            </p>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-      <div className="flex items-center">
-        <div className="p-2 bg-green-100 rounded-lg dark:bg-green-900">
-          <UserCheck className="w-6 h-6 text-green-600 dark:text-green-400" />
-        </div>
-        <div className="ml-4">
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Superadmins</p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {stats.active}
-          </p>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+        <div className="flex items-center">
+          <div className="p-2 bg-green-100 rounded-lg dark:bg-green-900">
+            <UserCheck className="w-6 h-6 text-green-600 dark:text-green-400" />
+          </div>
+          <div className="ml-4">
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('common.active')}</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              {stats.active}
+            </p>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-      <div className="flex items-center">
-        <div className="p-2 bg-red-100 rounded-lg dark:bg-red-900">
-          <UserX className="w-6 h-6 text-red-600 dark:text-red-400" />
-        </div>
-        <div className="ml-4">
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Inactive Superadmins</p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {stats.inactive}
-          </p>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+        <div className="flex items-center">
+          <div className="p-2 bg-red-100 rounded-lg dark:bg-red-900">
+            <UserX className="w-6 h-6 text-red-600 dark:text-red-400" />
+          </div>
+          <div className="ml-4">
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('common.inactive')}</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              {stats.inactive}
+            </p>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-      <div className="flex items-center">
-        <div className="p-2 bg-purple-100 rounded-lg dark:bg-purple-900">
-          <UserPlus className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-        </div>
-        <div className="ml-4">
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Recent Activity</p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {totalSuperadmins}
-          </p>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+        <div className="flex items-center">
+          <div className="p-2 bg-purple-100 rounded-lg dark:bg-purple-900">
+            <UserPlus className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+          </div>
+          <div className="ml-4">
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Recent Activity</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              {totalSuperadmins}
+            </p>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-));
+  );
+});
 
 StatsCards.displayName = 'StatsCards';
 
 export default function SuperadminsPage() {
+  const { t } = useTranslation('superadmin');
   const router = useRouter();
   const { confirm } = useConfirmModalContext();
   const [isPending, startTransition] = useTransition();
@@ -204,7 +210,7 @@ export default function SuperadminsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Superadmin Management
+            {t('superadmins.title')}
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
             Manage superadmin accounts and permissions
@@ -218,7 +224,7 @@ export default function SuperadminsPage() {
             disabled={isLoading}
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
+            {t('common.refresh')}
           </Button>
           <Button
             variant="primary"
@@ -227,7 +233,7 @@ export default function SuperadminsPage() {
             disabled={createInviteMutation.isPending}
           >
             <UserPlus className="w-4 h-4 mr-2" />
-            Invite Superadmin
+            {t('superadmins.inviteSuperadmin')}
           </Button>
         </div>
       </div>

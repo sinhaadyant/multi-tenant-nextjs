@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
+import { AuthLanguageSwitcher } from '@/components/common/AuthLanguageSwitcher';
 
 const signupSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -242,6 +243,11 @@ export default function SuperAdminSignup() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      {/* Language Switcher */}
+      <div className="absolute top-4 right-4">
+        <AuthLanguageSwitcher />
+      </div>
+      
       <div className="max-w-md w-full space-y-8">
         <div>
           <div className="text-center">

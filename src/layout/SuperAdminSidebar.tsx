@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
+import { useTranslation } from 'next-i18next';
 import {
   LayoutDashboard,
   ChevronDown,
@@ -38,104 +39,7 @@ type NavItem = {
   children?: { id: string; label: string; path: string }[];
 };
 
-const superAdminNavElements: NavItem[] = [
-  {
-    id: "dashboard",
-    label: "Dashboard",
-    icon: "home",
-    path: "/superadmin/dashboard"
-  },
-  {
-    id: "tenants",
-    label: "Tenant Management",
-    icon: "building",
-    children: [
-      { id: "allTenants", label: "All Tenants", path: "/superadmin/tenants" },
-      { id: "createTenant", label: "Create Tenant", path: "/superadmin/tenants/new" }
-    ]
-  },
-  {
-    id: "users",
-    label: "User Management",
-    icon: "users",
-    path: "/superadmin/users"
-  },
-  {
-    id: "superadmins",
-    label: "Superadmin Management",
-    icon: "user-circle",
-    path: "/superadmin/superadmins"
-  },
-  {
-    id: "roles",
-    label: "Roles & Permissions",
-    icon: "shield",
-    children: [
-      { id: "rolesManagement", label: "Roles Management", path: "/superadmin/roles" },
-      { id: "permissionGroups", label: "Permission Groups", path: "/superadmin/roles?tab=permissions" },
-      { id: "roleAssignment", label: "Role Assignment", path: "/superadmin/roles?tab=assignment" }
-    ]
-  },
 
-  {
-    id: "backup",
-    label: "Backup & Import",
-    icon: "database",
-    children: [
-      { id: "backupData", label: "Backup Data", path: "/superadmin/backup" },
-      { id: "importData", label: "Import Data", path: "/superadmin/import" },
-      { id: "backupHistory", label: "Backup History", path: "/superadmin/backup/history" }
-    ]
-  },
-  {
-    id: "dataManagement",
-    label: "Data Management",
-    icon: "hard-drive",
-    children: [
-      { id: "insertSampleData", label: "Insert Sample Data", path: "/superadmin/data-management/insert" },
-      { id: "clearData", label: "Clear Data", path: "/superadmin/data-management/clear" }
-    ]
-  },
-  {
-    id: "menuManagement",
-    label: "Menu Management",
-    icon: "list",
-    path: "/superadmin/menu"
-  },
-  {
-    id: "audit",
-    label: "Audit Logs",
-    icon: "clipboard-list",
-    path: "/superadmin/audit"
-  },
-  {
-    id: "reports",
-    label: "Reports",
-    icon: "chart-bar",
-    path: "/superadmin/reports"
-  },
-  {
-    id: "notifications",
-    label: "Notifications",
-    icon: "bell",
-    path: "/superadmin/notifications"
-  },
-  {
-    id: "supportTickets",
-    label: "Support Tickets",
-    icon: "life-ring",
-    children: [
-      { id: "allTickets", label: "All Tickets", path: "/superadmin/support-tickets" },
-      { id: "createTicket", label: "Create Ticket", path: "/superadmin/support-tickets/new" }
-    ]
-  },
-  {
-    id: "profile",
-    label: "Profile",
-    icon: "user-circle",
-    path: "/superadmin/profile"
-  }
-];
 
 // Icon mapping function
 const getIcon = (iconName: string) => {
@@ -158,8 +62,107 @@ const getIcon = (iconName: string) => {
 };
 
 const SuperAdminSidebar: React.FC = () => {
+  const { t } = useTranslation('superadmin');
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
+
+  const superAdminNavElements: NavItem[] = [
+    {
+      id: "dashboard",
+      label: t('navigation.dashboard'),
+      icon: "home",
+      path: "/superadmin/dashboard"
+    },
+    {
+      id: "tenants",
+      label: t('navigation.tenantManagement'),
+      icon: "building",
+      children: [
+        { id: "allTenants", label: t('navigation.allTenants'), path: "/superadmin/tenants" },
+        { id: "createTenant", label: t('navigation.createTenant'), path: "/superadmin/tenants/new" }
+      ]
+    },
+    {
+      id: "users",
+      label: t('navigation.userManagement'),
+      icon: "users",
+      path: "/superadmin/users"
+    },
+    {
+      id: "superadmins",
+      label: t('navigation.superadminManagement'),
+      icon: "user-circle",
+      path: "/superadmin/superadmins"
+    },
+    {
+      id: "roles",
+      label: t('navigation.rolesPermissions'),
+      icon: "shield",
+      children: [
+        { id: "rolesManagement", label: t('navigation.rolesManagement'), path: "/superadmin/roles" },
+        { id: "permissionGroups", label: t('navigation.permissionGroups'), path: "/superadmin/roles?tab=permissions" },
+        { id: "roleAssignment", label: t('navigation.roleAssignment'), path: "/superadmin/roles?tab=assignment" }
+      ]
+    },
+    {
+      id: "backup",
+      label: t('navigation.backupImport'),
+      icon: "database",
+      children: [
+        { id: "backupData", label: t('navigation.backupData'), path: "/superadmin/backup" },
+        { id: "importData", label: t('navigation.importData'), path: "/superadmin/import" },
+        { id: "backupHistory", label: t('navigation.backupHistory'), path: "/superadmin/backup/history" }
+      ]
+    },
+    {
+      id: "dataManagement",
+      label: t('navigation.dataManagement'),
+      icon: "hard-drive",
+      children: [
+        { id: "insertSampleData", label: t('navigation.insertSampleData'), path: "/superadmin/data-management/insert" },
+        { id: "clearData", label: t('navigation.clearData'), path: "/superadmin/data-management/clear" }
+      ]
+    },
+    {
+      id: "menuManagement",
+      label: t('navigation.menuManagement'),
+      icon: "list",
+      path: "/superadmin/menu"
+    },
+    {
+      id: "audit",
+      label: t('navigation.audit'),
+      icon: "clipboard-list",
+      path: "/superadmin/audit"
+    },
+    {
+      id: "reports",
+      label: t('navigation.reports'),
+      icon: "chart-bar",
+      path: "/superadmin/reports"
+    },
+    {
+      id: "notifications",
+      label: t('notifications.title'),
+      icon: "bell",
+      path: "/superadmin/notifications"
+    },
+    {
+      id: "supportTickets",
+      label: t('support.title'),
+      icon: "life-ring",
+      children: [
+        { id: "allTickets", label: t('support.supportTickets'), path: "/superadmin/support-tickets" },
+        { id: "createTicket", label: t('support.createTicket'), path: "/superadmin/support-tickets/new" }
+      ]
+    },
+    {
+      id: "profile",
+      label: t('common.profile'),
+      icon: "user-circle",
+      path: "/superadmin/profile"
+    }
+  ];
 
   const renderMenuItems = (navItems: NavItem[]) => (
     <ul className="flex flex-col gap-4">

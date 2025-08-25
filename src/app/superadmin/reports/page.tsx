@@ -26,8 +26,10 @@ import { GenerateReportModal } from '@/components/superadmin/GenerateReportModal
 import { ReportDetailsModal } from '@/components/superadmin/ReportDetailsModal';
 import { ReportsFilters as ReportsFiltersComponent } from '@/components/superadmin/ReportsFilters';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
+import { useTranslation } from 'next-i18next';
 
 export default function ReportsPage() {
+  const { t } = useTranslation('superadmin');
   const [filters, setFilters] = useState<ReportsFilters>({
     page: 1,
     limit: 10,
@@ -158,7 +160,7 @@ export default function ReportsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Reports</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('reports.title')}</h1>
             <p className="text-gray-600 dark:text-gray-400">
               Generate and manage detailed reports for platform monitoring and auditing
             </p>
@@ -168,7 +170,7 @@ export default function ReportsPage() {
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Generate Report
+            {t('reports.generateReport')}
           </button>
         </div>
 
