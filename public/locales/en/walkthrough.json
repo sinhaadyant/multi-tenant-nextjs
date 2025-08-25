@@ -1,0 +1,15 @@
+{
+  "welcome": "Welcome to your Admin Panel!",
+  "dashboard": "Here you can see an overview of your tenant activity.",
+  "users": "Manage tenant users from here.",
+  "roles": "Control permissions and roles for your team.",
+  "modules": "Enable or disable modules for your tenant.",
+  "billing": "View and manage subscription and invoices here.",
+  "reports": "Access analytics and insights.",
+  "settings": "Update language, theme, and preferences here.",
+  "language": "Switch between English, Hindi, Urdu, Arabic, Bengali, and French.",
+  "theme": "Toggle between light and dark themes.",
+  "search": "Use global search to quickly find anything.",
+  "finish": "Got it! Let’s get started."
+}
+
