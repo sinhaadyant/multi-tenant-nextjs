@@ -168,6 +168,7 @@ export const POST = asyncHandler(async (req: NextRequest) => {
       email: user.email,
       name: user.name,
       isActive: user.isActive,
+      isFirstLogin: user.isFirstLogin,
       lastLogin: user.lastLogin,
       createdAt: user.createdAt,
       tenant: user.tenant,

@@ -17,6 +17,7 @@ model SuperAdmin {
   updatedAt             DateTime             @updatedAt
   contactNumber         String?
   avatar                String?
+  defaultLanguage       String?              @default("en")
   auditLogs             AuditLog[]
   backups               Backup[]
   inviteTokens          InviteToken[]
@@ -63,11 +64,13 @@ model User {
   name              String
   password          String
   isActive          Boolean            @default(true)
+  isFirstLogin      Boolean            @default(true)
   lastLogin         DateTime?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   tenantId          String?
   contactNumber     String?
+  defaultLanguage   String?            @default("en")
   auditLogs         AuditLog[]
   supportTickets    SupportTicket[]
   userNotifications UserNotification[]
@@ -128,7 +131,7 @@ model Role {
   userInvitations UserInvitation[]
   userRoles       UserRole[]
 
-  @@unique([name, isGlobal])
+  @@unique([name, tenantId, isGlobal])
   @@index([tenantId], map: "roles_tenantId_fkey")
   @@index([isGlobal], map: "roles_isGlobal_fkey")
   @@index([isActive])
@@ -515,4 +518,17 @@ model MenuItem {
   @@index([createdBy], map: "menu_items_createdBy_fkey")
   @@index([updatedBy], map: "menu_items_updatedBy_fkey")
   @@map("menu_items")
+}
+
+model GlobalSettings {
+  id           String   @id @default(cuid())
+  socialLogin  String   @db.LongText // JSON string for social login settings
+  security     String   @db.LongText // JSON string for security settings
+  features     String   @db.LongText // JSON string for feature settings
+  updatedBy    String
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
+
+  @@index([updatedBy])
+  @@map("global_settings")
 }

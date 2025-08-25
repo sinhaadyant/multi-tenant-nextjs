@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import {
-  Search, User, Settings, LogOut, ChevronDown,
+  User, Settings, LogOut, ChevronDown,
   Building2, Shield, Activity
 } from 'lucide-react';
 import Image from 'next/image';
@@ -91,26 +91,24 @@ const TenantHeader: React.FC = () => {
 
   return (
     <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between bg-white px-4 shadow-sm dark:bg-gray-900 dark:border-gray-800 border-b border-gray-200">
-      {/* Left side - Search and breadcrumb */}
-      <div className="flex items-center space-x-4">
-        {/* Search Bar */}
-        <div className="relative hidden md:block">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-4 w-4 text-gray-400" />
-          </div>
-          <input
-            type="text"
-            placeholder="Search..."
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-          />
-        </div>
+      {/* Left side - Mobile menu button */}
+      <div className="flex items-center space-x-4" data-tour="tour-topbar">
+        {/* Mobile menu button */}
+        <button
+          onClick={toggleMobileSidebar}
+          className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
       </div>
 
       {/* Right side - User menu and notifications */}
       <div className="flex items-center space-x-4">
         {/* Tenant Info */}
         {tenant && (
-          <div className="hidden lg:flex items-center space-x-2 px-3 py-1 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div className="hidden lg:flex items-center space-x-2 px-3 py-1 bg-gray-50 dark:bg-gray-800 rounded-lg" data-tour="tour-tenant-info">
             <Building2 className="w-4 h-4 text-gray-500" />
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
               {tenant.name}
@@ -121,14 +119,13 @@ const TenantHeader: React.FC = () => {
           </div>
         )}
 
-        {/* Dynamic Notifications */}
+        {/* Notifications */}
         <TenantNotificationDropdown />
 
         {/* Theme Toggle */}
-        <ThemeToggleButton />
-
-        {/* Notifications */}
-        <TenantNotificationDropdown />
+        <div data-tour="tour-theme-toggle">
+          <ThemeToggleButton />
+        </div>
 
         {/* User Menu */}
         <div className="relative">

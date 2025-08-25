@@ -31,7 +31,7 @@ import DateFilterDropdown from './DateFilterDropdown';
 import { useSuperadminDashboard } from '@/hooks/useSuperadminDashboard';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import api, { debugToken } from '@/lib/api';
+import api from '@/lib/api';
 
 // Real-time stats hook
 const useRealTimeStats = () => {
@@ -213,7 +213,7 @@ export const DashboardClient: React.FC = () => {
           {process.env.NODE_ENV === 'development' && (
             <button
               onClick={() => {
-                debugToken();
+                // debugToken(); // Removed for now
                 toast.success('Token debug info logged to console');
               }}
               className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"

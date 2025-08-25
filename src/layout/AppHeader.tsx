@@ -225,10 +225,22 @@ const AppHeader = () => {
                     <div className="text-sm font-medium">
                       {user?.name || 'User'}
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {user?.roles && user.roles.length > 0 
-                        ? user.roles[0].name 
-                        : 'User'}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Role:</span>
+                      {user?.roles && user.roles.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {user.roles.map((role, index) => (
+                            <span
+                              key={role.id}
+                              className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full dark:bg-blue-900 dark:text-blue-200"
+                            >
+                              {role.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-500 dark:text-gray-400">No roles</span>
+                      )}
                     </div>
                   </div>
                   <ChevronDown className="w-4 h-4" />

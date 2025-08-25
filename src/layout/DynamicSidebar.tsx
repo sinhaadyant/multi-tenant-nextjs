@@ -108,7 +108,7 @@ const getFallbackMenuItems = (tenantSlug: string): MenuItem[] => [
     label: "Notifications",
     icon: "Bell",
     path: `/${tenantSlug}/notifications`,
-    description: "Manage notifications",
+    description: t('tables:filters.manageNotifications'),
     permissions: ["notifications:view"],
     hasChildren: false
   },
@@ -324,11 +324,11 @@ const DynamicSidebar: React.FC<DynamicSidebarProps> = ({ isAuthPage = false }) =
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                 {tenant?.name || (tenantSlug ? tenantSlug.charAt(0).toUpperCase() + tenantSlug.slice(1) : 'Admin')}
               </h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {user?.roles && user.roles.length > 0 
-                  ? user.roles[0].name 
-                  : 'User'}
-              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {user?.roles && user.roles.length > 0 
+                    ? user.roles.map(role => role.name).join(', ')
+                    : 'User'}
+                </p>
             </div>
           </div>
         </div>
@@ -382,10 +382,16 @@ const DynamicSidebar: React.FC<DynamicSidebarProps> = ({ isAuthPage = false }) =
                 </h2>
                 <div className="flex items-center space-x-2">
                   {user?.roles && user.roles.length > 0 ? (
-                    <RoleBadge 
-                      role={user.roles[0].name} 
-                      size="sm" 
-                    />
+                    <div className="flex flex-wrap gap-1">
+                      {user.roles.map((role, index) => (
+                        <span
+                          key={role.id}
+                          className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full dark:bg-blue-900 dark:text-blue-200"
+                        >
+                          {role.name}
+                        </span>
+                      ))}
+                    </div>
                   ) : (
                     <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
                       {user?.roles ? `No roles (${user.roles.length})` : 'User'}
@@ -405,7 +411,7 @@ const DynamicSidebar: React.FC<DynamicSidebarProps> = ({ isAuthPage = false }) =
               {user?.roles && user.roles.length > 0 && (
                 <div className="w-8 h-6 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
                   <span className="text-blue-600 dark:text-blue-400 text-xs font-medium">
-                    {user.roles[0].name.charAt(0)}
+                    {user.roles.length > 1 ? `${user.roles.length}R` : user.roles[0].name.charAt(0)}
                   </span>
                 </div>
               )}
@@ -429,10 +435,16 @@ const DynamicSidebar: React.FC<DynamicSidebarProps> = ({ isAuthPage = false }) =
               </p>
               <div className="flex items-center space-x-2 mt-1">
                 {user.roles && user.roles.length > 0 ? (
-                  <RoleBadge 
-                    role={user.roles[0].name} 
-                    size="sm" 
-                  />
+                  <div className="flex flex-wrap gap-1">
+                    {user.roles.map((role, index) => (
+                      <span
+                        key={role.id}
+                        className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full dark:bg-blue-900 dark:text-blue-200"
+                      >
+                        {role.name}
+                      </span>
+                    ))}
+                  </div>
                 ) : (
                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
                     {user.roles ? `No roles (${user.roles.length})` : 'User'}

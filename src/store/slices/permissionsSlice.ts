@@ -175,6 +175,12 @@ export const selectHasPermission = (moduleKey: string, action: string) => (state
     return false;
   }
   
+  // Validate action parameter
+  if (!action || typeof action !== 'string') {
+    console.log('🔍 Redux: Invalid action parameter:', action);
+    return false;
+  }
+  
   // Map action names to permission field names
   const actionMap: { [key: string]: string } = {
     'view': 'canRead',
@@ -187,6 +193,13 @@ export const selectHasPermission = (moduleKey: string, action: string) => (state
   };
   
   const permissionField = actionMap[action.toLowerCase()] || action;
+  
+  // Validate that the permission field exists in the Permission interface
+  const validPermissionFields = ['canCreate', 'canRead', 'canUpdate', 'canDelete', 'canViewAll'];
+  if (!validPermissionFields.includes(permissionField)) {
+    console.log('🔍 Redux: Invalid permission field:', permissionField);
+    return false;
+  }
   
   const result = permissions.permissions.some(permission => 
     permission.moduleKey === mappedModuleKey && permission[permissionField as keyof Permission] === true

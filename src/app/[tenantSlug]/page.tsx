@@ -6,7 +6,8 @@ export const metadata: Metadata = {
   description: "SuperAdmin dashboard for managing multi-tenant application",
 };
 
-export default function TenantPage({ params }: { params: { tenantSlug: string } }) {
+export default async function TenantPage({ params }: { params: Promise<{ tenantSlug: string }> }) {
+  const { tenantSlug } = await params;
   // Redirect to the tenant dashboard page
-  redirect(`/${params.tenantSlug}/dashboard`);
+  redirect(`/${tenantSlug}/dashboard`);
 }

@@ -118,8 +118,8 @@ const TenantSupportTicketTable: React.FC<TenantSupportTicketTableProps> = ({
           <svg className="mx-auto h-12 w-12 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          <h3 className="text-lg font-medium mb-2">No support tickets found</h3>
-          <p className="text-sm">Create your first support ticket to get started.</p>
+          <h3 className="text-lg font-medium mb-2">{t('common:noSupportTicketsFound')}</h3>
+          <p className="text-sm">{t('common:createFirstSupportTicket')}</p>
         </div>
       </div>
     );
@@ -246,14 +246,14 @@ const TenantSupportTicketTable: React.FC<TenantSupportTicketTableProps> = ({
                     <button
                       onClick={() => onView(ticket)}
                       className="text-brand-600 dark:text-brand-400 hover:text-brand-900 dark:hover:text-brand-300"
-                      title="View ticket"
+                      title={t('tables:filters.viewTicket')}
                     >
                       <Eye className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => onDelete(ticket)}
                       className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
-                      title="Delete ticket"
+                      title={t('tables:filters.deleteTicket')}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -299,7 +299,7 @@ const TenantSupportTicketTable: React.FC<TenantSupportTicketTableProps> = ({
               </p>
             </div>
             <div>
-              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label={t('common:pagination')}>
                 <button
                   onClick={() => onPageChange(pagination.page - 1)}
                   disabled={pagination.page === 1}

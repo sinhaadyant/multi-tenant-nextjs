@@ -160,39 +160,7 @@ const redirectToLogin = () => {
   }
 };
 
-// Debug utility to log token info
-export const debugToken = async () => {
-  if (typeof window !== 'undefined') {
-    const token = await getAuthToken();
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        console.log('🔍 Token Debug Info:', {
-          hasToken: true,
-          expiresAt: new Date(payload.exp * 1000).toISOString(),
-          isExpired: isTokenExpired(token),
-          payload: {
-            id: payload.id,
-            email: payload.email,
-            role: payload.role,
-            iat: new Date(payload.iat * 1000).toISOString(),
-            exp: new Date(payload.exp * 1000).toISOString()
-          }
-        });
-      } catch (error) {
-        console.log('🔍 Token Debug Info:', {
-          hasToken: true,
-          isExpired: true,
-          error: 'Invalid token format'
-        });
-      }
-    } else {
-      console.log('🔍 Token Debug Info:', {
-        hasToken: false
-      });
-    }
-  }
-};
+
 
 // Create axios instance
 const api: AxiosInstance = axios.create({

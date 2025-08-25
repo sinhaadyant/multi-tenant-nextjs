@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -24,6 +25,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export default function SuperAdminLogin() {
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const { t } = useTranslation(['auth']);
   
   // Check if user is already authenticated and redirect if needed
   const { shouldRedirect, isLoading: authLoading } = useAuthRedirect({
@@ -150,7 +152,7 @@ export default function SuperAdminLogin() {
       <div className="mx-auto w-full max-w-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Checking authentication...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">{t('common:checkingAuthentication')}</p>
         </div>
       </div>
     );
@@ -162,7 +164,7 @@ export default function SuperAdminLogin() {
       <div className="mx-auto w-full max-w-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Redirecting to dashboard...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">{t('common:redirectingToDashboard')}</p>
         </div>
       </div>
     );
@@ -174,10 +176,10 @@ export default function SuperAdminLogin() {
     <div className="mx-auto w-full max-w-[400px]">
       <div className="mb-8 text-center">
         <h1 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">
-          SuperAdmin Sign In
+          {t('auth:signInTitle')}
         </h1>
         <p className="text-base text-gray-600 dark:text-gray-400">
-          Welcome back! Please sign in to your account.
+          {t('auth:welcomeBack')}
         </p>
       </div>
 
@@ -213,7 +215,7 @@ export default function SuperAdminLogin() {
           <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
         </div>
         <div className="relative flex justify-center text-sm">
-          <span className="bg-white px-2 text-gray-500 dark:bg-gray-900 dark:text-gray-400">Or continue with email</span>
+          <span className="bg-white px-2 text-gray-500 dark:bg-gray-900 dark:text-gray-400">{t('auth:continueWithEmail')}</span>
         </div>
       </div>
 
@@ -221,13 +223,13 @@ export default function SuperAdminLogin() {
         {/* Email Field */}
         <div>
           <label htmlFor="email" className="mb-2.5 block text-sm font-medium text-gray-900 dark:text-white">
-            Email
+            {t('auth:email')}
           </label>
           <div className="relative">
             <input
               {...register('email')}
               type="email"
-              placeholder="Enter your email"
+              placeholder={t('forms:placeholders.enterEmail')}
               autoComplete="email"
               className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder:text-gray-500 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-400 dark:focus:border-brand-500"
             />
@@ -240,13 +242,13 @@ export default function SuperAdminLogin() {
         {/* Password Field */}
         <div>
           <label htmlFor="password" className="mb-2.5 block text-sm font-medium text-gray-900 dark:text-white">
-            Password
+            {t('auth:password')}
           </label>
           <div className="relative">
             <input
               {...register('password')}
               type={showPassword ? 'text' : 'password'}
-              placeholder="Enter your password"
+              placeholder={t('forms:placeholders.enterPassword')}
               autoComplete="current-password"
               className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 pr-12 text-gray-900 placeholder:text-gray-500 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-400 dark:focus:border-brand-500"
             />
@@ -291,7 +293,7 @@ export default function SuperAdminLogin() {
               Signing in...
             </>
           ) : (
-            'Sign In'
+            t('auth:signIn')
           )}
         </button>
 
@@ -301,7 +303,7 @@ export default function SuperAdminLogin() {
             href="/superadmin/forgot-password"
             className="text-sm text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
           >
-            Forgot your password?
+            {t('auth:forgotPassword')}
           </a>
         </div>
       </form>

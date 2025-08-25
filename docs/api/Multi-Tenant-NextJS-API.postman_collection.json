@@ -1,1 +1,517 @@
-{"info":{"name":"Multi-Tenant NextJS API","description":"Complete API collection for Multi-Tenant NextJS application","version":"1.0.0"},"variable":[{"key":"baseUrl","value":"http://localhost:3000/api"},{"key":"superadminToken","value":""},{"key":"tenantToken","value":""}],"item":[{"name":"Authentication","item":[{"name":"SuperAdmin Login","request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\"email\":\"superadmin@example.com\",\"password\":\"password123\"}"},"url":{"raw":"{{baseUrl}}/superadmin/auth/login"}}},{"name":"Tenant Login","request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\"email\":\"user@tenant.com\",\"password\":\"password123\",\"tenantSlug\":\"demo-tenant\"}"},"url":{"raw":"{{baseUrl}}/auth/login"}}}]}]}
+{
+  "info": {
+    "name": "Multi-Tenant NextJS API",
+    "description": "Complete API collection for Multi-Tenant NextJS application with SuperAdmin and Tenant management",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    },
+    {
+      "key": "superadminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tenantToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tenantSlug",
+      "value": "acme",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{superadminToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "SuperAdmin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["superadmin", "auth", "login"]
+            },
+            "description": "Login as SuperAdmin to get access token"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('superadminToken', response.data.token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tenant Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@acme.com\",\n  \"password\": \"password123\",\n  \"tenantSlug\": \"{{tenantSlug}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/{{tenantSlug}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{tenantSlug}}", "auth", "login"]
+            },
+            "description": "Login as tenant user to get access token"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('tenantToken', response.data.token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SuperAdmin APIs",
+      "item": [
+        {
+          "name": "Get Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superadminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/dashboard/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["superadmin", "dashboard", "stats"]
+            },
+            "description": "Get SuperAdmin dashboard statistics"
+          }
+        },
+        {
+          "name": "Get All Tenants",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superadminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/tenants?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["superadmin", "tenants"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Get all tenants with pagination"
+          }
+        },
+        {
+          "name": "Create Tenant",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superadminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"New Tenant Corp\",\n  \"slug\": \"newtenant\",\n  \"domain\": \"newtenant.com\",\n  \"adminEmail\": \"admin@newtenant.com\",\n  \"adminPassword\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/tenants",
+              "host": ["{{baseUrl}}"],
+              "path": ["superadmin", "tenants"]
+            },
+            "description": "Create a new tenant"
+          }
+        },
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superadminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/users?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["superadmin", "users"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Get all users across all tenants"
+          }
+        },
+        {
+          "name": "Get Support Tickets",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superadminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/support-tickets?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["superadmin", "support-tickets"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Get all support tickets"
+          }
+        },
+        {
+          "name": "Get Notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superadminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/notifications?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["superadmin", "notifications"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Get all notifications"
+          }
+        },
+        {
+          "name": "Create Notification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superadminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"System Maintenance\",\n  \"message\": \"Scheduled maintenance on Sunday at 2 AM\",\n  \"type\": \"info\",\n  \"priority\": \"medium\",\n  \"targetType\": \"all_tenants\",\n  \"status\": \"draft\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/notifications",
+              "host": ["{{baseUrl}}"],
+              "path": ["superadmin", "notifications"]
+            },
+            "description": "Create a new notification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tenant APIs",
+      "item": [
+        {
+          "name": "Get Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tenantToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/{{tenantSlug}}/dashboard/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{tenantSlug}}", "dashboard", "stats"]
+            },
+            "description": "Get tenant dashboard statistics"
+          }
+        },
+        {
+          "name": "Get Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tenantToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/{{tenantSlug}}/users?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{tenantSlug}}", "users"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Get users for the current tenant"
+          }
+        },
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tenantToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@acme.com\",\n  \"password\": \"password123\",\n  \"roleId\": \"role-id-here\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/{{tenantSlug}}/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{tenantSlug}}", "users"]
+            },
+            "description": "Create a new user for the tenant"
+          }
+        },
+        {
+          "name": "Get Roles",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tenantToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/{{tenantSlug}}/roles?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{tenantSlug}}", "roles"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Get roles for the current tenant"
+          }
+        },
+        {
+          "name": "Get Support Tickets",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tenantToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/{{tenantSlug}}/support-tickets?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{tenantSlug}}", "support-tickets"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Get support tickets for the current tenant"
+          }
+        },
+        {
+          "name": "Create Support Ticket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tenantToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Login Issue\",\n  \"description\": \"Unable to login to the system\",\n  \"priority\": \"medium\",\n  \"category\": \"technical\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/{{tenantSlug}}/support-tickets",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{tenantSlug}}", "support-tickets"]
+            },
+            "description": "Create a new support ticket"
+          }
+        },
+        {
+          "name": "Get Notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tenantToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/{{tenantSlug}}/notifications?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{tenantSlug}}", "notifications"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Get notifications for the current tenant"
+          }
+        },
+        {
+          "name": "Mark Notification as Read",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tenantToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationIds\": [\"notification-id-here\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/{{tenantSlug}}/notifications/mark-read",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{tenantSlug}}", "notifications", "mark-read"]
+            },
+            "description": "Mark notifications as read"
+          }
+        }
+      ]
+    }
+  ]
+}

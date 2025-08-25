@@ -1,0 +1,87 @@
+{
+  "superAdmins": [
+    {
+      "id": "sa-1",
+      "email": "admin@superadmin.com",
+      "password": "Test123!@#",
+      "name": "Super Admin",
+      "status": "active",
+      "createdAt": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "sa-2", 
+      "email": "inactive@superadmin.com",
+      "password": "Test123!@#",
+      "name": "Inactive Super Admin",
+      "status": "inactive",
+      "createdAt": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "tenantUsers": [
+    {
+      "id": "tu-1",
+      "email": "admin@tenant1.com",
+      "password": "Test123!@#",
+      "name": "Tenant 1 Admin",
+      "tenantSlug": "tenant1",
+      "role": "admin",
+      "status": "active",
+      "permissions": ["users.read", "users.create", "users.update", "users.delete"],
+      "createdAt": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "tu-2",
+      "email": "manager@tenant1.com", 
+      "password": "Test123!@#",
+      "name": "Tenant 1 Manager",
+      "tenantSlug": "tenant1",
+      "role": "manager",
+      "status": "active",
+      "permissions": ["users.read", "users.create"],
+      "createdAt": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "tu-3",
+      "email": "user@tenant1.com",
+      "password": "Test123!@#", 
+      "name": "Tenant 1 User",
+      "tenantSlug": "tenant1",
+      "role": "user",
+      "status": "active",
+      "permissions": ["users.read"],
+      "createdAt": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "tu-4",
+      "email": "admin@tenant2.com",
+      "password": "Test123!@#",
+      "name": "Tenant 2 Admin", 
+      "tenantSlug": "tenant2",
+      "role": "admin",
+      "status": "active",
+      "permissions": ["users.read", "users.create", "users.update", "users.delete"],
+      "createdAt": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "tu-5",
+      "email": "disabled@tenant1.com",
+      "password": "Test123!@#",
+      "name": "Disabled User",
+      "tenantSlug": "tenant1", 
+      "role": "user",
+      "status": "inactive",
+      "permissions": [],
+      "createdAt": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "invalidUsers": [
+    {
+      "email": "invalid-email",
+      "password": "weak"
+    },
+    {
+      "email": "test@nonexistent.com",
+      "password": "Test123!@#"
+    }
+  ]
+}

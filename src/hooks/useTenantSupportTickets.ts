@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 
 export interface SupportTicket {
   id: string;
@@ -106,9 +106,10 @@ export const useTenantSupportTickets = (tenantSlug: string, filters: SupportTick
     },
     enabled: !!tenantSlug,
     staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: (failureCount, error) => {
-      // Don't retry on authentication errors
-      if (error?.response?.status === 401) {
+    retry: (failureCount, error: unknown) => {
+      const axiosError = error as AxiosError | undefined;
+      const status = axiosError?.response?.status;
+      if (status === 401) {
         return false;
       }
       // Retry up to 3 times for other errors

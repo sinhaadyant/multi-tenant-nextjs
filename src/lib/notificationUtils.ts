@@ -110,16 +110,12 @@ export async function deliverNotificationToUsers(
       const existingUserIds = existingNotifications.map(n => n.userId);
       const newUserIds = validUserIds.filter(userId => !existingUserIds.includes(userId));
 
-      console.log(`📊 Notification delivery check:`, {
-        totalTargets: validUserIds.length,
-        existingNotifications: existingUserIds.length,
-        newNotifications: newUserIds.length
-      });
+
 
       if (newUserIds.length === 0) {
         // All notifications already exist
         result.deliveredCount = existingUserIds.length;
-        console.log(`✅ All ${result.deliveredCount} notifications already exist`);
+
         return result;
       }
 
@@ -143,7 +139,7 @@ export async function deliverNotificationToUsers(
         result.errors.push(`${skippedCount} user notifications already exist`);
       }
 
-      console.log(`✅ Delivered notification to ${result.deliveredCount} users (${result.requestedCount} requested)`);
+
 
     } catch (error: any) {
       console.error('❌ Error creating user notifications:', error);

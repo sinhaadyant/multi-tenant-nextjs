@@ -223,14 +223,14 @@ const SupportTicketTable: React.FC<SupportTicketTableProps> = ({
                     <button
                       onClick={() => onView(ticket)}
                       className="text-brand-600 hover:text-brand-900 dark:text-brand-400 dark:hover:text-brand-300"
-                      title="View ticket"
+                      title={t('tables:filters.viewTicket')}
                     >
                       <Eye className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => onDelete(ticket)}
                       className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                      title="Delete ticket"
+                      title={t('tables:filters.deleteTicket')}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -276,7 +276,7 @@ const SupportTicketTable: React.FC<SupportTicketTableProps> = ({
               </p>
             </div>
             <div>
-              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label={t('common:pagination')}>
                 <button
                   onClick={() => onPageChange(pagination.page - 1)}
                   disabled={pagination.page === 1}

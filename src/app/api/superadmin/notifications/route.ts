@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
       return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
     }
 
-    console.log('Authentication successful for user:', authResult.user?.email);
+
 
     const { searchParams } = new URL(req.url);
     filters = {
@@ -212,7 +212,7 @@ export async function POST(req: NextRequest) {
       return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
     }
 
-    console.log('Authentication successful for user:', authResult.user?.email);
+
 
     const body = await req.json();
     
@@ -275,12 +275,7 @@ export async function POST(req: NextRequest) {
     // Deliver notifications to users and send via WebSocket if status is 'sent'
     if (notificationData.status === 'sent') {
       try {
-        console.log('📨 Delivering notification immediately (status: sent)');
-        console.log('🔍 Target info:', {
-          targetType: body.targetType,
-          targetUserIds: body.targetUserIds,
-          targetTenantId: body.targetTenantId
-        });
+
 
         // Use the new utility function for robust notification delivery
         const deliveryResult = await deliverNotificationToUsers(
@@ -290,7 +285,7 @@ export async function POST(req: NextRequest) {
           body.targetTenantId
         );
 
-        console.log('📨 Delivery result:', deliveryResult);
+
 
         if (!deliveryResult.success) {
           console.error('❌ Notification delivery failed:', deliveryResult.errors);
@@ -303,7 +298,7 @@ export async function POST(req: NextRequest) {
 
         // Send notification via Socket.io
         if (deliveryResult.deliveredCount > 0 && global.sendNotification) {
-          console.log('🔌 Broadcasting notification via Socket.io...');
+  
           
           // Prepare notification data for Socket.io
           const socketNotification = {
@@ -324,7 +319,7 @@ export async function POST(req: NextRequest) {
           switch (body.targetType) {
             case 'specific_users':
               if (body.targetUserIds && body.targetUserIds.length > 0) {
-                console.log('🔌 Broadcasting to specific users:', body.targetUserIds);
+        
                 global.sendNotification('user', body.targetUserIds, socketNotification);
               }
               break;

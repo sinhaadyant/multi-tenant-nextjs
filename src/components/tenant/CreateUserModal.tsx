@@ -210,7 +210,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="Enter password"
+                  placeholder={t('forms:placeholders.enterPassword')}
                   {...register('password')}
                   error={errors.password?.message}
                 />

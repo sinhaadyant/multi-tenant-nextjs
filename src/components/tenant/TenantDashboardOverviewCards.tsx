@@ -123,12 +123,7 @@ export const TenantDashboardOverviewCards: React.FC<TenantDashboardOverviewCards
   }
 
   return (
-    <div className={`grid gap-6 ${
-      visibleCards.length === 1 ? 'grid-cols-1' :
-      visibleCards.length === 2 ? 'grid-cols-1 md:grid-cols-2' :
-      visibleCards.length === 3 ? 'grid-cols-1 md:grid-cols-3' :
-      'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'
-    }`}>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {visibleCards.map((stat, index) => (
         <div 
           key={index} 

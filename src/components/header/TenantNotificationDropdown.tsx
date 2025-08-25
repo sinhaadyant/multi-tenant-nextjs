@@ -34,24 +34,11 @@ export default function TenantNotificationDropdown() {
   const [showNewNotificationIndicator, setShowNewNotificationIndicator] = useState(false);
 
   // Initialize Socket.io connection
-  const { isConnected: socketConnected } = useSocketIO({ enabled: !!user?.id });
-
-  // Debug unread count changes
-  useEffect(() => {
-    console.log('📊 Header Notification Count Debug:', {
-      globalUnreadCount,
-      localUnreadCount: headerNotificationsData?.data?.unreadCount,
-      finalUnreadCount: unreadCount,
-      isConnected: globalIsConnected,
-      socketConnected,
-      hasNotifications: notifications.length > 0
-    });
-  }, [globalUnreadCount, headerNotificationsData?.data?.unreadCount, unreadCount, globalIsConnected, socketConnected, notifications.length]);
+  useSocketIO({ enabled: !!user?.id });
 
   // Optimized updates - sync with global context
   useEffect(() => {
     if (globalUnreadCount !== undefined && globalUnreadCount !== headerNotificationsData?.data?.unreadCount) {
-      console.log('🔄 Global context update: Refreshing header notifications');
       refetch();
     }
   }, [globalUnreadCount, headerNotificationsData?.data?.unreadCount, refetch]);
@@ -73,7 +60,6 @@ export default function TenantNotificationDropdown() {
   // Detect new notifications and show indicator (using global context)
   useEffect(() => {
     if (unreadCount > prevUnreadCount && prevUnreadCount > 0) {
-      console.log('📨 New notification detected in dropdown!');
       setShowNewNotificationIndicator(true);
       
       // Hide indicator after 3 seconds
@@ -178,7 +164,7 @@ export default function TenantNotificationDropdown() {
           </span>
         )}
         {!globalIsConnected && (
-          <span className="absolute -right-1 -top-1 z-10 h-3 w-3 rounded-full bg-gray-400" title="Real-time notifications disconnected"></span>
+          <span className="absolute -right-1 -top-1 z-10 h-3 w-3 rounded-full bg-gray-400" title={t('common:realTimeNotificationsDisconnected')}></span>
         )}
         {showNewNotificationIndicator && (
           <span className="absolute -right-1 -top-1 z-10 h-3 w-3 rounded-full bg-green-500 animate-pulse" title="New notification received!"></span>
@@ -216,11 +202,10 @@ export default function TenantNotificationDropdown() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
-                console.log('🔄 Manual refresh triggered');
                 refetch();
               }}
               className="text-xs text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
-              title="Refresh notifications"
+              title={t('common:refreshNotifications')}
             >
               🔄
             </button>
@@ -345,14 +330,14 @@ export default function TenantNotificationDropdown() {
             <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
               <span>
                 Showing {notifications.length} notifications
-                {!globalIsConnected && !socketConnected && (
+                {!globalIsConnected && (
                   <span className="ml-2 text-orange-500">(offline)</span>
                 )}
               </span>
               <button
                 onClick={() => refetch()}
                 className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
-                title="Refresh notifications"
+                title={t('common:refreshNotifications')}
               >
                 Refresh
               </button>

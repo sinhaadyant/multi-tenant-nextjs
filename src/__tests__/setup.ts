@@ -1,45 +1,51 @@
-import { server } from './utils/server'
+import '@testing-library/jest-dom'
 
-// Establish API mocking before all tests
-beforeAll(() => server.listen())
-
-// Reset any request handlers that we may add during the tests,
-// so they don't affect other tests
-afterEach(() => server.resetHandlers())
-
-// Clean up after the tests are finished
-afterAll(() => server.close())
-
-// Mock console methods to reduce noise in tests
-const originalError = console.error
-const originalWarn = console.warn
-
-beforeAll(() => {
-  console.error = (...args) => {
-    if (
-      typeof args[0] === 'string' &&
-      (args[0].includes('Warning: ReactDOM.render is no longer supported') ||
-       args[0].includes('Warning: An invalid form control') ||
-       args[0].includes('Warning: validateDOMNesting'))
-    ) {
-      return
+// Mock Next.js router
+jest.mock('next/router', () => ({
+  useRouter() {
+    return {
+      route: '/',
+      pathname: '/',
+      query: {},
+      asPath: '/',
+      push: jest.fn(),
+      pop: jest.fn(),
+      reload: jest.fn(),
+      back: jest.fn(),
+      prefetch: jest.fn().mockResolvedValue(undefined),
+      beforePopState: jest.fn(),
+      events: {
+        on: jest.fn(),
+        off: jest.fn(),
+        emit: jest.fn(),
+      },
+      isFallback: false,
     }
-    originalError.call(console, ...args)
-  }
+  },
+}))
 
-  console.warn = (...args) => {
-    if (
-      typeof args[0] === 'string' &&
-      (args[0].includes('Warning: componentWillReceiveProps') ||
-       args[0].includes('Warning: componentWillUpdate'))
-    ) {
-      return
+// Mock Next.js navigation
+jest.mock('next/navigation', () => ({
+  useRouter() {
+    return {
+      push: jest.fn(),
+      replace: jest.fn(),
+      prefetch: jest.fn(),
+      back: jest.fn(),
+      forward: jest.fn(),
+      refresh: jest.fn(),
     }
-    originalWarn.call(console, ...args)
-  }
+  },
+  useSearchParams() {
+    return new URLSearchParams()
+  },
+  usePathname() {
+    return '/'
+  },
+}))
+
+// Global test setup
+beforeEach(() => {
+  // Clear all mocks before each test
+  jest.clearAllMocks()
 })
-
-afterAll(() => {
-  console.error = originalError
-  console.warn = originalWarn
-}) 

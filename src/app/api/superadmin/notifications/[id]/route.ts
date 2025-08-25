@@ -7,7 +7,7 @@ import { createAuditLog } from '@/lib/audit';
 // GET /api/superadmin/notifications/[id] - Get single notification
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify authentication
@@ -16,7 +16,7 @@ export async function GET(
       return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
     }
 
-    const { id } = params;
+    const { id } = await params;
     
     const notification = await prisma.notification.findUnique({
       where: { id: id },
@@ -57,7 +57,7 @@ export async function GET(
 // PUT /api/superadmin/notifications/[id] - Update notification
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify authentication
@@ -66,7 +66,7 @@ export async function PUT(
       return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
     }
 
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
 
     // Check if notification exists
@@ -136,7 +136,7 @@ export async function PUT(
     // Create audit log
     await createAuditLog({
       action: 'notification_updated',
-      superAdminId: authResult.user.id,
+      superAdminId: (authResult.user as any).id,
       resourceType: 'NOTIFICATION',
       resourceId: notification.id,
       details: `Updated notification: ${notification.title}`,
@@ -152,7 +152,7 @@ export async function PUT(
 // DELETE /api/superadmin/notifications/[id] - Delete notification
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify authentication
@@ -161,7 +161,7 @@ export async function DELETE(
       return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
     }
 
-    const { id } = params;
+    const { id } = await params;
     
     // Check if notification exists
     const notification = await prisma.notification.findUnique({
@@ -180,7 +180,7 @@ export async function DELETE(
     // Create audit log
     await createAuditLog({
       action: 'notification_deleted',
-      superAdminId: authResult.user.id,
+      superAdminId: (authResult.user as any).id,
       resourceType: 'NOTIFICATION',
       resourceId: notification.id,
       details: `Deleted notification: ${notification.title}`,
@@ -196,7 +196,7 @@ export async function DELETE(
 // PATCH /api/superadmin/notifications/[id] - Send notification
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify authentication
@@ -205,7 +205,7 @@ export async function PATCH(
       return createErrorResponse(`Authentication failed: ${authResult.error}`, 401);
     }
 
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
 
     // Check if notification exists
@@ -298,7 +298,7 @@ export async function PATCH(
       }
 
       // Send notification via Socket.io if available
-      if (deliveryResult.deliveredCount > 0 && global.sendNotification) {
+      if (deliveryResult.deliveredCount > 0 && (global as any).sendNotification) {
         console.log('🔌 Broadcasting notification via Socket.io...');
         
         const socketNotification = {
@@ -309,29 +309,29 @@ export async function PATCH(
           priority: notification.priority,
           createdAt: notification.createdAt,
           createdBy: {
-            id: authResult.user.id,
-            name: authResult.user.name,
-            email: authResult.user.email
+            id: (authResult.user as any).id,
+            name: (authResult.user as any).name,
+            email: (authResult.user as any).email
           }
-        };
+        } as any;
 
         switch (notification.targetType) {
           case 'specific_users':
             if (targetUserIds && targetUserIds.length > 0) {
               console.log('🔌 Broadcasting to specific users:', targetUserIds);
-              global.sendNotification('user', targetUserIds, socketNotification);
+              (global as any).sendNotification('user', targetUserIds, socketNotification);
             }
             break;
           case 'entire_tenant':
             if (notification.targetTenantId) {
-              global.sendNotification('tenant', [notification.targetTenantId], socketNotification);
+              (global as any).sendNotification('tenant', [notification.targetTenantId], socketNotification);
             }
             break;
           case 'superadmin':
-            global.sendNotification('superadmin', [], socketNotification);
+            (global as any).sendNotification('superadmin', [], socketNotification);
             break;
           case 'all':
-            global.sendNotification('all', [], socketNotification);
+            (global as any).sendNotification('all', [], socketNotification);
             break;
         }
       }
@@ -349,7 +349,7 @@ export async function PATCH(
     try {
       await createAuditLog({
         action: 'notification_sent',
-        superAdminId: authResult.user.id,
+        superAdminId: (authResult.user as any).id,
         resourceType: 'NOTIFICATION',
         resourceId: notification.id,
         details: `Sent notification: ${notification.title} to ${targetUserIds.length} users`,

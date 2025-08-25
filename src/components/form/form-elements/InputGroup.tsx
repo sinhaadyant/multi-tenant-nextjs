@@ -1,5 +1,6 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
+import { useTranslation } from 'react-i18next';
 import ComponentCard from "../../common/ComponentCard";
 import Label from "../Label";
 import Input from "../input/InputField";
@@ -7,23 +8,25 @@ import { EnvelopeIcon } from "../../../icons";
 import PhoneInput from "../group-input/PhoneInput";
 
 export default function InputGroup() {
+  const { t } = useTranslation('forms');
+  const [phoneNumber, setPhoneNumber] = useState("");
   const countries = [
     { code: "US", label: "+1" },
     { code: "GB", label: "+44" },
     { code: "CA", label: "+1" },
     { code: "AU", label: "+61" },
   ];
-  const handlePhoneChange = (phoneNumber: string) => {
+  const handlePhoneNumberChange = (phoneNumber: string) => {
     setPhoneNumber(phoneNumber);
   };
   return (
-    <ComponentCard title="Input Group">
+    <ComponentCard title={t('sections.inputGroup')}>
       <div className="space-y-6">
         <div>
-          <Label>Email</Label>
+          <Label>{t('labels.email')}</Label>
           <div className="relative">
             <Input
-              placeholder="info@gmail.com"
+              placeholder={t('placeholders.emailPlaceholder')}
               type="text"
               className="pl-[62px]"
             />
@@ -33,20 +36,20 @@ export default function InputGroup() {
           </div>
         </div>
         <div>
-          <Label>Phone</Label>
+          <Label>{t('labels.phone')}</Label>
           <PhoneInput
             selectPosition="start"
             countries={countries}
-            placeholder="+1 (555) 000-0000"
+            placeholder={t('placeholders.phonePlaceholder')}
             onChange={handlePhoneNumberChange}
           />
         </div>{" "}
         <div>
-          <Label>Phone</Label>
+          <Label>{t('labels.phone')}</Label>
           <PhoneInput
             selectPosition="end"
             countries={countries}
-            placeholder="+1 (555) 000-0000"
+            placeholder={t('placeholders.phonePlaceholder')}
             onChange={handlePhoneNumberChange}
           />
         </div>

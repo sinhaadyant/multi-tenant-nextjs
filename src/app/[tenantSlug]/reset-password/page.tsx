@@ -4,7 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { notFound } from 'next/navigation';
 import ResetPasswordClient from './ResetPasswordClient';
+import { GuestLanguageSwitcher } from '@/components/common/GuestLanguageSwitcher';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 
 interface TokenValidation {
   isValid: boolean;
@@ -17,6 +19,7 @@ export default function ResetPasswordPage() {
   const searchParams = useSearchParams();
   const [tokenValidation, setTokenValidation] = useState<TokenValidation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { t } = useTranslation(['auth']);
 
   const token = searchParams.get('token');
 
@@ -103,11 +106,18 @@ export default function ResetPasswordPage() {
   if (isLoading) {
     console.log('🔄 Rendering loading state');
     return (
-      <div className="flex flex-col flex-1 w-full">
+      <div className="flex flex-col flex-1 w-full relative">
+        {/* Language Switcher */}
+        <GuestLanguageSwitcher 
+          position="top-right" 
+          className="z-10"
+          size="sm"
+        />
+        
         <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto space-y-8">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600 dark:text-gray-400">Verifying reset token...</p>
+            <p className="mt-4 text-gray-600 dark:text-gray-400">{t('auth:verifyingResetToken')}</p>
           </div>
         </div>
       </div>
@@ -118,17 +128,32 @@ export default function ResetPasswordPage() {
   if (tokenValidation?.isValid && tokenValidation.email && token) {
     console.log('✅ Rendering ResetPasswordClient - token is valid');
     return (
-      <ResetPasswordClient 
-        token={token} 
-        email={tokenValidation.email} 
-      />
+      <div className="relative">
+        {/* Language Switcher */}
+        <GuestLanguageSwitcher 
+          position="top-right" 
+          className="z-10"
+          size="sm"
+        />
+        
+        <ResetPasswordClient 
+          token={token} 
+          email={tokenValidation.email} 
+        />
+      </div>
     );
   }
 
   // Show error for invalid token
   console.log('❌ Rendering error page - token is invalid or missing');
   return (
-    <div className="flex flex-col flex-1 w-full">
+    <div className="flex flex-col flex-1 w-full relative">
+      {/* Language Switcher */}
+      <GuestLanguageSwitcher 
+        position="top-right" 
+        className="z-10"
+        size="sm"
+      />
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto space-y-8">
         <div className="text-center">
           <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-full mb-4 shadow-sm">
@@ -137,17 +162,17 @@ export default function ResetPasswordPage() {
             </svg>
           </div>
           <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90 sm:text-3xl">
-            Invalid Reset URL
+            {t('auth:invalidResetUrl')}
           </h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            {tokenValidation?.error || 'This reset link is invalid or has expired.'}
+            {tokenValidation?.error || t('auth:invalidResetMsg')}
           </p>
           <div className="mt-6">
             <button
               onClick={() => router.push('/superadmin/forgot-password')}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
-              Request New Reset Link
+              {t('auth:sendReset')}
             </button>
           </div>
         </div>

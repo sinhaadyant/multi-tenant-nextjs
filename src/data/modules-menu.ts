@@ -142,7 +142,7 @@ export const MODULES_MENU = {
     // Utilities
     utilities: {
       main: "Utilities",
-      debugPermissions: "Debug Permissions",
+    
       testRole: "Test Role",
       systemInfo: "System Information"
     }
@@ -199,7 +199,7 @@ export const MODULE_PERMISSIONS = {
     notifications: ["notifications:view", "notifications:create"],
     support: ["support:view", "support:create", "support:manage"],
     settings: ["settings:view", "settings:edit"],
-    utilities: ["utilities:view", "utilities:debug"]
+    utilities: ["utilities:view"]
   }
 };
 
@@ -232,7 +232,7 @@ export const MODULE_ICONS = {
   contentManagement: "FileText",
   analytics: "Activity",
   utilities: "Wrench",
-  debugPermissions: "Bug",
+
   testRole: "TestTube",
   systemInfo: "Info"
 };

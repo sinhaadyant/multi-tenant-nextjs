@@ -36,8 +36,6 @@ export default function NotificationDropdown() {
 
     // Listen for new notifications
     const handleNewNotification = (notification: any) => {
-      console.log('📨 New notification received via WebSocket (SuperAdmin):', notification);
-      
       // Show toast notification
       toast.success(`${notification.title}: ${notification.message}`, {
         duration: 5000,
@@ -58,7 +56,6 @@ export default function NotificationDropdown() {
 
     // Listen for notification count updates
     const handleCountUpdate = (data: { unreadCount: number }) => {
-      console.log('📊 Notification count updated via WebSocket (SuperAdmin):', data);
       // The refetch will update the count automatically
     };
 
@@ -116,7 +113,7 @@ export default function NotificationDropdown() {
           </span>
         )}
         {!isConnected && (
-          <span className="absolute -right-1 -top-1 z-10 h-3 w-3 rounded-full bg-gray-400" title="WebSocket disconnected"></span>
+          <span className="absolute -right-1 -top-1 z-10 h-3 w-3 rounded-full bg-gray-400" title={t('common:webSocketDisconnected')}></span>
         )}
         <svg
           className="fill-current"
@@ -248,7 +245,7 @@ export default function NotificationDropdown() {
               <button
                 onClick={() => refetch()}
                 className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
-                title="Refresh notifications"
+                title={t('common:refreshNotifications')}
               >
                 Refresh
               </button>

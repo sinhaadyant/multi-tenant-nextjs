@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useTransition, useCallback, memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef, GridOptions, GridReadyEvent, ICellRendererParams, ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import { 
@@ -141,6 +142,7 @@ const DataTable: React.FC<DataTableProps> = memo(({
   pagination = true,
   pageSize = 10,
 }) => {
+  const { t } = useTranslation(['tables', 'loading']);
   const [gridApi, setGridApi] = useState<any>(null);
   const { searchTerm, setSearchTerm, debouncedSearchTerm, isPending } = useDebouncedSearch(300);
 
@@ -181,7 +183,7 @@ const DataTable: React.FC<DataTableProps> = memo(({
     // Add actions column if any action handlers are provided
     if (onView || onEdit || onDelete) {
       cols.push({
-        headerName: 'Actions',
+        headerName: t('tables:headers.actions'),
         field: 'actions',
         width: 120,
         sortable: false,
@@ -239,15 +241,15 @@ const DataTable: React.FC<DataTableProps> = memo(({
               {title}
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              {filteredData.length} records found
-              {isPending && <span className="ml-2 text-blue-500">Searching...</span>}
+              {t('tables:search.recordsFound', { count: filteredData.length })}
+              {isPending && <span className="ml-2 text-blue-500">{t('tables:search.searching')}</span>}
             </p>
           </div>
           {searchable && (
             <div className="relative">
               <input
                 type="text"
-                placeholder="Search..."
+                placeholder={t('tables:search.placeholder')}
                 value={searchTerm}
                 onChange={handleSearch}
                 className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"

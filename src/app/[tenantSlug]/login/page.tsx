@@ -7,6 +7,7 @@ import { useDispatch } from "react-redux";
 import { setTenantLogin, setTenantPermissions, setTenantModules, setTenantModulesLoading, setTenantModulesError } from "@/store/slices/tenantAuthSlice";
 import { setPermissions } from "@/store/slices/permissionsSlice";
 import TenantLogin from "@/components/auth/TenantLogin";
+import { GuestLanguageSwitcher } from "@/components/common/GuestLanguageSwitcher";
 import { Loader2 } from "lucide-react";
 import axios from "axios";
 
@@ -188,7 +189,7 @@ const TenantLoginPage: React.FC = () => {
           id: result.data.user.id,
           email: result.data.user.email,
           name: result.data.user.name,
-          role: result.data.user.roles?.[0]?.name || 'user',
+                          role: result.data.user.roles?.map(role => role.name).join(', ') || 'user',
           tenantId: result.data.user.tenant?.id || '',
           tenantSlug: result.data.user.tenant?.slug || '',
           avatar: result.data.user.avatar,
@@ -271,7 +272,14 @@ const TenantLoginPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 relative">
+      {/* Language Switcher */}
+      <GuestLanguageSwitcher 
+        position="top-right" 
+        className="z-10"
+        size="sm"
+      />
+      
       <TenantLogin 
         tenantSlug={tenantSlug} 
         onLoginSuccess={handleLoginSuccess}

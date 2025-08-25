@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { useTranslation } from 'react-i18next';
 import { useSidebar } from "../context/SidebarContext";
 import {
   LayoutDashboard,
@@ -27,8 +28,10 @@ import {
   User,
   Download,
   Upload,
+  Languages,
 } from "lucide-react";
 import SidebarWidget from "./SidebarWidget";
+import { LanguageSwitcher } from "@/components/common/LanguageSwitcher";
 
 type NavItem = {
   id: string;
@@ -38,104 +41,7 @@ type NavItem = {
   children?: { id: string; label: string; path: string }[];
 };
 
-const superAdminNavElements: NavItem[] = [
-  {
-    id: "dashboard",
-    label: "Dashboard",
-    icon: "home",
-    path: "/superadmin/dashboard"
-  },
-  {
-    id: "tenants",
-    label: "Tenant Management",
-    icon: "building",
-    children: [
-      { id: "allTenants", label: "All Tenants", path: "/superadmin/tenants" },
-      { id: "createTenant", label: "Create Tenant", path: "/superadmin/tenants/new" }
-    ]
-  },
-  {
-    id: "users",
-    label: "User Management",
-    icon: "users",
-    path: "/superadmin/users"
-  },
-  {
-    id: "superadmins",
-    label: "Superadmin Management",
-    icon: "user-circle",
-    path: "/superadmin/superadmins"
-  },
-  {
-    id: "roles",
-    label: "Roles & Permissions",
-    icon: "shield",
-    children: [
-      { id: "rolesManagement", label: "Roles Management", path: "/superadmin/roles" },
-      { id: "permissionGroups", label: "Permission Groups", path: "/superadmin/roles?tab=permissions" },
-      { id: "roleAssignment", label: "Role Assignment", path: "/superadmin/roles?tab=assignment" }
-    ]
-  },
 
-  {
-    id: "backup",
-    label: "Backup & Import",
-    icon: "database",
-    children: [
-      { id: "backupData", label: "Backup Data", path: "/superadmin/backup" },
-      { id: "importData", label: "Import Data", path: "/superadmin/import" },
-      { id: "backupHistory", label: "Backup History", path: "/superadmin/backup/history" }
-    ]
-  },
-  {
-    id: "dataManagement",
-    label: "Data Management",
-    icon: "hard-drive",
-    children: [
-      { id: "insertSampleData", label: "Insert Sample Data", path: "/superadmin/data-management/insert" },
-      { id: "clearData", label: "Clear Data", path: "/superadmin/data-management/clear" }
-    ]
-  },
-  {
-    id: "menuManagement",
-    label: "Menu Management",
-    icon: "list",
-    path: "/superadmin/menu"
-  },
-  {
-    id: "audit",
-    label: "Audit Logs",
-    icon: "clipboard-list",
-    path: "/superadmin/audit"
-  },
-  {
-    id: "reports",
-    label: "Reports",
-    icon: "chart-bar",
-    path: "/superadmin/reports"
-  },
-  {
-    id: "notifications",
-    label: "Notifications",
-    icon: "bell",
-    path: "/superadmin/notifications"
-  },
-  {
-    id: "supportTickets",
-    label: "Support Tickets",
-    icon: "life-ring",
-    children: [
-      { id: "allTickets", label: "All Tickets", path: "/superadmin/support-tickets" },
-      { id: "createTicket", label: "Create Ticket", path: "/superadmin/support-tickets/new" }
-    ]
-  },
-  {
-    id: "profile",
-    label: "Profile",
-    icon: "user-circle",
-    path: "/superadmin/profile"
-  }
-];
 
 // Icon mapping function
 const getIcon = (iconName: string) => {
@@ -158,8 +64,108 @@ const getIcon = (iconName: string) => {
 };
 
 const SuperAdminSidebar: React.FC = () => {
+  const { t } = useTranslation('navigation');
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
+
+  // Generate navigation items dynamically with translations
+  const getSuperAdminNavElements = (): NavItem[] => [
+    {
+      id: "dashboard",
+      label: t('superadmin.dashboard'),
+      icon: "home",
+      path: "/superadmin/dashboard"
+    },
+    {
+      id: "tenants",
+      label: t('superadmin.tenantManagement'),
+      icon: "building",
+      children: [
+        { id: "allTenants", label: t('superadmin.allTenants'), path: "/superadmin/tenants" },
+        { id: "createTenant", label: t('superadmin.createTenant'), path: "/superadmin/tenants/new" }
+      ]
+    },
+    {
+      id: "users",
+      label: t('superadmin.userManagement'),
+      icon: "users",
+      path: "/superadmin/users"
+    },
+    {
+      id: "superadmins",
+      label: t('superadmin.superadminManagement'),
+      icon: "user-circle",
+      path: "/superadmin/superadmins"
+    },
+    {
+      id: "roles",
+      label: t('superadmin.rolesPermissions'),
+      icon: "shield",
+      children: [
+        { id: "rolesManagement", label: t('superadmin.rolesManagement'), path: "/superadmin/roles" },
+        { id: "permissionGroups", label: t('superadmin.permissionGroups'), path: "/superadmin/roles?tab=permissions" },
+        { id: "roleAssignment", label: t('superadmin.roleAssignment'), path: "/superadmin/roles?tab=assignment" }
+      ]
+    },
+    {
+      id: "backup",
+      label: t('superadmin.backupImport'),
+      icon: "database",
+      children: [
+        { id: "backupData", label: t('superadmin.backupData'), path: "/superadmin/backup" },
+        { id: "importData", label: t('superadmin.importData'), path: "/superadmin/import" },
+        { id: "backupHistory", label: t('superadmin.backupHistory'), path: "/superadmin/backup/history" }
+      ]
+    },
+    {
+      id: "dataManagement",
+      label: t('superadmin.dataManagement'),
+      icon: "hard-drive",
+      children: [
+        { id: "insertSampleData", label: t('superadmin.insertSampleData'), path: "/superadmin/data-management/insert" },
+        { id: "clearData", label: t('superadmin.clearData'), path: "/superadmin/data-management/clear" }
+      ]
+    },
+    {
+      id: "menuManagement",
+      label: t('superadmin.menuManagement'),
+      icon: "list",
+      path: "/superadmin/menu"
+    },
+    {
+      id: "audit",
+      label: t('superadmin.auditLogs'),
+      icon: "clipboard-list",
+      path: "/superadmin/audit"
+    },
+    {
+      id: "reports",
+      label: t('superadmin.reports'),
+      icon: "chart-bar",
+      path: "/superadmin/reports"
+    },
+    {
+      id: "notifications",
+      label: t('superadmin.notifications'),
+      icon: "bell",
+      path: "/superadmin/notifications"
+    },
+    {
+      id: "supportTickets",
+      label: t('superadmin.supportTickets'),
+      icon: "life-ring",
+      children: [
+        { id: "allTickets", label: t('superadmin.allTickets'), path: "/superadmin/support-tickets" },
+        { id: "createTicket", label: t('superadmin.createTicket'), path: "/superadmin/support-tickets/new" }
+      ]
+    },
+    {
+      id: "profile",
+      label: t('superadmin.profile'),
+      icon: "user-circle",
+      path: "/superadmin/profile"
+    }
+  ];
 
   const renderMenuItems = (navItems: NavItem[]) => (
     <ul className="flex flex-col gap-4">
@@ -272,7 +278,7 @@ const SuperAdminSidebar: React.FC = () => {
   useEffect(() => {
     // Check if the current path matches any submenu item
     let submenuMatched = false;
-    superAdminNavElements.forEach((item, itemIndex) => {
+    getSuperAdminNavElements().forEach((item, itemIndex) => {
       if (item.children) {
         item.children.forEach((subItem) => {
           if (isActive(subItem.path)) {
@@ -361,10 +367,41 @@ const SuperAdminSidebar: React.FC = () => {
       <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
         <nav className="mb-6">
           <div className="flex flex-col gap-4">
-            {renderMenuItems(superAdminNavElements)}
+            {renderMenuItems(getSuperAdminNavElements())}
           </div>
         </nav>
        </div>
+
+       {/* SuperAdmin Info & Language Switcher */}
+       {(isExpanded || isHovered || isMobileOpen) && (
+         <div className="mt-auto p-3 border-t border-gray-200 dark:border-gray-700 space-y-3">
+           <div className="flex items-center space-x-3">
+             <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
+               <User className="w-4 h-4 text-purple-600 dark:text-purple-300" />
+             </div>
+             <div className="flex-1 min-w-0">
+               <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                 Super Admin
+               </p>
+               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                 System Administrator
+               </p>
+             </div>
+           </div>
+           
+           {/* Language Switcher */}
+           <div className="flex items-center space-x-2 pt-2 border-t border-gray-100 dark:border-gray-600">
+             <Languages className="w-4 h-4 text-gray-500" />
+             <div className="flex-1">
+               <LanguageSwitcher 
+                 userId="superadmin-current"
+                 userType="superadmin"
+                 className="w-full"
+               />
+             </div>
+           </div>
+         </div>
+       )}
     </aside>
   );
 };

@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
+import { GuestLanguageSwitcher } from '@/components/common/GuestLanguageSwitcher';
 
 const signupSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -241,7 +242,14 @@ export default function SuperAdminSignup() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 relative">
+      {/* Language Switcher */}
+      <GuestLanguageSwitcher 
+        position="top-right" 
+        className="z-10"
+        size="sm"
+      />
+      
       <div className="max-w-md w-full space-y-8">
         <div>
           <div className="text-center">
@@ -272,7 +280,7 @@ export default function SuperAdminSignup() {
               type="text"
               id="name"
               className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              placeholder="Enter your full name"
+              placeholder={t('forms:placeholders.enterFullName')}
             />
             {errors.name && (
               <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name.message}</p>
@@ -290,7 +298,7 @@ export default function SuperAdminSignup() {
               id="email"
               disabled
               className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400"
-              placeholder="Enter your email"
+              placeholder={t('forms:placeholders.enterEmail')}
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Email is pre-filled from your invite
@@ -309,7 +317,7 @@ export default function SuperAdminSignup() {
               pattern="[0-9]*"
               id="contactNumber"
               className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              placeholder="Enter your contact number (numbers only)"
+              placeholder={t('forms:placeholders.enterContactNumber')}
               onInput={handleContactNumberInput}
               maxLength={15}
             />
@@ -332,7 +340,7 @@ export default function SuperAdminSignup() {
                 type={showPassword ? 'text' : 'password'}
                 id="password"
                 className="block w-full pr-10 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                placeholder="Create a strong password"
+                placeholder={t('forms:placeholders.createStrongPassword')}
               />
               <button
                 type="button"
@@ -384,7 +392,7 @@ export default function SuperAdminSignup() {
                 type={showConfirmPassword ? 'text' : 'password'}
                 id="confirmPassword"
                 className="block w-full pr-10 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                placeholder="Confirm your password"
+                placeholder={t('forms:placeholders.confirmPassword')}
               />
               <button
                 type="button"

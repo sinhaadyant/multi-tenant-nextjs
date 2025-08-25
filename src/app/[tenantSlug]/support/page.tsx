@@ -2,6 +2,7 @@
 
 import React from 'react';
 import TenantSupportTicketList from '@/components/tenant/support/TenantSupportTicketList';
+
 import { useToast } from '@/hooks/useToast';
 import { useTenantAuth } from '@/hooks/useTenantAuth';
 import { Loader2 } from 'lucide-react';
@@ -17,7 +18,7 @@ export default function TenantSupportTicketsPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Loading authentication...</p>
+          <p className="text-gray-600 dark:text-gray-400">Loading permissions and modules...</p>
         </div>
       </div>
     );

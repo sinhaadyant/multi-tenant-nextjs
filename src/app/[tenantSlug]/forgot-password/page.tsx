@@ -4,9 +4,11 @@ import React, { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Mail, Loader2, CheckCircle } from 'lucide-react';
+import { GuestLanguageSwitcher } from '@/components/common/GuestLanguageSwitcher';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useTranslation } from 'react-i18next';
 import { requestPasswordReset } from '@/services/authService';
 
 // Forgot password form validation schema
@@ -23,6 +25,7 @@ export default function ForgotPassword() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const { t } = useTranslation(['auth']);
 
   const {
     register,
@@ -46,7 +49,7 @@ export default function ForgotPassword() {
         // For demo purposes, we'll redirect to reset password page
         console.log('✅ Forgot password successful, redirecting with token:', response.token?.substring(0, 10) + '...');
         setTimeout(() => {
-          const redirectUrl = `/${tenantSlug}/reset-password?token=${encodeURIComponent(response.token)}`;
+          const redirectUrl = `/${tenantSlug}/reset-password?token=${encodeURIComponent(response.token || '')}`;
           console.log('🔗 Redirecting to:', redirectUrl);
           router.push(redirectUrl);
         }, 2000);
@@ -63,21 +66,27 @@ export default function ForgotPassword() {
 
   if (success) {
     return (
-      <div className="flex flex-col flex-1 w-full">
+      <div className="flex flex-col flex-1 w-full relative">
+        {/* Language Switcher */}
+        <GuestLanguageSwitcher 
+          position="top-right" 
+          className="z-10"
+          size="sm"
+        />
+        
         <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto space-y-8">
           <div className="text-center">
             <div className="mt-6 flex justify-center">
               <CheckCircle className="h-16 w-16 text-green-500" />
             </div>
             <h2 className="mt-4 text-3xl font-bold text-gray-900 dark:text-white">
-              Check Your Email
+              {t('auth:checkYourEmail')}
             </h2>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              We've sent password reset instructions to <br />
-              <span className="font-medium">{getValues('email')}</span>
+              {t('auth:sentTo', { email: getValues('email') })}
             </p>
             <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-              Redirecting to reset password page for demo purposes...
+              {t('auth:redirectingToReset')}
             </p>
           </div>
         </div>
@@ -86,13 +95,20 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="flex flex-col flex-1 w-full">
+    <div className="flex flex-col flex-1 w-full relative">
+      {/* Language Switcher */}
+      <GuestLanguageSwitcher 
+        position="top-right" 
+        className="z-10"
+        size="sm"
+      />
+      
       <div className="w-full max-w-md sm:pt-10 mx-auto mb-5">
         <Link
           href={`/${tenantSlug}/login`}
           className="inline-flex items-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
         >
-          ← Back to login
+          ← {t('auth:backToLogin')}
         </Link>
       </div>
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto space-y-8">
@@ -104,10 +120,10 @@ export default function ForgotPassword() {
           </div>
           
           <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90 sm:text-3xl">
-            Forgot Password?
+            {t('auth:forgotPasswordTitle')}
           </h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Enter your email address and we'll send you instructions to reset your password
+            {t('auth:forgotPasswordDesc')}
           </p>
         </div>
 
@@ -115,7 +131,7 @@ export default function ForgotPassword() {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Email Address
+              {t('auth:emailAddress')}
             </label>
             <input
               {...register('email')}
@@ -124,7 +140,7 @@ export default function ForgotPassword() {
               className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white ${
                 errors.email ? 'border-red-300' : 'border-gray-300'
               }`}
-              placeholder="Enter your email address"
+              placeholder={t('auth:emailAddress')}
               disabled={isLoading}
             />
             {errors.email && (
@@ -159,10 +175,10 @@ export default function ForgotPassword() {
             {isLoading ? (
               <>
                 <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5" />
-                Sending Instructions...
+                {t('auth:sendReset') + '...'}
               </>
             ) : (
-              'Send Reset Instructions'
+              t('auth:sendReset')
             )}
           </button>
         </form>

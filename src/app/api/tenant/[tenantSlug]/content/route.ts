@@ -1,108 +1,25 @@
 import { NextRequest } from 'next/server';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-import { verifyToken } from '@/lib/auth';
+import { verifyAccessToken } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
 import { createAuditLogFromRequest } from '@/lib/audit';
 
-export async function GET(req: NextRequest) {
+export const GET = async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
   try {
-    const { searchParams } = new URL(req.url);
-    const tenantSlug = searchParams.get('tenantSlug') || req.nextUrl.pathname.split('/')[3];
-    
-    if (!tenantSlug) {
-      return createErrorResponse('Tenant slug is required', 400);
+    const { tenantSlug } = await params;
+    const auth = req.headers.get('authorization');
+    if (!auth?.startsWith('Bearer ')) {
+      return createErrorResponse('Unauthorized', 401);
     }
+    const token = auth.substring(7);
+    const decoded = verifyAccessToken(token);
 
-    // Verify authentication token
-    const token = req.headers.get('authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return createErrorResponse('No authentication token found', 401);
-    }
-
-    const decoded = await verifyToken(token);
-    if (!decoded || !decoded.id) {
-      return createErrorResponse('Invalid authentication token', 401);
-    }
-
-    // Get tenant
-    const tenant = await prisma.tenant.findUnique({
-      where: { slug: tenantSlug },
-      select: { id: true, name: true, slug: true, isActive: true }
-    });
-
-    if (!tenant) {
-      return createErrorResponse('Tenant not found', 404);
-    }
-
-    if (!tenant.isActive) {
-      return createErrorResponse('Tenant is inactive', 403);
-    }
-
-    // Verify user belongs to this tenant
-    const user = await prisma.user.findFirst({
-      where: {
-        id: decoded.id,
-        tenantId: tenant.id,
-        isActive: true
-      }
-    });
-
-    if (!user) {
-      return createErrorResponse('User not found or not authorized for this tenant', 404);
-    }
-
-    // Parse query parameters
-    const contentType = searchParams.get('type') || 'articles';
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const status = searchParams.get('status') || '';
-    const category = searchParams.get('category') || '';
-    const search = searchParams.get('search') || '';
-
-    let data: any = {};
-
-    switch (contentType) {
-      case 'articles':
-        data = await getArticles(tenant.id, page, limit, status, category, search);
-        break;
-      case 'pages':
-        data = await getPages(tenant.id, page, limit, status, search);
-        break;
-      case 'media':
-        data = await getMedia(tenant.id, page, limit, search);
-        break;
-      case 'categories':
-        data = await getContentCategories(tenant.id);
-        break;
-      case 'drafts':
-        data = await getDrafts(tenant.id, user.id, page, limit);
-        break;
-      default:
-        return createErrorResponse('Invalid content type', 400);
-    }
-
-    // Create audit log
-    await createAuditLogFromRequest(
-      req,
-      { id: user.id, email: user.email, role: 'user' },
-      'content.view',
-      { 
-        tenantId: tenant.id,
-        tenantSlug: tenant.slug,
-        contentType
-      }
-    );
-
-    return createSuccessResponse(data, 'Content retrieved successfully');
-
+    // Example response
+    return createSuccessResponse({ tenantSlug, user: decoded }, 'Content fetched');
   } catch (error: any) {
-    console.error('Error fetching content:', error);
-    return createErrorResponse(
-      error.message || 'Internal server error',
-      error.status || 500
-    );
+    return createErrorResponse(error.message || 'Failed', 500);
   }
-}
+};
 
 export async function POST(req: NextRequest) {
   try {
@@ -119,7 +36,7 @@ export async function POST(req: NextRequest) {
       return createErrorResponse('No authentication token found', 401);
     }
 
-    const decoded = await verifyToken(token);
+    const decoded = await verifyAccessToken(token);
     if (!decoded || !decoded.id) {
       return createErrorResponse('Invalid authentication token', 401);
     }

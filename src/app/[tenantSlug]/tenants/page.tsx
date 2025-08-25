@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useTransition, memo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslation } from 'react-i18next';
 import { Plus, Download, RefreshCw } from '@/icons';
 import { useTenants, useDeleteTenant, useToggleTenantStatus, useExportTenants, TenantFilters as TenantFiltersType, Tenant } from '@/hooks/useTenantsAPI';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
@@ -12,48 +13,54 @@ import Button from '@/components/ui/button/Button';
 import TenantSkeleton from '@/components/superadmin/TenantSkeleton';
 
 import { CountCard } from '@/components/ui/CountCard';
+import { CountCardsGridSkeleton } from '@/components/ui/CountCardSkeleton';
 import { CheckCircle, XCircle, Building2, Users } from 'lucide-react';
 
 // Memoized stats cards component for better performance
-const StatsCards = memo(({ stats, totalUsers }: { stats: any; totalUsers: number }) => (
-  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-    <CountCard
-      title="Active Tenants"
-      value={stats.active}
-      icon={CheckCircle}
-      bgColor="bg-green-100 dark:bg-green-900"
-      iconColor="text-green-600 dark:text-green-400"
-    />
-    
-    <CountCard
-      title="Suspended Tenants"
-      value={stats.inactive}
-      icon={XCircle}
-      bgColor="bg-red-100 dark:bg-red-900"
-      iconColor="text-red-600 dark:text-red-400"
-    />
-    
-    <CountCard
-      title="Total Tenants"
-      value={stats.total}
-      icon={Building2}
-      bgColor="bg-blue-100 dark:bg-blue-900"
-      iconColor="text-blue-600 dark:text-blue-400"
-    />
-    
-    <CountCard
-      title="Total Users"
-      value={totalUsers}
-      icon={Users}
-      bgColor="bg-purple-100 dark:bg-purple-900"
-      iconColor="text-purple-600 dark:text-purple-400"
-    />
-  </div>
-));
+const StatsCards = memo(({ stats, totalUsers }: { stats: any; totalUsers: number }) => {
+  const { t } = useTranslation('tenants');
+  
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <CountCard
+        title={t('activeTenants')}
+        value={stats.active}
+        icon={CheckCircle}
+        bgColor="bg-green-100 dark:bg-green-900"
+        iconColor="text-green-600 dark:text-green-400"
+      />
+      
+      <CountCard
+        title={t('suspendedTenants')}
+        value={stats.inactive}
+        icon={XCircle}
+        bgColor="bg-red-100 dark:bg-red-900"
+        iconColor="text-red-600 dark:text-red-400"
+      />
+      
+      <CountCard
+        title={t('totalTenants')}
+        value={stats.total}
+        icon={Building2}
+        bgColor="bg-blue-100 dark:bg-blue-900"
+        iconColor="text-blue-600 dark:text-blue-400"
+      />
+      
+      <CountCard
+        title={t('totalUsers')}
+        value={totalUsers}
+        icon={Users}
+        bgColor="bg-purple-100 dark:bg-purple-900"
+        iconColor="text-purple-600 dark:text-purple-400"
+      />
+    </div>
+  );
+});
 
 StatsCards.displayName = 'StatsCards';
 
 const TenantsPage: React.FC = () => {
+  const { t } = useTranslation(['tenants', 'common', 'forms']);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { confirm } = useConfirmModalContext();
@@ -124,28 +131,32 @@ const TenantsPage: React.FC = () => {
 
   const handleDeleteTenant = useCallback((tenant: Tenant) => {
     confirm({
-      title: 'Delete Tenant',
-      message: `Are you sure you want to delete "${tenant.name}"? This action cannot be undone and will permanently remove all tenant data, users, and associated resources.`,
-      confirmText: 'Delete Tenant',
+      title: t('tenants:deleteTenant'),
+      message: t('tenants:deleteTenantConfirm', { name: tenant.name }),
+      confirmText: t('tenants:deleteTenantButton'),
       variant: 'danger',
       onConfirm: () => deleteTenantMutation.mutate(tenant.id),
     });
-  }, [confirm, deleteTenantMutation]);
+  }, [confirm, deleteTenantMutation, t]);
 
   const handleToggleStatus = useCallback((tenant: Tenant) => {
     const isCurrentlyActive = tenant.status === 'active';
     const action = isCurrentlyActive ? 'suspend' : 'activate';
+    const titleKey = isCurrentlyActive ? 'suspendTenant' : 'activateTenant';
+    const messageKey = isCurrentlyActive ? 'suspendTenantConfirm' : 'activateTenantConfirm';
+    const confirmKey = isCurrentlyActive ? 'suspend' : 'activate';
+    
     confirm({
-      title: `${action.charAt(0).toUpperCase() + action.slice(1)} Tenant`,
-      message: `Are you sure you want to ${action} "${tenant.name}"? ${isCurrentlyActive ? 'All users will lose access to the system until reactivated.' : 'All users will regain access to the system.'}`,
-      confirmText: action.charAt(0).toUpperCase() + action.slice(1),
+      title: t(`tenants:${titleKey}`),
+      message: t(`tenants:${messageKey}`, { name: tenant.name }),
+      confirmText: t(`tenants:${confirmKey}`),
       variant: isCurrentlyActive ? 'warning' : 'success',
       onConfirm: () => toggleStatusMutation.mutate({
         id: tenant.id,
         isActive: !isCurrentlyActive
       }),
     });
-  }, [confirm, toggleStatusMutation]);
+  }, [confirm, toggleStatusMutation, t]);
 
   const handleCreateTenant = useCallback(() => {
     startTransition(() => {
@@ -197,10 +208,10 @@ const TenantsPage: React.FC = () => {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Tenant Management
+            {t('tenants:tenantManagement')}
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Manage all tenants in the system
+            {t('tenants:manageAllTenants')}
           </p>
         </div>
         <div className="flex gap-3">
@@ -211,7 +222,7 @@ const TenantsPage: React.FC = () => {
             size="sm"
           >
             <RefreshCw className={`w-4 h-4 mr-2 inline ${isLoading || isPending ? 'animate-spin' : ''}`} />
-            Refresh
+            {t('common:refresh')}
           </Button>
           <Button
             onClick={handleExportData}
@@ -220,7 +231,7 @@ const TenantsPage: React.FC = () => {
             size="sm"
           >
             <Download className={`w-4 h-4 mr-2 inline ${exportTenantsMutation.isPending ? 'animate-spin' : ''}`} />
-            {exportTenantsMutation.isPending ? 'Exporting...' : 'Export'}
+            {exportTenantsMutation.isPending ? t('common:exporting') : t('common:export')}
           </Button>
           <Button
             onClick={handleCreateTenant}
@@ -229,7 +240,7 @@ const TenantsPage: React.FC = () => {
             disabled={isPending}
           >
             <Plus className="w-4 h-4 mr-2 inline" />
-            Create Tenant
+            {t('tenants:createTenant')}
           </Button>
         </div>
       </div>

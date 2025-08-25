@@ -23,7 +23,6 @@ import {
   AlertCircle,
   Building2,
   Eye,
-  Bug,
   UserPlus
 } from 'lucide-react';
 import Button from '@/components/ui/button/Button';
@@ -31,13 +30,14 @@ import { useRouter, useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { TenantDashboardOverviewCards } from './TenantDashboardOverviewCards';
 import { TenantDashboardAnalyticsChart } from './TenantDashboardAnalyticsChart';
+import { DynamicAnalyticsCharts } from './DynamicAnalyticsCharts';
 import { TenantRecentActivity } from './TenantRecentActivity';
 import { TenantQuickActions } from './TenantQuickActions';
 import { TenantDashboardSkeleton } from './TenantDashboardSkeleton';
 import { TenantErrorComponent, TenantNoDataComponent } from './TenantErrorComponent';
 import DateFilterDropdown from '../superadmin/DateFilterDropdown';
-import api, { debugToken } from '@/lib/api';
-import ApiDebugger from '../debug/ApiDebugger';
+import TenantSearch from './TenantSearch';
+import api from '@/lib/api';
 
 // Real-time stats hook for tenant
 const useTenantRealTimeStats = (tenantSlug: string) => {
@@ -104,6 +104,8 @@ const TenantDashboardClient: React.FC = () => {
     refreshDashboard
   } = useTenantDashboard();
 
+
+
   // Real-time stats with better error handling
   const { stats: realTimeStats, loading: statsLoading, error: statsError, refetch: refetchStats } = useTenantRealTimeStats(tenant?.slug || '');
 
@@ -132,13 +134,13 @@ const TenantDashboardClient: React.FC = () => {
     });
   }
 
-  // Temporary override for testing - force permissions to false
-  const testPermissions = {
-    canViewUsers: false,
-    canViewRoles: false,
-    canViewAudit: false,
-    canViewReports: false,
-    canViewAnalytics: false
+  // Use actual permissions from the API
+  const actualPermissions = {
+    canViewUsers: canViewUsers,
+    canViewRoles: canViewRoles,
+    canViewAudit: canViewAudit,
+    canViewReports: canViewReports,
+    canViewAnalytics: canViewAnalytics
   };
 
   // Handle dashboard errors
@@ -228,9 +230,7 @@ const TenantDashboardClient: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-3">
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            Last updated: {lastUpdated.toLocaleTimeString()}
-          </div>
+          <TenantSearch tenantSlug={tenantSlug} className="w-64" />
           {selectedRange && setSelectedRange && (
             <DateFilterDropdown 
               selectedRange={selectedRange}
@@ -245,65 +245,16 @@ const TenantDashboardClient: React.FC = () => {
             <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
             {isRefreshing ? 'Refreshing...' : 'Refresh'}
           </button>
-          {process.env.NODE_ENV === 'development' && (
-            <>
-              <button
-                onClick={() => {
-                  debugToken();
-                  toast.success('Token debug info logged to console');
-                }}
-                className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
-              >
-                <Bug className="w-4 h-4 mr-2" />
-                Debug Token
-              </button>
-              <button
-                onClick={() => {
-                  // Clear all tokens and redirect to login
-                  localStorage.clear();
-                  sessionStorage.clear();
-                  document.cookie = 'superadmin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-                  document.cookie = 'refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-                  document.cookie = 'tenant_auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-                  toast.success('Tokens cleared. Redirecting to login...');
-                  setTimeout(() => {
-                    router.push(`/${tenant?.slug}/login`);
-                  }, 1000);
-                }}
-                className="inline-flex items-center px-3 py-2 text-sm font-medium text-red-700 bg-white border border-red-300 rounded-lg hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 dark:bg-gray-800 dark:text-red-300 dark:border-red-600 dark:hover:bg-red-900/20"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Clear Tokens
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Last Updated */}
-      <div className="text-sm text-gray-500 dark:text-gray-400">
-        Last updated: {lastUpdated.toLocaleString()}
-      </div>
-
-      {/* Debug Permissions - Only show in development */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-2">Debug Permissions:</h3>
-          <div className="text-xs text-yellow-700 dark:text-yellow-300 space-y-1">
-            <div>canViewUsers: {canViewUsers ? 'true' : 'false'}</div>
-            <div>canViewRoles: {canViewRoles ? 'true' : 'false'}</div>
-            <div>canViewAudit: {canViewAudit ? 'true' : 'false'}</div>
-            <div>canViewReports: {canViewReports ? 'true' : 'false'}</div>
-            <div>canViewAnalytics: {canViewAnalytics ? 'true' : 'false'}</div>
-            <div className="mt-2 pt-2 border-t border-yellow-300">
-              <div>Modules count: {modules?.length || 0}</div>
-            </div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            Last updated: {lastUpdated.toLocaleTimeString()}
           </div>
         </div>
-      )}
+      </div>
+
+
 
       {/* Overview Cards - Only show if user has any relevant permissions */}
-      {(testPermissions.canViewUsers || testPermissions.canViewRoles || testPermissions.canViewAudit || testPermissions.canViewReports) && (
+      {(actualPermissions.canViewUsers || actualPermissions.canViewRoles || actualPermissions.canViewAudit || actualPermissions.canViewReports) && (
         <TenantDashboardOverviewCards 
           summary={{
             totalUsers: displayStats?.summary?.totalUsers || 0,
@@ -316,10 +267,10 @@ const TenantDashboardClient: React.FC = () => {
           selectedRange={selectedRange || '7d'} 
           isLoading={isLoading}
           permissions={{
-            canViewUsers: testPermissions.canViewUsers,
-            canViewRoles: testPermissions.canViewRoles,
-            canViewAudit: testPermissions.canViewAudit,
-            canViewReports: testPermissions.canViewReports
+            canViewUsers: actualPermissions.canViewUsers,
+            canViewRoles: actualPermissions.canViewRoles,
+            canViewAudit: actualPermissions.canViewAudit,
+            canViewReports: actualPermissions.canViewReports
           }}
         />
       )}
@@ -446,37 +397,19 @@ const TenantDashboardClient: React.FC = () => {
         </div>
       )}
 
-      {/* Charts Section - Only show if user has analytics permission */}
+      {/* Analytics Section - Only show if user has analytics permission */}
       {canViewAnalytics && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          {displayStats?.charts && (displayStats?.permissions?.canViewUsers || displayStats?.permissions?.canViewAudit) ? (
-            <TenantDashboardAnalyticsChart 
-              chartData={displayStats.charts}
-              tenantSlug={tenant?.slug}
-            />
-          ) : (displayStats?.permissions?.canViewUsers || displayStats?.permissions?.canViewAudit) ? (
-            /* Fallback Chart Section */
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Analytics</h3>
-              <div className="flex items-center justify-center h-48 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <div className="text-center">
-                  <BarChart3 className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-500 dark:text-gray-400">Analytics data will appear here</p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* No data available */
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Analytics</h3>
-              <div className="flex items-center justify-center h-48 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <div className="text-center">
-                  <BarChart3 className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-500 dark:text-gray-400">No analytics data available</p>
-                </div>
-              </div>
-            </div>
-          )}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Analytics Overview</h3>
+            <button
+              onClick={() => router.push(`/${tenantSlug}/analytics`)}
+              className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              View Full Analytics
+            </button>
+          </div>
+          <DynamicAnalyticsCharts tenantSlug={tenantSlug} />
         </div>
       )}
 

@@ -61,14 +61,14 @@ class NotificationSocket {
 
     // Connection events
     this.socket.on('connect', () => {
-      console.log('🔌 WebSocket connected');
+  
       this.isConnected = true;
       this.reconnectAttempts = 0;
       this.emit('socket_connected', { timestamp: new Date().toISOString() });
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('🔌 WebSocket disconnected:', reason);
+  
       this.isConnected = false;
       
       if (reason === 'io server disconnect') {
@@ -89,17 +89,17 @@ class NotificationSocket {
 
     // Notification events
     this.socket.on('new_notification', (data: NotificationSocketData) => {
-      console.log('📨 Received new_notification:', data);
+  
       this.emit('new_notification', data);
     });
 
     this.socket.on('notification', (data: SocketNotificationEvent) => {
-      console.log('📨 Received notification:', data);
+  
       this.handleNotification(data);
     });
 
     this.socket.on('notification_count_update', (data: { unreadCount: number }) => {
-      console.log('📊 Notification count updated:', data);
+  
       this.emit('notification_count_update', data);
     });
 
@@ -121,7 +121,7 @@ class NotificationSocket {
         this.emit('notification_count_update', data.data);
         break;
       default:
-        console.log('Unknown notification type:', data.type);
+    
     }
   }
 

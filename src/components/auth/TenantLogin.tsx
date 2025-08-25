@@ -1,20 +1,25 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import SocialLoginButtons from './SocialLoginButtons';
 
-// Login form validation schema
-const loginSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-  password: z.string().min(1, 'Password is required'),
+// Create validation schema function to use translations
+const createLoginSchema = (t: any) => z.object({
+  email: z.string().email(t('errors:validation.email')),
+  password: z.string().min(1, t('errors:validation.required')),
 });
 
-type LoginFormData = z.infer<typeof loginSchema>;
+type LoginFormData = {
+  email: string;
+  password: string;
+};
 
 interface TenantInfo {
   id: string;
@@ -25,6 +30,20 @@ interface TenantInfo {
   description?: string;
 }
 
+interface GlobalSettings {
+  socialLogin: {
+    enabled: boolean;
+    google: {
+      enabled: boolean;
+      clientId?: string;
+    };
+    apple: {
+      enabled: boolean;
+      clientId?: string;
+    };
+  };
+}
+
 interface TenantLoginProps {
   tenantSlug: string;
   onLoginSuccess: (result: any) => void;
@@ -33,32 +52,44 @@ interface TenantLoginProps {
 
 const TenantLogin: React.FC<TenantLoginProps> = ({ tenantSlug, onLoginSuccess, isSubmitting }) => {
   const [showPassword, setShowPassword] = useState(false);
+  const { t } = useTranslation(['auth']);
   const [error, setError] = useState<string | null>(null);
   const [tenantInfo, setTenantInfo] = useState<TenantInfo | null>(null);
   const [loadingTenant, setLoadingTenant] = useState(true);
   const [tenantNotFound, setTenantNotFound] = useState(false);
+  const [globalSettings, setGlobalSettings] = useState<GlobalSettings | null>(null);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
+    resolver: zodResolver(createLoginSchema(t)),
   });
 
-  // Fetch tenant information
+  // Fetch tenant information and global settings
   useEffect(() => {
-    const fetchTenantInfo = async () => {
+    const fetchData = async () => {
       try {
         setLoadingTenant(true);
-        const response = await axios.get(`/api/tenant/${tenantSlug}/info`);
-        if (response.data.success) {
-          setTenantInfo(response.data.data.tenant);
+        
+        // Fetch both tenant info and global settings in parallel
+        const [tenantResponse, settingsResponse] = await Promise.all([
+          axios.get(`/api/tenant/${tenantSlug}/info`),
+          axios.get('/api/global-settings')
+        ]);
+
+        if (tenantResponse.data.success) {
+          setTenantInfo(tenantResponse.data.data.tenant);
         } else {
           setTenantNotFound(true);
         }
+
+        if (settingsResponse.data.success) {
+          setGlobalSettings(settingsResponse.data.data);
+        }
       } catch (error: any) {
-        console.error('Error fetching tenant info:', error);
+        console.error('Error fetching data:', error);
         if (error.response?.status === 404 || error.response?.data?.success === false) {
           setTenantNotFound(true);
         }
@@ -68,7 +99,7 @@ const TenantLogin: React.FC<TenantLoginProps> = ({ tenantSlug, onLoginSuccess, i
     };
 
     if (tenantSlug) {
-      fetchTenantInfo();
+      fetchData();
     }
   }, [tenantSlug]);
 
@@ -100,6 +131,28 @@ const TenantLogin: React.FC<TenantLoginProps> = ({ tenantSlug, onLoginSuccess, i
     }
   };
 
+  const handleGoogleLogin = async () => {
+    try {
+      console.log('🔐 Attempting Google login for tenant:', tenantSlug);
+      // TODO: Implement Google OAuth login
+      toast.error('Google login not implemented yet');
+    } catch (error) {
+      console.error('❌ Google login error:', error);
+      toast.error('Google login failed');
+    }
+  };
+
+  const handleAppleLogin = async () => {
+    try {
+      console.log('🔐 Attempting Apple login for tenant:', tenantSlug);
+      // TODO: Implement Apple Sign-In
+      toast.error('Apple login not implemented yet');
+    } catch (error) {
+      console.error('❌ Apple login error:', error);
+      toast.error('Apple login failed');
+    }
+  };
+
   // Show loading state while fetching tenant info
   if (loadingTenant) {
     return (
@@ -107,7 +160,7 @@ const TenantLogin: React.FC<TenantLoginProps> = ({ tenantSlug, onLoginSuccess, i
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600 dark:text-gray-400">
-            Loading tenant information...
+            {t('auth:loadingTenant')}
           </p>
         </div>
       </div>
@@ -120,7 +173,7 @@ const TenantLogin: React.FC<TenantLoginProps> = ({ tenantSlug, onLoginSuccess, i
       <div className="relative flex flex-col items-center justify-center min-h-screen p-6 overflow-hidden z-1">
         <div className="mx-auto w-full max-w-[242px] text-center sm:max-w-[472px]">
           <h1 className="mb-8 font-bold text-gray-800 text-title-md dark:text-white/90 xl:text-title-2xl">
-            Tenant Not Found
+            {t('auth:tenantNotFound')}
           </h1>
 
           <div className="mb-8">
@@ -130,14 +183,14 @@ const TenantLogin: React.FC<TenantLoginProps> = ({ tenantSlug, onLoginSuccess, i
           </div>
 
           <p className="mt-10 mb-6 text-base text-gray-700 dark:text-gray-400 sm:text-lg">
-            The tenant "{tenantSlug}" does not exist or is not active.
+            {t('auth:tenantNotFoundMsg', { slug: tenantSlug })}
           </p>
 
           <a
             href="/"
             className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-3.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200"
           >
-            Back to Home Page
+            {t('auth:backToHome')}
           </a>
         </div>
         <p className="absolute text-sm text-center text-gray-500 -translate-x-1/2 bottom-6 left-1/2 dark:text-gray-400">
@@ -185,10 +238,10 @@ const TenantLogin: React.FC<TenantLoginProps> = ({ tenantSlug, onLoginSuccess, i
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-gray-700">
           <div className="mb-8 text-center">
             <h1 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">
-              Sign In to {tenantInfo?.name || 'Your Account'}
+              {t('auth:signInTo', { name: tenantInfo?.name || t('auth:signInTitle') })}
             </h1>
             <p className="text-base text-gray-600 dark:text-gray-400">
-              Welcome back! Please sign in to your account.
+              {t('auth:welcomeBack')}
             </p>
           </div>
 
@@ -224,7 +277,7 @@ const TenantLogin: React.FC<TenantLoginProps> = ({ tenantSlug, onLoginSuccess, i
               <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="bg-white px-2 text-gray-500 dark:bg-gray-800 dark:text-gray-400">Or continue with email</span>
+              <span className="bg-white px-2 text-gray-500 dark:bg-gray-800 dark:text-gray-400">{t('auth:orContinueWith')} email</span>
             </div>
           </div>
 
@@ -232,13 +285,13 @@ const TenantLogin: React.FC<TenantLoginProps> = ({ tenantSlug, onLoginSuccess, i
             {/* Email Field */}
             <div>
               <label htmlFor="email" className="mb-2.5 block text-sm font-medium text-gray-900 dark:text-white">
-                Email
+                {t('auth:email')}
               </label>
               <div className="relative">
                 <input
                   {...register('email')}
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder={t('auth:emailAddress')}
                   autoComplete="email"
                   className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder:text-gray-500 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-400 dark:focus:border-brand-500"
                 />
@@ -251,13 +304,13 @@ const TenantLogin: React.FC<TenantLoginProps> = ({ tenantSlug, onLoginSuccess, i
             {/* Password Field */}
             <div>
               <label htmlFor="password" className="mb-2.5 block text-sm font-medium text-gray-900 dark:text-white">
-                Password
+                {t('auth:password')}
               </label>
               <div className="relative">
                 <input
                   {...register('password')}
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="Enter your password"
+                  placeholder={t('auth:password')}
                   autoComplete="current-password"
                   className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 pr-12 text-gray-900 placeholder:text-gray-500 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-400 dark:focus:border-brand-500"
                 />
@@ -299,10 +352,10 @@ const TenantLogin: React.FC<TenantLoginProps> = ({ tenantSlug, onLoginSuccess, i
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Signing in...
+                  {t('auth:signIn') + '...'}
                 </>
               ) : (
-                'Sign In'
+                t('auth:signIn')
               )}
             </button>
 
@@ -312,7 +365,7 @@ const TenantLogin: React.FC<TenantLoginProps> = ({ tenantSlug, onLoginSuccess, i
                 href={`/${tenantSlug}/forgot-password`}
                 className="text-sm text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
               >
-                Forgot your password?
+                {t('auth:forgotPassword')}
               </a>
             </div>
           </form>

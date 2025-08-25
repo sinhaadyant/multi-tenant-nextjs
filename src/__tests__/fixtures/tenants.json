@@ -1,0 +1,72 @@
+{
+  "activeTenants": [
+    {
+      "id": "t-1",
+      "slug": "tenant1",
+      "name": "Tenant One Corp",
+      "domain": "tenant1.example.com",
+      "status": "active",
+      "settings": {
+        "theme": "blue",
+        "language": "en",
+        "modules": ["users", "roles", "audit", "reports"]
+      },
+      "createdAt": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "t-2", 
+      "slug": "tenant2",
+      "name": "Tenant Two Inc",
+      "domain": "tenant2.example.com",
+      "status": "active",
+      "settings": {
+        "theme": "green",
+        "language": "en",
+        "modules": ["users", "roles"]
+      },
+      "createdAt": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "t-3",
+      "slug": "tenant3",
+      "name": "Tenant Three LLC",
+      "domain": "tenant3.example.com", 
+      "status": "active",
+      "settings": {
+        "theme": "purple",
+        "language": "fr",
+        "modules": ["users", "roles", "audit", "reports", "support"]
+      },
+      "createdAt": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "inactiveTenants": [
+    {
+      "id": "t-4",
+      "slug": "disabled-tenant",
+      "name": "Disabled Tenant",
+      "domain": "disabled.example.com",
+      "status": "inactive",
+      "settings": {
+        "theme": "red",
+        "language": "en", 
+        "modules": []
+      },
+      "createdAt": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "invalidTenants": [
+    {
+      "slug": "invalid-chars!@#",
+      "name": "Invalid Tenant"
+    },
+    {
+      "slug": "",
+      "name": "Empty Slug Tenant"
+    },
+    {
+      "slug": "non-existent",
+      "name": "Non Existent Tenant"
+    }
+  ]
+}

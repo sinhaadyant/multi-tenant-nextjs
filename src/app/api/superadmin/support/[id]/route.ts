@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-import { requireSuperAdminAuth } from '@/middleware/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { createAuditLogFromRequest } from '@/lib/audit';
 import { asyncHandler } from '@/lib/errorHandler';
@@ -17,7 +17,7 @@ const updateTicketSchema = z.object({
   assignedTo: z.string().optional(),
 });
 
-export const GET = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+export const GET = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   const { id: ticketId } = await params;
   
   if (!ticketId) {
@@ -25,12 +25,12 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
   }
 
   // Authenticate superadmin
-  const authResult = await requireSuperAdminAuth(req);
-  if (authResult instanceof Response) {
-    return authResult;
+  const authResult = await requireSuperAdmin(req);
+  if (!authResult.success) {
+    return createErrorResponse(authResult.error || 'Unauthorized', 401);
   }
 
-  const superadmin = authResult as any;
+  const superadmin = authResult.user as any;
 
   // Get support ticket with all related data
   const ticket = await prisma.supportTicket.findUnique({
@@ -95,7 +95,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
   return createSuccessResponse({ ticket }, 'Support ticket retrieved successfully');
 });
 
-export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: { id: string } }) => {
   const { id: ticketId } = await params;
   
   if (!ticketId) {
@@ -103,12 +103,12 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }: { params: P
   }
 
   // Authenticate superadmin
-  const authResult = await requireSuperAdminAuth(req);
-  if (authResult instanceof Response) {
-    return authResult;
+  const authResult = await requireSuperAdmin(req);
+  if (!authResult.success) {
+    return createErrorResponse(authResult.error || 'Unauthorized', 401);
   }
 
-  const superadmin = authResult as any;
+  const superadmin = authResult.user as any;
 
   // Get existing ticket
   const existingTicket = await prisma.supportTicket.findUnique({

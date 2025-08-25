@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import { useTranslation } from 'react-i18next';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { 
   Shield, 
@@ -41,13 +42,15 @@ import RoleAssignmentTable from './roles/RoleAssignmentTable';
 import { ErrorComponent } from '@/components/superadmin/ErrorComponent';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Switch } from '@/components/ui/Switch';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { toast } from 'react-hot-toast';
 
 const TenantRolesClient: React.FC = () => {
+  const { t } = useTranslation(['forms', 'common']);
   const params = useParams();
   const tenantSlug = params.tenantSlug as string;
   const { user, hasPermission } = useReduxAuth();
@@ -164,9 +167,14 @@ const TenantRolesClient: React.FC = () => {
   const handleCreateRole = async (roleData: CreateRoleData) => {
     try {
       await createRoleMutation.mutateAsync(roleData);
+      toast.success('Role created successfully!');
       setModalType(null);
+      // Refresh the roles list
+      refetch();
     } catch (error: any) {
-      // Error is handled by the mutation
+      // Handle network or other errors
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to create role';
+      toast.error(errorMessage);
     }
   };
 
@@ -175,10 +183,15 @@ const TenantRolesClient: React.FC = () => {
     
     try {
       await updateRoleMutation.mutateAsync({ roleId: selectedRole.id, roleData });
+      toast.success('Role updated successfully!');
       setModalType(null);
       setSelectedRole(null);
+      // Refresh the roles list
+      refetch();
     } catch (error: any) {
-      // Error is handled by the mutation
+      // Handle network or other errors
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to update role';
+      toast.error(errorMessage);
     }
   };
 
@@ -197,22 +210,21 @@ const TenantRolesClient: React.FC = () => {
   const handleBulkDelete = async () => {
     if (selectedRoles.length === 0) return;
 
-    const confirmed = await confirm({
+    confirm({
       title: 'Delete Multiple Roles',
       message: `Are you sure you want to delete ${selectedRoles.length} selected roles? This action cannot be undone.`,
       confirmText: 'Delete',
       cancelText: 'Cancel',
-      variant: 'destructive'
-    });
-
-    if (confirmed) {
-      try {
-        await bulkDeleteMutation.mutateAsync(selectedRoles);
-        setSelectedRoles([]);
-      } catch (error: any) {
-        // Error is handled by the mutation
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await bulkDeleteMutation.mutateAsync(selectedRoles);
+          setSelectedRoles([]);
+        } catch (error: any) {
+          // handled by mutation
+        }
       }
-    }
+    });
   };
 
   const handleToggleStatus = async (role: Role) => {
@@ -248,18 +260,17 @@ const TenantRolesClient: React.FC = () => {
       return;
     }
 
-    const confirmed = await confirm({
+    confirm({
       title: 'Delete Role',
       message: `Are you sure you want to delete the role "${role.name}"? This action cannot be undone.`,
       confirmText: 'Delete',
       cancelText: 'Cancel',
-      variant: 'destructive'
+      variant: 'danger',
+      onConfirm: async () => {
+        setSelectedRole(role);
+        setModalType('delete');
+      }
     });
-
-    if (confirmed) {
-      setSelectedRole(role);
-      setModalType('delete');
-    }
   };
 
   const handleAssignRole = (role: Role) => {
@@ -319,7 +330,7 @@ const TenantRolesClient: React.FC = () => {
   }
 
   if (error) {
-    return <ErrorComponent error={error} onRetry={refetch} />;
+    return <ErrorComponent error={(error as any)?.message || 'Failed to load roles'} onRetry={refetch} />;
   }
 
   return (
@@ -327,7 +338,7 @@ const TenantRolesClient: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Role Management</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('forms:labels.roleManagement')}</h1>
           <p className="text-gray-600 dark:text-gray-400">
             Manage roles and permissions within your tenant organization
           </p>
@@ -365,7 +376,7 @@ const TenantRolesClient: React.FC = () => {
                   <Shield className="w-6 h-6 text-blue-600 dark:text-blue-300" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Roles</p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('forms:labels.totalRoles')}</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
                 </div>
               </div>
@@ -378,7 +389,7 @@ const TenantRolesClient: React.FC = () => {
                   <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-300" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Roles</p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('forms:labels.activeRoles')}</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.active}</p>
                 </div>
               </div>
@@ -391,7 +402,7 @@ const TenantRolesClient: React.FC = () => {
                   <XCircle className="w-6 h-6 text-red-600 dark:text-red-300" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Inactive Roles</p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('forms:labels.inactiveRoles')}</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.inactive}</p>
                 </div>
               </div>
@@ -415,7 +426,7 @@ const TenantRolesClient: React.FC = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <Input
                 type="text"
-                placeholder="Search roles..."
+                placeholder={t('forms:placeholders.searchRoles')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -425,7 +436,7 @@ const TenantRolesClient: React.FC = () => {
             {/* Status Filter */}
             <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
               <SelectTrigger>
-                <SelectValue placeholder="All Status" />
+                <SelectValue placeholder={t('forms:options.allStatus')} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
@@ -437,7 +448,7 @@ const TenantRolesClient: React.FC = () => {
             {/* Role Type Filter */}
             <Select value={roleTypeFilter} onValueChange={(value: any) => setRoleTypeFilter(value)}>
               <SelectTrigger>
-                <SelectValue placeholder="All Types" />
+                <SelectValue placeholder={t('forms:options.allTypes')} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
@@ -453,7 +464,7 @@ const TenantRolesClient: React.FC = () => {
               setSortOrder(order as any);
             }}>
               <SelectTrigger>
-                <SelectValue placeholder="Sort by" />
+                <SelectValue placeholder={t('forms:options.sortBy')} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="name-asc">Name (A-Z)</SelectItem>
@@ -518,7 +529,7 @@ const TenantRolesClient: React.FC = () => {
                         <div>
                           <div className="font-medium">{role.name}</div>
                           {role.isDefault && (
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge variant="outline" className="text-xs">
                               Default
                             </Badge>
                           )}
@@ -549,7 +560,7 @@ const TenantRolesClient: React.FC = () => {
                           onCheckedChange={() => handleToggleStatus(role)}
                           disabled={!permissions?.canUpdate || role.isSystem}
                         />
-                        <Badge variant={role.isActive ? "default" : "secondary"}>
+                        <Badge variant={role.isActive ? "default" : "outline"}>
                           {role.isActive ? 'Active' : 'Inactive'}
                         </Badge>
                       </div>
@@ -570,7 +581,6 @@ const TenantRolesClient: React.FC = () => {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleViewRole(role)}
-                          title="View Role"
                         >
                           <Eye className="w-4 h-4" />
                         </Button>
@@ -579,7 +589,6 @@ const TenantRolesClient: React.FC = () => {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleEditClick(role)}
-                            title="Edit Role"
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
@@ -589,7 +598,6 @@ const TenantRolesClient: React.FC = () => {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteClick(role)}
-                            title="Delete Role"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -598,7 +606,6 @@ const TenantRolesClient: React.FC = () => {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleAssignRole(role)}
-                          title="Assign Role"
                         >
                           <UserCheck className="w-4 h-4" />
                         </Button>
@@ -684,10 +691,8 @@ const TenantRolesClient: React.FC = () => {
             setModalType(null);
             setSelectedRole(null);
           }}
-          onSubmit={handleEditRole}
+          onSuccess={async () => { await refetch(); }}
           role={selectedRole}
-          modules={modules || []}
-          loading={updateRoleMutation.isPending}
         />
       )}
 

@@ -7,16 +7,18 @@ import { createAuditLog } from '@/lib/audit';
 // GET /api/superadmin/backup/[id] - Get backup details
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const superAdmin = await requireSuperAdmin(request);
-    if (!superAdmin) {
+    const { id } = await params;
+    const auth = await requireSuperAdmin(request);
+    if (!auth.success || !auth.user) {
       return createErrorResponse('Unauthorized', 401);
     }
+    const superAdmin = auth.user as any;
 
     const backup = await prisma.backup.findUnique({
-      where: { id: id },
+      where: { id },
       include: {
         createdBy: {
           select: {
@@ -40,7 +42,7 @@ export async function GET(
       details: { backupId: backup.id }
     });
 
-    return createSuccessResponse('Backup details retrieved successfully', {
+    return createSuccessResponse({
       id: backup.id,
       filename: backup.filename,
       status: backup.status,
@@ -51,7 +53,7 @@ export async function GET(
       description: backup.description,
       options: backup.options,
       createdBy: backup.createdBy
-    });
+    }, 'Backup details retrieved successfully');
   } catch (error: any) {
     console.error('Get backup details error:', error);
     return createErrorResponse('Failed to retrieve backup details', 500);
@@ -61,27 +63,26 @@ export async function GET(
 // DELETE /api/superadmin/backup/[id] - Delete backup
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const superAdmin = await requireSuperAdmin(request);
-    if (!superAdmin) {
+    const { id } = await params;
+    const auth = await requireSuperAdmin(request);
+    if (!auth.success || !auth.user) {
       return createErrorResponse('Unauthorized', 401);
     }
+    const superAdmin = auth.user as any;
 
     const backup = await prisma.backup.findUnique({
-      where: { id: id }
+      where: { id }
     });
 
     if (!backup) {
       return createErrorResponse('Backup not found', 404);
     }
 
-    // In a real implementation, you would also delete the actual backup file
-    // from storage (S3, local filesystem, etc.)
-
     await prisma.backup.delete({
-      where: { id: id }
+      where: { id }
     });
 
     // Create audit log
@@ -107,19 +108,21 @@ export async function DELETE(
 // PUT /api/superadmin/backup/[id] - Update backup
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const superAdmin = await requireSuperAdmin(request);
-    if (!superAdmin) {
+    const { id } = await params;
+    const auth = await requireSuperAdmin(request);
+    if (!auth.success || !auth.user) {
       return createErrorResponse('Unauthorized', 401);
     }
+    const superAdmin = auth.user as any;
 
     const body = await request.json();
     const { description, status } = body;
 
     const backup = await prisma.backup.findUnique({
-      where: { id: id }
+      where: { id }
     });
 
     if (!backup) {
@@ -127,7 +130,7 @@ export async function PUT(
     }
 
     const updatedBackup = await prisma.backup.update({
-      where: { id: id },
+      where: { id },
       data: {
         ...(description && { description }),
         ...(status && { status }),
@@ -147,12 +150,12 @@ export async function PUT(
       }
     });
 
-    return createSuccessResponse('Backup updated successfully', {
+    return createSuccessResponse({
       id: updatedBackup.id,
       filename: updatedBackup.filename,
       status: updatedBackup.status,
       description: updatedBackup.description
-    });
+    }, 'Backup updated successfully');
   } catch (error: any) {
     console.error('Update backup error:', error);
     return createErrorResponse('Failed to update backup', 500);

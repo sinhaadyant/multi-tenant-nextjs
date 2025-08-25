@@ -12,7 +12,8 @@ const updateUserSchema = z.object({
   email: z.string().email('Invalid email address').optional(),
   contactNumber: z.string().optional(),
   roleIds: z.array(z.string()).max(1, 'Only one role can be assigned per user').optional(),
-  isActive: z.boolean().optional()
+  isActive: z.boolean().optional(),
+  isFirstLogin: z.boolean().optional()
 });
 
 // GET /api/tenant/[tenantSlug]/users/[userId] - Get specific user
@@ -153,6 +154,7 @@ export const PUT = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
     if (validatedData.email !== undefined) updateData.email = validatedData.email;
     if (validatedData.contactNumber !== undefined) updateData.contactNumber = validatedData.contactNumber;
     if (validatedData.isActive !== undefined) updateData.isActive = validatedData.isActive;
+    if (validatedData.isFirstLogin !== undefined) updateData.isFirstLogin = validatedData.isFirstLogin;
 
     // Update user
     const updatedUser = await prisma.user.update({
@@ -200,6 +202,7 @@ export const PUT = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
         email: updatedUser.email,
         contactNumber: updatedUser.contactNumber,
         isActive: updatedUser.isActive,
+        isFirstLogin: (updatedUser as any).isFirstLogin,
         updatedAt: updatedUser.updatedAt
       }
     }, 'User updated successfully');

@@ -65,6 +65,7 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: P
       email: user.email,
       name: user.name,
       isActive: user.isActive,
+      isFirstLogin: (user as any).isFirstLogin ?? true,
       lastLogin: user.lastLogin,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,

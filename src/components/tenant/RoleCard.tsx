@@ -186,7 +186,7 @@ const RoleCard: React.FC<RoleCardProps> = ({
                   <button
                     onClick={() => onManagePermissions?.(role)}
                     className="flex items-center space-x-1 text-sm text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300"
-                    title="Manage permissions"
+                    title={t('tables:filters.managePermissions')}
                   >
                     <Shield className="w-4 h-4" />
                     <span>Permissions</span>
@@ -198,7 +198,7 @@ const RoleCard: React.FC<RoleCardProps> = ({
                   <button
                     onClick={() => onEdit?.(role)}
                     className="p-2 text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
-                    title="Edit role"
+                    title={t('tables:filters.editRole')}
                   >
                     <Edit className="w-4 h-4" />
                   </button>
@@ -207,7 +207,7 @@ const RoleCard: React.FC<RoleCardProps> = ({
                   <button
                     onClick={() => onClone?.(role)}
                     className="p-2 text-gray-600 hover:text-green-600 dark:text-gray-400 dark:hover:text-green-400"
-                    title="Clone role"
+                    title={t('tables:filters.cloneRole')}
                   >
                     <Copy className="w-4 h-4" />
                   </button>
@@ -216,7 +216,7 @@ const RoleCard: React.FC<RoleCardProps> = ({
                   <button
                     onClick={() => onDelete?.(role)}
                     className="p-2 text-gray-600 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
-                    title="Delete role"
+                    title={t('tables:filters.deleteRole')}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -276,7 +276,7 @@ const RoleCard: React.FC<RoleCardProps> = ({
                 <button
                   onClick={() => onManagePermissions?.(role)}
                   className="p-2 text-gray-600 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400"
-                  title="Manage permissions"
+                  title={t('tables:filters.managePermissions')}
                 >
                   <Shield className="w-4 h-4" />
                 </button>
@@ -285,7 +285,7 @@ const RoleCard: React.FC<RoleCardProps> = ({
                 <button
                   onClick={() => onEdit?.(role)}
                   className="p-2 text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
-                  title="Edit role"
+                  title={t('tables:filters.editRole')}
                 >
                   <Edit className="w-4 h-4" />
                 </button>
@@ -294,7 +294,7 @@ const RoleCard: React.FC<RoleCardProps> = ({
                 <button
                   onClick={() => onClone?.(role)}
                   className="p-2 text-gray-600 hover:text-green-600 dark:text-gray-400 dark:hover:text-green-400"
-                  title="Clone role"
+                  title={t('tables:filters.cloneRole')}
                 >
                   <Copy className="w-4 h-4" />
                 </button>

@@ -1,0 +1,15 @@
+{
+  "welcome": "Bienvenue sur votre panneau d'administration !",
+  "dashboard": "Ici, vous voyez un aperçu de l'activité de votre locataire.",
+  "users": "Gérez les utilisateurs du locataire ici.",
+  "roles": "Contrôlez les autorisations et les rôles de votre équipe.",
+  "modules": "Activez ou désactivez les modules pour votre locataire.",
+  "billing": "Gérez l'abonnement et les factures ici.",
+  "reports": "Accédez aux analyses et aux insights.",
+  "settings": "Mettez à jour la langue, le thème et les préférences ici.",
+  "language": "Basculez entre anglais, hindi, ourdou, arabe, bengali et français.",
+  "theme": "Basculez entre les thèmes clair et sombre.",
+  "search": "Utilisez la recherche globale pour tout trouver rapidement.",
+  "finish": "Compris ! Commençons."
+}
+

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { createSuccessResponse, createErrorResponse } from '@/lib/apiResponse';
-import { requireSuperAdminAuth } from '@/middleware/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { createAuditLogFromRequest } from '@/lib/audit';
 import { asyncHandler } from '@/lib/errorHandler';
@@ -27,12 +27,12 @@ export const GET = asyncHandler(async (req: NextRequest, { params }: { params: {
   }
 
   // Authenticate superadmin
-  const authResult = await requireSuperAdminAuth(req);
-  if (authResult instanceof Response) {
-    return authResult;
+  const authResult = await requireSuperAdmin(req);
+  if (!authResult.success) {
+    return createErrorResponse(authResult.error || 'Unauthorized', 401);
   }
 
-  const superadmin = authResult as any;
+  const superadmin = authResult.user as any;
 
   // Verify ticket exists
   const ticket = await prisma.supportTicket.findUnique({
@@ -97,12 +97,12 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
   }
 
   // Authenticate superadmin
-  const authResult = await requireSuperAdminAuth(req);
-  if (authResult instanceof Response) {
-    return authResult;
+  const authResult = await requireSuperAdmin(req);
+  if (!authResult.success) {
+    return createErrorResponse(authResult.error || 'Unauthorized', 401);
   }
 
-  const superadmin = authResult as any;
+  const superadmin = authResult.user as any;
 
   // Verify ticket exists
   const ticket = await prisma.supportTicket.findUnique({

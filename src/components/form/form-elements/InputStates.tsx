@@ -1,10 +1,12 @@
 "use client";
 import React, { useState } from "react";
+import { useTranslation } from 'react-i18next';
 import ComponentCard from "../../common/ComponentCard";
 import Input from "../input/InputField";
 import Label from "../Label";
 
 export default function InputStates() {
+  const { t } = useTranslation('forms');
   const [email, setEmail] = useState("");
   const [error, setError] = useState(false);
 
@@ -23,45 +25,45 @@ export default function InputStates() {
   };
   return (
     <ComponentCard
-      title="Input States"
-      desc="Validation styles for error, success and disabled states on form controls."
+      title={t('sections.inputStates')}
+      desc={t('sections.inputStatesDesc')}
     >
       <div className="space-y-5 sm:space-y-6">
         {/* Error Input */}
         <div>
-          <Label>Email</Label>
+          <Label>{t('labels.email')}</Label>
           <Input
             type="email"
             defaultValue={email}
             error={error}
             onChange={handleEmailChange}
-            placeholder="Enter your email"
-            hint={error ? "This is an invalid email address." : ""}
+            placeholder={t('placeholders.enterEmail')}
+            hint={error ? t('states.invalidEmail') : ""}
           />
         </div>
 
         {/* Success Input */}
         <div>
-          <Label>Email</Label>
+          <Label>{t('labels.email')}</Label>
           <Input
             type="email"
             defaultValue={email}
             success={!error}
             onChange={handleEmailChange}
-            placeholder="Enter your email"
-            hint={!error ? "Valid email!" : ""}
+            placeholder={t('placeholders.enterEmail')}
+            hint={!error ? t('states.validEmail') : ""}
           />
         </div>
 
         {/* Disabled Input */}
         <div>
-          <Label>Email</Label>
+          <Label>{t('labels.email')}</Label>
           <Input
             type="text"
-            defaultValue="disabled@example.com"
+            defaultValue={t('placeholders.disabledEmail')}
             disabled={true}
-            placeholder="Disabled email"
-            hint="This field is disabled."
+            placeholder={t('placeholders.disabledEmail')}
+            hint={t('states.fieldDisabled')}
           />
         </div>
       </div>

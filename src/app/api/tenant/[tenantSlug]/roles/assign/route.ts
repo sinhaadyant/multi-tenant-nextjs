@@ -267,14 +267,21 @@ export const POST = withTenantAuth(async (req: AuthenticatedRequest, { params }:
       return createErrorResponse('Role not found', 404);
     }
 
-    // For single role assignment: Remove any existing role assignments for this user
-    await prisma.userRole.deleteMany({
+    // Check if role assignment already exists
+    const existingAssignment = await prisma.userRole.findUnique({
       where: {
-        userId: validatedData.userId
+        userId_roleId: {
+          userId: validatedData.userId,
+          roleId: validatedData.roleId
+        }
       }
     });
 
-    // Create new role assignment
+    if (existingAssignment) {
+      return createErrorResponse('Role assignment already exists', 409);
+    }
+
+    // Create new role assignment (multiple roles per user supported)
     const assignment = await prisma.userRole.create({
       data: {
         userId: validatedData.userId,
@@ -300,9 +307,8 @@ export const POST = withTenantAuth(async (req: AuthenticatedRequest, { params }:
     });
 
     // Create audit log
-    await createAuditLogFromRequest(req, {
-      action: 'role.assigned',
-      details: `Assigned single role "${role.name}" to user "${user.name}" (replaced previous role)`,
+    await createAuditLogFromRequest(req, req.user! as any, 'role.assigned', {
+      details: `Assigned role "${role.name}" to user "${user.name}"`,
       tenantId: tenantId
     });
 
@@ -372,14 +378,22 @@ export const PUT = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
       return createErrorResponse('Some roles not found', 404);
     }
 
-    // For single role assignment: Always remove existing assignments for all users
-    await prisma.userRole.deleteMany({
+    // Check for existing assignments to avoid duplicates
+    const existingAssignments = await prisma.userRole.findMany({
       where: {
-        userId: { in: validatedData.assignments.map(a => a.userId) }
+        OR: validatedData.assignments.map(a => ({
+          userId: a.userId,
+          roleId: a.roleId
+        }))
       }
     });
 
-    // Create new assignments (single role per user)
+    if (existingAssignments.length > 0) {
+      const duplicates = existingAssignments.map(a => `${a.userId}-${a.roleId}`);
+      return createErrorResponse(`Role assignments already exist: ${duplicates.join(', ')}`, 409);
+    }
+
+    // Create new assignments (multiple roles per user supported)
     const assignments = await Promise.all(
       validatedData.assignments.map(async (assignment) => {
         return prisma.userRole.create({
@@ -409,9 +423,8 @@ export const PUT = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
     );
 
     // Create audit log
-    await createAuditLogFromRequest(req, {
-      action: 'roles.bulk_assigned',
-      details: `Bulk assigned single roles to ${assignments.length} users (replaced previous roles)`,
+    await createAuditLogFromRequest(req, req.user! as any, 'roles.bulk_assigned', {
+      details: `Bulk assigned ${assignments.length} roles to users`,
       tenantId: tenantId
     });
 
@@ -498,8 +511,7 @@ export const DELETE = withTenantAuth(async (req: AuthenticatedRequest, { params 
     });
 
     // Create audit log
-    await createAuditLogFromRequest(req, {
-      action: 'roles.bulk_removed',
+    await createAuditLogFromRequest(req, req.user! as any, 'roles.bulk_removed', {
       details: `Removed ${assignments.length} role assignments`,
       tenantId: tenantId
     });

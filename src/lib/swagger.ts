@@ -11,25 +11,32 @@ const options = {
 ## Available Credentials
 
 ### SuperAdmin
-- **Email**: admin@superadmin.com
-- **Password**: AdminPass123
+- **Email**: admin@example.com
+- **Password**: admin123
 - **URL**: http://localhost:3000/superadmin/login
 
 ### Tenants
 
-#### TechCorp Solutions
-- **URL**: http://localhost:3000/techcorp/login
-- **Admin**: admin@techcorp.com / AdminPass123
-- **Manager**: manager@techcorp.com / AdminPass123
-- **User**: user@techcorp.com / AdminPass123
-- **Viewer**: viewer@techcorp.com / AdminPass123
+#### ACME Corp (Default Tenant)
+- **URL**: http://localhost:3000/acme/login
+- **Admin**: user@acme.com / password123
+- **Manager**: manager@acme.com / password123
+- **User**: user@acme.com / password123
 
-#### Global Retail Inc
-- **URL**: http://localhost:3000/globalretail/login
-- **Admin**: admin@globalretail.com / AdminPass123
-- **Manager**: manager@globalretail.com / AdminPass123
-- **User**: user@globalretail.com / AdminPass123
-- **Viewer**: viewer@globalretail.com / AdminPass123`,
+## Quick Start
+
+1. **Database Setup**: Run \`npm run db:seed\` to create initial data
+2. **Access SuperAdmin**: Use the credentials above to access the superadmin panel
+3. **Access Tenant**: Use the tenant URL and credentials to access tenant-specific features
+
+## Features
+
+- **Multi-Tenant Architecture**: Isolated data per tenant
+- **Role-Based Access Control**: Granular permissions
+- **Real-Time Notifications**: WebSocket integration
+- **Audit Logging**: Complete activity tracking
+- **Support System**: Ticket management
+- **Reporting**: Analytics and insights`,
       contact: {
         name: 'API Support',
         email: 'support@multitenant.com'

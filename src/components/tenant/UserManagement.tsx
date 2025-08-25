@@ -199,7 +199,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ tenantSlug }) => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search by name or email..."
+                placeholder={t('forms:placeholders.searchByNameOrEmail')}
                 value={filters.search}
                 onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
@@ -379,9 +379,14 @@ const UserManagement: React.FC<UserManagementProps> = ({ tenantSlug }) => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex flex-wrap gap-1">
                       {user.roles && user.roles.length > 0 ? (
-                        <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full">
-                          {user.roles[0].name}
-                        </span>
+                        user.roles.map((role, index) => (
+                          <span
+                            key={role.id}
+                            className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full"
+                          >
+                            {role.name}
+                          </span>
+                        ))
                       ) : (
                         <span className="px-2 py-1 text-xs font-medium bg-gray-50 text-gray-500 dark:bg-gray-800 dark:text-gray-400 rounded-full">
                           No role assigned
@@ -409,7 +414,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ tenantSlug }) => {
                       <button
                         onClick={() => router.push(`/${tenantSlug}/users/${user.id}`)}
                         className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
-                        title="View Details"
+                        title={t('tables:filters.viewDetails')}
                       >
                         <Eye className="w-4 h-4" />
                       </button>
@@ -417,7 +422,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ tenantSlug }) => {
                         <button
                           onClick={() => router.push(`/${tenantSlug}/users/${user.id}?edit=true`)}
                           className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 transition-colors"
-                          title="Edit User"
+                          title={t('tables:filters.editUser')}
                         >
                           <Edit className="w-4 h-4" />
                         </button>

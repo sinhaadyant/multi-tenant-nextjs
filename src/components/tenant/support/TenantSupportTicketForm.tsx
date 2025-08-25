@@ -79,6 +79,42 @@ export const TenantSupportTicketForm: React.FC<TenantSupportTicketFormProps> = (
     }
   }, [existingTicket, mode]);
 
+  // Define validation and helper functions before conditional returns
+  const validateForm = useCallback((): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    // Title validation
+    if (!formData.title.trim()) {
+      newErrors.title = 'Title is required';
+    } else if (formData.title.trim().length < 5) {
+      newErrors.title = 'Title must be at least 5 characters long';
+    } else if (formData.title.trim().length > 200) {
+      newErrors.title = 'Title must be less than 200 characters';
+    }
+
+    // Description validation
+    if (!formData.description.trim()) {
+      newErrors.description = 'Description is required';
+    } else if (formData.description.trim().length < 10) {
+      newErrors.description = 'Description must be at least 10 characters long';
+    } else if (formData.description.trim().length > 5000) {
+      newErrors.description = 'Description must be less than 5000 characters';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }, [formData]);
+
+  const handleInputChange = useCallback((field: keyof typeof formData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    setIsDirty(true);
+    
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  }, [errors]);
+
   // Check if user has permission for the current mode
   if (mode === 'create' && !canCreate) {
     return (
@@ -116,40 +152,7 @@ export const TenantSupportTicketForm: React.FC<TenantSupportTicketFormProps> = (
     );
   }
 
-  const validateForm = useCallback((): boolean => {
-    const newErrors: Record<string, string> = {};
 
-    // Title validation
-    if (!formData.title.trim()) {
-      newErrors.title = 'Title is required';
-    } else if (formData.title.trim().length < 5) {
-      newErrors.title = 'Title must be at least 5 characters long';
-    } else if (formData.title.trim().length > 200) {
-      newErrors.title = 'Title must be less than 200 characters';
-    }
-
-    // Description validation
-    if (!formData.description.trim()) {
-      newErrors.description = 'Description is required';
-    } else if (formData.description.trim().length < 10) {
-      newErrors.description = 'Description must be at least 10 characters long';
-    } else if (formData.description.trim().length > 5000) {
-      newErrors.description = 'Description must be less than 5000 characters';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }, [formData]);
-
-  const handleInputChange = (field: keyof typeof formData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    setIsDirty(true);
-    
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
-  };
 
   const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -281,7 +284,7 @@ export const TenantSupportTicketForm: React.FC<TenantSupportTicketFormProps> = (
         <CardContent className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-gray-500 dark:text-gray-400">Loading ticket...</p>
+            <p className="text-gray-500 dark:text-gray-400">{t('common:loadingTicket')}</p>
           </div>
         </CardContent>
       </Card>
@@ -316,7 +319,7 @@ export const TenantSupportTicketForm: React.FC<TenantSupportTicketFormProps> = (
       {/* Form */}
       <Card>
         <CardHeader>
-          <CardTitle>Ticket Details</CardTitle>
+          <CardTitle>{t('forms:labels.ticketDetails')}</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -330,7 +333,7 @@ export const TenantSupportTicketForm: React.FC<TenantSupportTicketFormProps> = (
                 type="text"
                 value={formData.title}
                 onChange={(e) => handleInputChange('title', e.target.value)}
-                placeholder="Brief description of your issue"
+                placeholder={t('forms:placeholders.briefDescription')}
                 className={errors.title ? 'border-red-500' : ''}
               />
               {errors.title && (
@@ -347,7 +350,7 @@ export const TenantSupportTicketForm: React.FC<TenantSupportTicketFormProps> = (
                 id="description"
                 value={formData.description}
                 onChange={(e) => handleInputChange('description', e.target.value)}
-                placeholder="Please provide detailed information about your issue..."
+                placeholder={t('forms:placeholders.detailedInformation')}
                 rows={6}
                 className={errors.description ? 'border-red-500' : ''}
               />
@@ -367,10 +370,10 @@ export const TenantSupportTicketForm: React.FC<TenantSupportTicketFormProps> = (
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
+                    <SelectItem value="low">{t('forms:options.low')}</SelectItem>
+                    <SelectItem value="medium">{t('forms:options.medium')}</SelectItem>
+                    <SelectItem value="high">{t('forms:options.high')}</SelectItem>
+                    <SelectItem value="urgent">{t('forms:options.urgent')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -387,8 +390,8 @@ export const TenantSupportTicketForm: React.FC<TenantSupportTicketFormProps> = (
                     <SelectItem value="general">General</SelectItem>
                     <SelectItem value="technical">Technical</SelectItem>
                     <SelectItem value="billing">Billing</SelectItem>
-                    <SelectItem value="feature-request">Feature Request</SelectItem>
-                    <SelectItem value="bug-report">Bug Report</SelectItem>
+                    <SelectItem value="feature-request">{t('forms:options.featureRequest')}</SelectItem>
+                    <SelectItem value="bug-report">{t('forms:options.bugReport')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

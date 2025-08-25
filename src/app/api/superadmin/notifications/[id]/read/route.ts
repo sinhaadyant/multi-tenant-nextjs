@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { requireSuperAdmin } from '@/lib/auth';
 import { createAuditLogFromRequest } from '@/lib/audit';
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     // Authenticate SuperAdmin
     const authResult = await requireSuperAdmin(req);
@@ -29,7 +29,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // Check if the superadmin has a corresponding user record (for read tracking)
     let superadminUser = await prisma.user.findFirst({
       where: { 
-        email: authResult.user.email,
+        email: (authResult.user as any).email,
         tenantId: null // Superadmin users don't belong to any tenant
       }
     });
@@ -38,7 +38,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (!superadminUser) {
       // Get superadmin details
       const superadmin = await prisma.superAdmin.findUnique({
-        where: { id: authResult.user.id }
+        where: { id: (authResult.user as any).id }
       });
 
       if (superadmin) {
@@ -58,7 +58,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     if (superadminUser) {
       // Mark notification as read for the superadmin user
-      const userNotification = await prisma.userNotification.upsert({
+      await prisma.userNotification.upsert({
         where: {
           notificationId_userId: {
             notificationId: notificationId,
@@ -78,7 +78,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       });
     } else {
       // Fallback: just log the read action
-      console.log(`Superadmin ${authResult.user.email} marked notification ${notificationId} as read`);
+      console.log(`Superadmin ${(authResult.user as any).email} marked notification ${notificationId} as read`);
     }
 
     // Get the updated notification

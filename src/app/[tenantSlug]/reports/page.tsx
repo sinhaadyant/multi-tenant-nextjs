@@ -6,8 +6,7 @@ import {
   Download, 
   FileText, 
   Users, 
-  Building2, 
-  Bell, 
+  Shield, 
   Activity,
   Plus,
   Search,
@@ -17,18 +16,26 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  XCircle
+  XCircle,
+  RefreshCw
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { useReportsOverview, useReports, ReportsFilters } from '@/hooks/useReports';
-import { ReportsOverviewSkeleton, ReportsTableSkeleton } from '@/components/superadmin/ReportsOverviewSkeleton';
-import { GenerateReportModal } from '@/components/superadmin/GenerateReportModal';
-import { ReportDetailsModal } from '@/components/superadmin/ReportDetailsModal';
-import { ReportsFilters as ReportsFiltersComponent } from '@/components/superadmin/ReportsFilters';
+import { useTenantReportsOverview, useTenantReports, TenantReportsFilters as TenantReportsFiltersType } from '@/hooks/useTenantReports';
+import TenantReportsOverviewSkeleton from '@/components/tenant/TenantReportsOverviewSkeleton';
+import TenantReportsTableSkeleton from '@/components/tenant/TenantReportsTableSkeleton';
+import TenantGenerateReportModal from '@/components/tenant/TenantGenerateReportModal';
+import TenantReportDetailsModal from '@/components/tenant/TenantReportDetailsModal';
+import TenantReportsFilters from '@/components/tenant/TenantReportsFilters';
+import { useExportTenantReports } from '@/hooks/useTenantReports';
+import { useParams } from 'next/navigation';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
+import toast from 'react-hot-toast';
 
-export default function ReportsPage() {
-  const [filters, setFilters] = useState<ReportsFilters>({
+export default function TenantReportsPage() {
+  const params = useParams();
+  const tenantSlug = params.tenantSlug as string;
+
+  const [filters, setFilters] = useState<TenantReportsFiltersType>({
     page: 1,
     limit: 10,
     sortBy: 'createdAt',
@@ -53,15 +60,16 @@ export default function ReportsPage() {
   ]);
 
   // Fetch data
-  const { data: overviewData, isLoading: overviewLoading, error: overviewError } = useReportsOverview();
-  const { data: reportsData, isLoading: reportsLoading, error: reportsError } = useReports(memoizedFilters);
+  const { data: overviewData, isLoading: overviewLoading, error: overviewError } = useTenantReportsOverview(tenantSlug);
+  const { data: reportsData, isLoading: reportsLoading, error: reportsError } = useTenantReports(tenantSlug, memoizedFilters);
+  const exportReportsMutation = useExportTenantReports(tenantSlug);
 
   const overview = overviewData?.overview;
-  const platformStats = overviewData?.platformStats;
+  const tenantStats = overviewData?.tenantStats;
   const reports = reportsData?.reports || [];
   const pagination = reportsData?.pagination;
 
-  const handleFiltersChange = (newFilters: Partial<ReportsFilters>) => {
+  const handleFiltersChange = (newFilters: Partial<TenantReportsFiltersType>) => {
     setFilters(prev => ({ ...prev, ...newFilters, page: 1 }));
   };
 
@@ -80,6 +88,14 @@ export default function ReportsPage() {
   const handleViewReport = (report: any) => {
     setSelectedReport(report);
     setIsDetailsModalOpen(true);
+  };
+
+  const handleExportReports = async (format: 'csv' | 'excel' | 'pdf') => {
+    try {
+      await exportReportsMutation.mutateAsync({ ...filters, format });
+    } catch (error) {
+      // Error is handled by the mutation
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -115,7 +131,7 @@ export default function ReportsPage() {
   const getReportTypeLabel = (type: string) => {
     const typeLabels = {
       user_activity: 'User Activity',
-      tenant_summary: 'Tenant Summary',
+      role_summary: 'Role Summary',
       login_history: 'Login History',
       audit_logs: 'Audit Logs',
       system_health: 'System Health'
@@ -140,10 +156,10 @@ export default function ReportsPage() {
             <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
             <div>
               <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
-                Error loading reports
+                {t('common:errorLoadingReports')}
               </h3>
               <p className="mt-1 text-sm text-red-700 dark:text-red-300">
-                {overviewError?.message || reportsError?.message || 'An error occurred while loading the reports data.'}
+                {overviewError?.message || reportsError?.message || t('common:anErrorOccurredWhileLoadingReportsData')}
               </p>
             </div>
           </div>
@@ -160,21 +176,31 @@ export default function ReportsPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Reports</h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Generate and manage detailed reports for platform monitoring and auditing
+              Generate and manage detailed reports for your organization
             </p>
           </div>
-          <button
-            onClick={() => setIsGenerateModalOpen(true)}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Generate Report
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => handleExportReports('csv')}
+              disabled={exportReportsMutation.isPending}
+              className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700 disabled:opacity-50"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              {exportReportsMutation.isPending ? 'Exporting...' : 'Export CSV'}
+            </button>
+            <button
+              onClick={() => setIsGenerateModalOpen(true)}
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Generate Report
+            </button>
+          </div>
         </div>
 
         {/* Overview Panel */}
         {overviewLoading ? (
-          <ReportsOverviewSkeleton />
+          <TenantReportsOverviewSkeleton />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Total Reports */}
@@ -195,7 +221,7 @@ export default function ReportsPage() {
               </p>
             </div>
 
-            {/* Platform Users */}
+            {/* Total Users */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
               <div className="flex items-center">
                 <div className="p-2 bg-green-100 rounded-lg dark:bg-green-900">
@@ -204,62 +230,68 @@ export default function ReportsPage() {
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {platformStats?.totalUsers || 0}
+                    {tenantStats?.totalUsers || 0}
                   </p>
                 </div>
               </div>
               <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                Across all tenants
+                {tenantStats?.activeUsers || 0} active users
               </p>
             </div>
 
-            {/* Active Tenants */}
+            {/* Total Roles */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
               <div className="flex items-center">
                 <div className="p-2 bg-purple-100 rounded-lg dark:bg-purple-900">
-                  <Building2 className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                  <Shield className="w-6 h-6 text-purple-600 dark:text-purple-400" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Tenants</p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Roles</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {platformStats?.activeTenants || 0}
+                    {tenantStats?.totalRoles || 0}
                   </p>
                 </div>
               </div>
               <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                Currently active
+                Role assignments
               </p>
             </div>
 
-            {/* Login Trends */}
+            {/* System Health */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
               <div className="flex items-center">
                 <div className="p-2 bg-orange-100 rounded-lg dark:bg-orange-900">
                   <TrendingUp className="w-6 h-6 text-orange-600 dark:text-orange-400" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Login Trends</p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">System Health</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {platformStats?.loginTrends || 0}
+                    {tenantStats?.systemHealth || 0}%
                   </p>
                 </div>
               </div>
               <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                Last 7 days
+                Overall performance
               </p>
             </div>
           </div>
         )}
 
         {/* Filters */}
-        <ReportsFiltersComponent
+        <TenantReportsFilters
           filters={filters}
           onFiltersChange={handleFiltersChange}
+          onClearFilters={() => setFilters({
+            page: 1,
+            limit: 10,
+            sortBy: 'createdAt',
+            sortOrder: 'desc'
+          })}
         />
 
         {/* Reports Table */}
         {reportsLoading ? (
-          <ReportsTableSkeleton />
+          <TenantReportsTableSkeleton />
         ) : (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             {reports.length === 0 ? (
@@ -285,10 +317,12 @@ export default function ReportsPage() {
                   <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead className="bg-gray-50 dark:bg-gray-700">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                            onClick={() => handleSort('name', filters.sortBy === 'name' && filters.sortOrder === 'asc' ? 'desc' : 'asc')}>
                           Report Type
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                            onClick={() => handleSort('createdAt', filters.sortBy === 'createdAt' && filters.sortOrder === 'asc' ? 'desc' : 'asc')}>
                           Status
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -297,7 +331,8 @@ export default function ReportsPage() {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                           Generated By
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                            onClick={() => handleSort('createdAt', filters.sortBy === 'createdAt' && filters.sortOrder === 'asc' ? 'desc' : 'asc')}>
                           Created
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -328,10 +363,10 @@ export default function ReportsPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900 dark:text-white">
-                              {report.superAdmin?.name || 'Unknown'}
+                              {report.user?.name || 'Unknown'}
                             </div>
                             <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {report.superAdmin?.email || 'N/A'}
+                              {report.user?.email || 'N/A'}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -342,16 +377,18 @@ export default function ReportsPage() {
                               <button
                                 onClick={() => handleViewReport(report)}
                                 className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                                title="View Details"
+                                title={t('tables:filters.viewDetails')}
                               >
                                 <FileText className="w-4 h-4" />
                               </button>
-                              <button
-                                className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
-                                title="Download Report"
-                              >
-                                <Download className="w-4 h-4" />
-                              </button>
+                              {report.status === 'ready' && (
+                                <button
+                                  className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
+                                  title={t('tables:filters.downloadReport')}
+                                >
+                                  <Download className="w-4 h-4" />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -408,15 +445,17 @@ export default function ReportsPage() {
         )}
 
         {/* Modals */}
-        <GenerateReportModal
+        <TenantGenerateReportModal
           isOpen={isGenerateModalOpen}
           onClose={() => setIsGenerateModalOpen(false)}
+          tenantSlug={tenantSlug}
         />
 
-        <ReportDetailsModal
+        <TenantReportDetailsModal
           isOpen={isDetailsModalOpen}
           onClose={() => setIsDetailsModalOpen(false)}
           report={selectedReport}
+          tenantSlug={tenantSlug}
         />
       </div>
     </ErrorBoundary>

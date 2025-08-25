@@ -8,24 +8,21 @@ const createJestConfig = nextJest({
 // Add any custom config to be passed to Jest
 const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.e2e.setup.js'],
-  testEnvironment: 'node', // Use node environment for e2e tests
-  testPathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/node_modules/'],
-  moduleNameMapper: {
+  testEnvironment: 'jsdom',
+  testMatch: [
+    '<rootDir>/tests/**/*.test.js',
+    '<rootDir>/tests/**/*.test.ts',
+    '<rootDir>/tests/**/*.test.jsx',
+    '<rootDir>/tests/**/*.test.tsx',
+  ],
+  moduleNameMapping: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
-  testMatch: [
-    '<rootDir>/src/**/__tests__/e2e/**/*.{js,jsx,ts,tsx}',
+  collectCoverageFrom: [
+    'src/**/*.{js,jsx,ts,tsx}',
+    '!src/**/*.d.ts',
+    '!src/**/*.stories.{js,jsx,ts,tsx}',
   ],
-  transform: {
-    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { presets: ['next/babel'] }],
-  },
-  transformIgnorePatterns: [
-    '/node_modules/',
-    '^.+\\.module\\.(css|sass|scss)$',
-  ],
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-  testTimeout: 60000, // 60 seconds timeout for e2e tests
-  maxWorkers: 1, // Run tests sequentially for e2e
 }
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async

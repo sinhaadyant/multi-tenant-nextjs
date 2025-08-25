@@ -6,6 +6,7 @@ import { usePathname, useParams } from "next/navigation";
 import { useSelector } from "react-redux";
 import { useSidebar } from "../context/SidebarContext";
 import { useTenantAuth } from "@/hooks/useTenantAuth";
+import { LanguageSwitcher } from "@/components/common/LanguageSwitcher";
 import {
   ChevronDown,
   Users,
@@ -33,6 +34,7 @@ import {
   UserPlus,
   LogIn,
   LayoutDashboard,
+  Languages,
 } from "lucide-react";
 
 type NavItem = {
@@ -80,35 +82,15 @@ const TenantSidebar: React.FC = () => {
     isExpanded, isMobileOpen, isHovered
   });
 
-  // Debug Redux state directly
-  console.log('🔍 Redux state debug:', {
-    apiModules: apiModules,
-    modulesLoading,
-    modulesError,
-    userPermissions: userPermissions,
-    modulesCount: apiModules?.length || 0,
-    userPermissionsModulesCount: userPermissions?.modules?.length || 0
-  });
+
 
   // Check if we have modules from either source
   const hasModulesFromAPI = apiModules && apiModules.length > 0;
   const hasModulesFromUserPermissions = userPermissions?.modules && userPermissions.modules.length > 0;
   
-  console.log('🔍 Module availability check:', {
-    hasModulesFromAPI,
-    hasModulesFromUserPermissions,
-    modulesLoading,
-    modulesError
-  });
 
-  // Debug permissions
-  if (userPermissions) {
-    console.log('🔐 User permissions structure:', {
-      accessibleModules: userPermissions.accessibleModules,
-      permissions: userPermissions.permissions,
-      modulePermissions: userPermissions.modulePermissions
-    });
-  }
+
+
 
   const [openSubmenu, setOpenSubmenu] = useState<number | null>(null);
   const [subMenuHeight, setSubMenuHeight] = useState<Record<number, number>>({});
@@ -123,20 +105,17 @@ const TenantSidebar: React.FC = () => {
     
     // Check if user has permissions for this module
     if (!userPermissions) {
-      console.log(`❌ Module ${moduleKey} - no permissions available`);
       return false;
     }
 
     // Check if module is in accessible modules list
     if (userPermissions.accessibleModules && userPermissions.accessibleModules.includes(moduleKey)) {
-      console.log(`✅ Module ${moduleKey} - found in accessible modules`);
       return true;
     }
 
     // Check if user has any permission for this module (read, create, update, delete)
     const modulePermissions = userPermissions.modulePermissions?.[moduleKey];
     if (modulePermissions && modulePermissions.length > 0) {
-      console.log(`✅ Module ${moduleKey} - has module permissions:`, modulePermissions);
       return true;
     }
 
@@ -146,30 +125,19 @@ const TenantSidebar: React.FC = () => {
     );
     
     if (hasAnyModulePermission) {
-      console.log(`✅ Module ${moduleKey} - has matching permissions`);
       return true;
     }
 
-    console.log(`❌ Module ${moduleKey} - no permissions found`);
     return false;
   }, [userPermissions]);
 
   // Dynamic navigation items based on modules from API
   const getTenantNavElements = useCallback((): NavItem[] => {
-    console.log('🔍 Building sidebar navigation from API modules:', {
-      user: user?.name,
-      modulesCount: apiModules?.length,
-      modulesLoading,
-      modulesError
-    });
-
     if (modulesLoading) {
-      console.log('⏳ Loading modules from API...');
       return [];
     }
 
     if (modulesError) {
-      console.error('❌ Error loading modules from API:', modulesError);
       return [];
     }
 
@@ -262,6 +230,14 @@ const TenantSidebar: React.FC = () => {
         icon: module.icon || 'home',
         path: routeMapping[moduleKey] || `/${tenantSlug}/${moduleKey}`
       };
+
+      // Attach data-tour ids for known modules
+      if (moduleKey === 'dashboard') (navItem as any).dataTour = 'tour-dashboard';
+      if (moduleKey === 'users' || moduleKey === 'user-management') (navItem as any).dataTour = 'tour-users';
+      if (moduleKey === 'roles' || moduleKey === 'roles-permissions') (navItem as any).dataTour = 'tour-roles';
+      if (moduleKey === 'modules' || moduleKey === 'module-management') (navItem as any).dataTour = 'tour-modules';
+      if (moduleKey === 'billing' || moduleKey === 'subscription') (navItem as any).dataTour = 'tour-billing';
+      if (moduleKey === 'reports' || moduleKey === 'analytics' || moduleKey === 'reports-analytics') (navItem as any).dataTour = 'tour-reports';
 
       // Add children if module has child modules
       if (module.childModules && module.childModules.length > 0) {
@@ -414,6 +390,7 @@ const TenantSidebar: React.FC = () => {
                   ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                   : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
               } ${!isExpanded && !isMobileOpen ? 'justify-center' : ''}`}
+              data-tour={(item as any).dataTour || undefined}
               onClick={(e) => {
                 if (hasChildren) {
                   e.preventDefault();
@@ -554,7 +531,7 @@ const TenantSidebar: React.FC = () => {
           <div className="px-3 py-2 text-sm text-red-500 dark:text-red-400">
             <div className="flex items-center space-x-2">
               <div className="w-4 h-4">⚠️</div>
-              <span>Error loading modules</span>
+              <span>{t('common:errorLoadingModules')}</span>
             </div>
           </div>
         ) : navItems.length === 0 ? (
@@ -562,7 +539,7 @@ const TenantSidebar: React.FC = () => {
           <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
             <div className="flex items-center space-x-2">
               <div className="w-4 h-4">ℹ️</div>
-              <span>No modules available</span>
+              <span>{t('common:noModulesAvailable')}</span>
             </div>
           </div>
         ) : (
@@ -573,7 +550,7 @@ const TenantSidebar: React.FC = () => {
 
       {/* User Info */}
       {user && (isExpanded || isHovered || isMobileOpen) && (
-        <div className="p-3 border-t border-gray-200 dark:border-gray-700">
+        <div className="p-3 border-t border-gray-200 dark:border-gray-700 space-y-3">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
               <User className="w-4 h-4 text-blue-600 dark:text-blue-300" />
@@ -585,6 +562,18 @@ const TenantSidebar: React.FC = () => {
               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                 {user.role}
               </p>
+            </div>
+          </div>
+          
+          {/* Language Switcher */}
+          <div className="flex items-center space-x-2 pt-2 border-t border-gray-100 dark:border-gray-600" data-tour="tour-language-switcher">
+            <Languages className="w-4 h-4 text-gray-500" />
+            <div className="flex-1">
+              <LanguageSwitcher 
+                userId={user.id}
+                userType="user"
+                className="w-full"
+              />
             </div>
           </div>
         </div>

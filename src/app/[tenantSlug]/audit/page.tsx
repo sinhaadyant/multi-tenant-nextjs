@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Download, AlertTriangle, CheckCircle, XCircle, Activity } from 'lucide-react';
+import { Download, AlertTriangle, CheckCircle, XCircle, Activity, Eye, Users } from 'lucide-react';
 import { useTenantAuditLogs, AuditLog } from '@/hooks/useTenantAuditLogs';
 import TenantAuditLogsTable from '@/components/tenant/TenantAuditLogsTable';
 import TenantAuditLogsFilters from '@/components/tenant/TenantAuditLogsFilters';
 import TenantAuditLogDetailsModal from '@/components/tenant/TenantAuditLogDetailsModal';
+import Button from '@/components/ui/button/Button';
+import { usePermissions } from '@/hooks/usePermissions';
 
 export default function TenantAuditLogsPage() {
   const {

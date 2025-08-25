@@ -1,0 +1,74 @@
+{
+  "validation": {
+    "required": "This field is required",
+    "email": "Please enter a valid email address",
+    "password": "Password must be at least 8 characters long",
+    "passwordConfirm": "Passwords do not match",
+    "minLength": "Must be at least {{min}} characters",
+    "maxLength": "Must be no more than {{max}} characters",
+    "phoneNumber": "Please enter a valid phone number",
+    "url": "Please enter a valid URL",
+    "number": "Please enter a valid number",
+    "integer": "Please enter a valid whole number",
+    "decimal": "Please enter a valid decimal number",
+    "date": "Please enter a valid date",
+    "time": "Please enter a valid time",
+    "range": "Value must be between {{min}} and {{max}}",
+    "fileSize": "File size must be less than {{size}}",
+    "fileType": "File type not supported",
+    "unique": "This value already exists",
+    "custom": "Invalid value"
+  },
+  "network": {
+    "connectionError": "Connection error. Please check your internet connection.",
+    "timeout": "Request timed out. Please try again.",
+    "serverError": "Server error. Please try again later.",
+    "notFound": "Resource not found",
+    "unauthorized": "You are not authorized to perform this action",
+    "forbidden": "Access denied",
+    "badRequest": "Invalid request. Please check your input.",
+    "conflict": "Conflict occurred. Please refresh and try again.",
+    "rateLimited": "Too many requests. Please wait and try again."
+  },
+  "auth": {
+    "invalidCredentials": "Invalid email or password",
+    "accountLocked": "Account is locked. Please contact support.",
+    "accountDisabled": "Account is disabled",
+    "sessionExpired": "Your session has expired. Please log in again.",
+    "emailNotVerified": "Please verify your email address",
+    "weakPassword": "Password is too weak",
+    "passwordMismatch": "Passwords do not match",
+    "tokenExpired": "Reset token has expired",
+    "tokenInvalid": "Invalid reset token",
+    "emailExists": "An account with this email already exists",
+    "userNotFound": "User not found",
+    "incorrectCurrentPassword": "Current password is incorrect"
+  },
+  "tenant": {
+    "notFound": "Tenant not found",
+    "inactive": "Tenant is not active",
+    "suspended": "Tenant is suspended",
+    "limitExceeded": "Tenant limit exceeded",
+    "subscriptionExpired": "Subscription has expired",
+    "accessDenied": "Access denied for this tenant"
+  },
+  "general": {
+    "unknownError": "An unknown error occurred",
+    "tryAgain": "Please try again",
+    "contactSupport": "Please contact support if the problem persists",
+    "operationFailed": "Operation failed",
+    "noPermission": "You don't have permission to perform this action",
+    "dataCorrupted": "Data appears to be corrupted",
+    "serviceUnavailable": "Service is temporarily unavailable"
+  },
+  "file": {
+    "uploadFailed": "File upload failed",
+    "downloadFailed": "File download failed",
+    "invalidFormat": "Invalid file format",
+    "tooLarge": "File is too large",
+    "tooSmall": "File is too small",
+    "corrupted": "File appears to be corrupted",
+    "notSupported": "File type not supported",
+    "processingFailed": "File processing failed"
+  }
+}

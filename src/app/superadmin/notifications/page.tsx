@@ -95,13 +95,7 @@ export default function NotificationsPage() {
     return usersData.users.find(user => user.email === 'anil@cc.com');
   }, [usersData]);
 
-  // Debug logging
-  useEffect(() => {
-    console.log('🔍 Debug - Users data:', usersData);
-    console.log('🔍 Debug - Users loading:', usersLoading);
-    console.log('🔍 Debug - Users error:', usersError);
-    console.log('🔍 Debug - Anil user found:', anilUser);
-  }, [usersData, usersLoading, usersError, anilUser]);
+
 
   const handleSearch = () => {
     setFilters(prev => ({
@@ -162,18 +156,11 @@ export default function NotificationsPage() {
   };
 
   const handleSendSampleNotification = async () => {
-    console.log('🔍 Debug - Button clicked!');
-    console.log('🔍 Debug - Anil user:', anilUser);
-    console.log('🔍 Debug - Create mutation pending:', createMutation.isPending);
-    
     try {
       if (!anilUser) {
-        console.log('🔍 Debug - Anil user not found, showing error toast');
         toast.error('User anil@cc.com not found');
         return;
       }
-      
-      console.log('🔍 Debug - Creating sample notification...');
       
       // Create and send sample notification
       const sampleNotification = {
@@ -186,14 +173,10 @@ export default function NotificationsPage() {
         status: 'sent'
       };
 
-      console.log('🔍 Debug - Sample notification data:', sampleNotification);
-
       await createMutation.mutateAsync(sampleNotification);
-      console.log('🔍 Debug - Sample notification sent successfully');
       toast.success('Sample notification sent to anil@cc.com successfully!');
       refetch(); // Refresh the notifications list
     } catch (error) {
-      console.error('🔍 Debug - Error sending sample notification:', error);
       toast.error('Failed to send sample notification');
     }
   };

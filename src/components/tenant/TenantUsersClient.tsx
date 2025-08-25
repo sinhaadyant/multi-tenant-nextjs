@@ -266,9 +266,9 @@ const TenantUsersClient: React.FC = () => {
         )}
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - Moved to top */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
             <div className="flex items-center">
               <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
@@ -302,6 +302,19 @@ const TenantUsersClient: React.FC = () => {
               </div>
             </div>
           </div>
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+            <div className="flex items-center">
+              <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
+                <Shield className="w-6 h-6 text-purple-600 dark:text-purple-300" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Users with Roles</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {users.filter(user => user.roles && user.roles.length > 0).length}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -313,7 +326,7 @@ const TenantUsersClient: React.FC = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search users..."
+                placeholder={t('forms:placeholders.searchUsers')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
@@ -335,9 +348,9 @@ const TenantUsersClient: React.FC = () => {
             className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
           >
             <option value="all">All Roles</option>
-            <option value="admin">Admin</option>
-            <option value="manager">Manager</option>
-            <option value="user">User</option>
+            {rolesData?.map((role) => (
+              <option key={role.id} value={role.id}>{role.name}</option>
+            ))}
           </select>
         </div>
       </div>
@@ -358,7 +371,7 @@ const TenantUsersClient: React.FC = () => {
                       User
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Role
+                      Roles
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Status
@@ -395,14 +408,22 @@ const TenantUsersClient: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {user.roles.map((role, index) => (
-                          <span
-                            key={role.id}
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(role.name)}`}
-                          >
-                            {role.name}
-                          </span>
-                        ))}
+                        <div className="flex flex-wrap gap-1">
+                          {user.roles && user.roles.length > 0 ? (
+                            user.roles.map((role, index) => (
+                              <span
+                                key={role.id}
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(role.name)}`}
+                              >
+                                {role.name}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-sm text-gray-500 dark:text-gray-400">
+                              No roles assigned
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(user.isActive)}`}>
@@ -420,7 +441,7 @@ const TenantUsersClient: React.FC = () => {
                           <button 
                             onClick={() => router.push(`/${tenantSlug}/users/${user.id}`)}
                             className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                            title="View Details"
+                            title={t('tables:filters.viewDetails')}
                           >
                             <Eye className="w-4 h-4" />
                           </button>
@@ -428,7 +449,7 @@ const TenantUsersClient: React.FC = () => {
                             <button 
                               onClick={() => router.push(`/${tenantSlug}/users/${user.id}`)}
                               className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
-                              title="Edit User"
+                              title={t('tables:filters.editUser')}
                             >
                               <Edit className="w-4 h-4" />
                             </button>
@@ -438,7 +459,7 @@ const TenantUsersClient: React.FC = () => {
                               onClick={() => handleDeleteUser(user.id)}
                               className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                               disabled={deleteUserMutation.isPending}
-                              title="Delete User"
+                              title={t('tables:filters.deleteUser')}
                             >
                               {deleteUserMutation.isPending ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />

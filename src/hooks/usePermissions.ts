@@ -198,7 +198,7 @@ export const usePermissions = () => {
           label: "Notifications",
           icon: "Bell",
           path: `/${tenantSlug}/notifications`,
-          description: "Manage notifications",
+          description: t('tables:filters.manageNotifications'),
           permissions: ["notifications:view"],
           hasChildren: false
         },

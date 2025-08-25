@@ -268,7 +268,7 @@ export default function SuperAdminNotificationDropdown() {
               <button
                 onClick={() => refetch()}
                 className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
-                title="Refresh notifications"
+                title={t('common:refreshNotifications')}
               >
                 Refresh
               </button>

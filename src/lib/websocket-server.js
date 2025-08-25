@@ -28,7 +28,7 @@ class NotificationWebSocketServer {
     this.setupMiddleware();
     this.setupEventHandlers();
     
-    console.log('🔌 WebSocket server initialized');
+
   }
 
   setupMiddleware() {
@@ -82,7 +82,7 @@ class NotificationWebSocketServer {
     if (!this.io) return;
 
     this.io.on('connection', (socket) => {
-      console.log(`🔌 User connected: ${socket.userId} (${socket.userType})`);
+  
       
       // Store connected user
       this.connectedUsers.set(socket.userId, socket);
@@ -132,7 +132,7 @@ class NotificationWebSocketServer {
 
       // Handle disconnection
       socket.on('disconnect', () => {
-        console.log(`🔌 User disconnected: ${socket.userId}`);
+    
         this.handleUserDisconnect(socket.userId);
       });
     });
@@ -150,7 +150,7 @@ class NotificationWebSocketServer {
       }
       this.userRooms.get(userId).add(roomName);
       
-      console.log(`👤 User ${userId} joined user room`);
+  
     }
   }
 
@@ -166,7 +166,7 @@ class NotificationWebSocketServer {
       }
       this.tenantRooms.get(tenantId).add(userId);
       
-      console.log(`🏢 User ${userId} joined tenant room ${tenantId}`);
+  
     }
   }
 
@@ -177,7 +177,7 @@ class NotificationWebSocketServer {
     if (socket) {
       socket.join(roomName);
       this.superAdminRooms.add(userId);
-      console.log(`👑 SuperAdmin ${userId} joined superadmin room`);
+  
     }
   }
 
@@ -192,7 +192,7 @@ class NotificationWebSocketServer {
         this.userRooms.get(userId).delete(roomName);
       }
       
-      console.log(`👤 User ${userId} left user room`);
+  
     }
   }
 
@@ -207,7 +207,7 @@ class NotificationWebSocketServer {
         this.tenantRooms.get(tenantId).delete(userId);
       }
       
-      console.log(`🏢 User ${userId} left tenant room ${tenantId}`);
+  
     }
   }
 
@@ -218,7 +218,7 @@ class NotificationWebSocketServer {
     if (socket) {
       socket.leave(roomName);
       this.superAdminRooms.delete(userId);
-      console.log(`👑 SuperAdmin ${userId} left superadmin room`);
+  
     }
   }
 
@@ -280,10 +280,9 @@ class NotificationWebSocketServer {
     const socket = this.connectedUsers.get(userId);
     if (socket) {
       socket.emit(event, data);
-      console.log(`📨 Sent ${event} to user ${userId}`);
+  
     } else {
-      console.log(`⚠️ User ${userId} not connected`);
-      console.log(`🔍 Connected users:`, Array.from(this.connectedUsers.keys()));
+      
     }
   }
 
@@ -292,7 +291,7 @@ class NotificationWebSocketServer {
     const roomName = `tenant_${tenantId}`;
     if (this.io) {
       this.io.to(roomName).emit(event, data);
-      console.log(`📨 Sent ${event} to tenant ${tenantId}`);
+  
     }
   }
 
@@ -301,7 +300,7 @@ class NotificationWebSocketServer {
     const roomName = 'superadmin_room';
     if (this.io) {
       this.io.to(roomName).emit(event, data);
-      console.log(`📨 Sent ${event} to all superadmins`);
+  
     }
   }
 
@@ -309,14 +308,13 @@ class NotificationWebSocketServer {
   sendToAll(event, data) {
     if (this.io) {
       this.io.emit(event, data);
-      console.log(`📨 Sent ${event} to all users`);
+  
     }
   }
 
   // Broadcast new notification
   async broadcastNotification(notification, targetType, targetIds = []) {
-    console.log(`🔌 Broadcasting notification:`, { targetType, targetIds });
-    console.log(`🔍 Connected users:`, Array.from(this.connectedUsers.keys()));
+
     
     const notificationData = {
       type: 'new_notification',

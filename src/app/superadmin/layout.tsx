@@ -9,6 +9,7 @@ import { usePathname } from "next/navigation";
 import React from "react";
 import GridShape from "@/components/common/GridShape";
 import { ThemeToggleButton } from "@/components/common/ThemeToggleButton";
+import { GuestLanguageSwitcher } from "@/components/common/GuestLanguageSwitcher";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -65,7 +66,14 @@ export default function SuperAdminLayout({
         </div>
 
         {/* Right Side - Auth Form */}
-        <div className="flex w-full flex-col justify-center lg:w-1/2">
+        <div className="flex w-full flex-col justify-center lg:w-1/2 relative">
+          {/* Language Switcher */}
+          <GuestLanguageSwitcher 
+            position="top-right" 
+            className="z-10"
+            size="sm"
+          />
+          
           <div className="px-4 sm:px-6 lg:px-8">
             {children}
           </div>

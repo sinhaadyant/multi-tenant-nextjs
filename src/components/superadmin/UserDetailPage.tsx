@@ -296,7 +296,7 @@ const UserDetailPage: React.FC<UserDetailPageProps> = ({ userId }) => {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
           {/* Tab Navigation */}
           <div className="border-b border-gray-200 dark:border-gray-700">
-            <nav className="flex space-x-8 px-6" aria-label="Tabs">
+            <nav className="flex space-x-8 px-6" aria-label={t('common:tabs')}>
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 return (

@@ -84,7 +84,7 @@ const RoleAssignmentModal: React.FC<RoleAssignmentModalProps> = ({
                   Role Assignment: {role.name}
                 </CardTitle>
                 <CardDescription>
-                  Assign this role to users (single role per user)
+                  Assign this role to users (multiple roles per user supported)
                 </CardDescription>
               </div>
               <Button
@@ -123,7 +123,7 @@ const RoleAssignmentModal: React.FC<RoleAssignmentModalProps> = ({
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <Input
                 type="text"
-                placeholder="Search users..."
+                placeholder={t('forms:placeholders.searchUsers')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -133,7 +133,7 @@ const RoleAssignmentModal: React.FC<RoleAssignmentModalProps> = ({
             {/* Users with Role */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">
-                Users with this role as primary ({usersWithRole.length})
+                Users with this role ({usersWithRole.length})
               </h3>
               
               {usersWithRole.length > 0 ? (
@@ -157,7 +157,7 @@ const RoleAssignmentModal: React.FC<RoleAssignmentModalProps> = ({
                         <div className="flex items-center gap-2">
                           <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                             <UserCheck className="w-3 h-3 mr-1" />
-                            Primary Role
+                            Assigned
                           </Badge>
                           <Button
                             variant="ghost"
@@ -173,10 +173,10 @@ const RoleAssignmentModal: React.FC<RoleAssignmentModalProps> = ({
                     ))}
                 </div>
               ) : (
-                              <div className="text-center py-8 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <Users className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-500 dark:text-gray-400">No users have this as their primary role</p>
-              </div>
+                <div className="text-center py-8 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <Users className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-500 dark:text-gray-400">No users have this role</p>
+                </div>
               )}
             </div>
 
@@ -228,10 +228,10 @@ const RoleAssignmentModal: React.FC<RoleAssignmentModalProps> = ({
                     ))}
                 </div>
               ) : (
-                              <div className="text-center py-8 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <Users className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-500 dark:text-gray-400">All users already have this as their primary role</p>
-              </div>
+                <div className="text-center py-8 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <Users className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-500 dark:text-gray-400">All users already have this role</p>
+                </div>
               )}
             </div>
 
@@ -267,7 +267,7 @@ const RoleAssignmentModal: React.FC<RoleAssignmentModalProps> = ({
                     ) : (
                       <>
                         <UserCheck className="w-4 h-4" />
-                        Assign as primary role to {selectedUsers.length} user(s)
+                        Assign role to {selectedUsers.length} user(s)
                       </>
                     )}
                   </Button>

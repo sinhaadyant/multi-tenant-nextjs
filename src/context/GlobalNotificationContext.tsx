@@ -40,27 +40,15 @@ export const GlobalNotificationProvider: React.FC<GlobalNotificationProviderProp
   const { data: headerNotificationsData, refetch, isEnabled, error, isLoading } = useHeaderNotifications();
 
   // Initialize Socket.io connection
-  const { isConnected: socketConnected } = useSocketIO({ enabled: !!user?.id });
+  useSocketIO({ enabled: !!user?.id });
 
-  // Debug logging
-  useEffect(() => {
-    console.log('🔍 Global Notification Context Debug:', {
-      userId: user?.id,
-      tenantId: user?.tenantId,
-      userEmail: user?.email,
-      isEnabled,
-      isLoading,
-      hasError: !!error,
-      unreadCount: headerNotificationsData?.data?.unreadCount,
-      notificationsCount: headerNotificationsData?.data?.notifications?.length
-    });
-  }, [user?.id, user?.tenantId, user?.email, isEnabled, isLoading, error, headerNotificationsData]);
+
 
   // Update unread count from header notifications
   useEffect(() => {
     if (headerNotificationsData?.data?.unreadCount !== undefined) {
       const newCount = headerNotificationsData.data.unreadCount;
-      console.log('🔄 Global Context: Updating unread count:', { old: unreadCount, new: newCount });
+
       if (newCount !== unreadCount) {
         setUnreadCount(newCount);
       }
@@ -71,7 +59,7 @@ export const GlobalNotificationProvider: React.FC<GlobalNotificationProviderProp
   useEffect(() => {
     if (unreadCount > prevUnreadCount && prevUnreadCount > 0) {
       const newNotificationsCount = unreadCount - prevUnreadCount;
-      console.log('📨 New notification detected globally!', { newNotificationsCount, unreadCount, prevUnreadCount });
+
       
       // Show toast notification
       toast.success(
@@ -93,7 +81,6 @@ export const GlobalNotificationProvider: React.FC<GlobalNotificationProviderProp
     
     if (prevUnreadCount === 0 && unreadCount > 0) {
       // First time loading, don't show toast
-      console.log('📨 Initial notification count loaded:', unreadCount);
     }
     
     setPrevUnreadCount(unreadCount);
@@ -102,41 +89,39 @@ export const GlobalNotificationProvider: React.FC<GlobalNotificationProviderProp
   // Socket.io-based notification updates with fallback polling
   useEffect(() => {
     if (!user?.id || !user?.tenantId || !isEnabled) {
-      console.log('🔌 Global notifications disabled - user not logged in or hook not enabled');
+
       setIsConnected(false);
       return;
     }
 
-    console.log('🔌 Starting Socket.io-based notification system for user:', user.id);
-    setIsConnected(socketConnected);
+
+    setIsConnected(true);
 
     // Initial fetch
     refetch();
 
     // Fallback polling every 10 seconds in case Socket.io fails
     const fallbackInterval = setInterval(() => {
-      if (!socketConnected) {
-        console.log('🔄 Fallback polling (Socket.io not connected)...');
-        refetch();
-      }
+      
+      refetch();
     }, 10000); // 10 seconds - fallback only
 
     return () => {
-      console.log('🔌 Stopping notification system');
+
       clearInterval(fallbackInterval);
       setIsConnected(false);
     };
-  }, [user?.id, user?.tenantId, isEnabled, refetch, socketConnected]);
+  }, [user?.id, user?.tenantId, isEnabled, refetch]);
 
   // Optimized refresh notifications function
   const refreshNotifications = useCallback(() => {
-    console.log('🔄 Manual refresh of notifications');
+
     refetch();
   }, [refetch]);
 
   // Add a function to trigger refresh when new notifications are sent
   const triggerNotificationUpdate = useCallback(() => {
-    console.log('🔄 Triggering notification update');
+
     // Small delay to ensure backend has processed the notification
     setTimeout(() => {
       refetch();
@@ -160,7 +145,7 @@ export const GlobalNotificationProvider: React.FC<GlobalNotificationProviderProp
   // Listen for Socket.io notification events
   useEffect(() => {
     const handleNotificationReceived = (event: CustomEvent) => {
-      console.log('📨 Socket.io notification received in global context:', event.detail);
+  
       setLastNotification(event.detail);
       // Trigger refresh to update notification count
       refetch();
