@@ -40,11 +40,11 @@ model Tenant {
   isActive          Boolean            @default(true)
   plan              String             @default("starter")
   region            String             @default("US East")
-  features          String             @db.LongText
+  features          String
   defaultLanguage   String             @default("en")
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
-  metadata          String?            @db.LongText
+  metadata          String?
   auditLogs         AuditLog[]
   notifications     Notification[]
   reports           Report[]
@@ -90,7 +90,7 @@ model UserInvitation {
   invitedById String
   token       String    @unique
   expiresAt   DateTime
-  message     String?   @db.Text
+  message     String?
   status      String    @default("pending") // pending, accepted, expired, cancelled
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -152,7 +152,7 @@ model Module {
   updatedAt       DateTime         @updatedAt
   maxVersion      String?
   minVersion      String?
-  releaseNotes    String?          @db.Text
+  releaseNotes    String?
   version         String?
   parentModule    Module?          @relation("ModuleHierarchy", fields: [parentModuleKey], references: [moduleKey])
   childModules    Module[]         @relation("ModuleHierarchy")
@@ -170,7 +170,7 @@ model TenantModule {
   isEnabled      Boolean   @default(true)
   isVisible      Boolean   @default(true)
   version        String?
-  settings       String?   @db.LongText
+  settings       String?
   enabledAt      DateTime?
   disabledAt     DateTime?
   enabledBy      String?
@@ -224,7 +224,7 @@ model UserRole {
 model AuditLog {
   id              String      @id @default(cuid())
   action          String
-  details         String?     @db.LongText
+  details         String?
   ipAddress       String?
   userAgent       String?
   createdAt       DateTime    @default(now())
@@ -233,8 +233,8 @@ model AuditLog {
   superAdminId    String?
   archivedAt      DateTime?
   isArchived      Boolean     @default(false)
-  newValues       String?     @db.LongText
-  oldValues       String?     @db.LongText
+  newValues       String?
+  oldValues       String?
   requestId       String?
   resourceId      String?
   resourceType    String?
@@ -260,8 +260,8 @@ model AuditLog {
 
 model Notification {
   id                String             @id @default(cuid())
-  title             String             @db.VarChar(255)
-  message           String             @db.Text
+  title             String
+  message           String
   isActive          Boolean            @default(true)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
@@ -269,9 +269,9 @@ model Notification {
   priority          String             @default("medium")
   targetTenantId    String?
   targetType        String             @default("superadmin")
-  attachments       String?            @db.Text
+  attachments       String?
   createdByType     String             @default("superadmin")
-  metadata          String?            @db.Text
+  metadata          String?
   scheduledAt       DateTime?
   sentAt            DateTime?
   status            String             @default("draft")
@@ -313,7 +313,7 @@ model UserNotification {
 
 model SupportTicket {
   id                  String                    @id @default(cuid())
-  description         String                    @db.Text
+  description         String
   status              String                    @default("open")
   priority            String                    @default("medium")
   createdAt           DateTime                  @default(now())
@@ -322,7 +322,7 @@ model SupportTicket {
   userId              String?
   category            String                    @default("general")
   isForwarded         Boolean                   @default(false)
-  title               String                    @db.VarChar(255)
+  title               String
   createdBy           String?
   createdByType       String                    @default("user")
   attachments         SupportTicketAttachment[]
@@ -342,7 +342,7 @@ model SupportTicket {
 
 model SupportTicketComment {
   id            String                           @id @default(cuid())
-  text          String                           @db.Text
+  text          String
   createdAt     DateTime                         @default(now())
   updatedAt     DateTime                         @updatedAt
   ticketId      String
@@ -389,7 +389,7 @@ model SupportTicketCommentAttachment {
 model SystemSetting {
   id        String   @id @default(cuid())
   key       String   @unique
-  value     String   @db.Text
+  value     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -414,7 +414,7 @@ model InviteToken {
 model SystemLog {
   id        String   @id @default(cuid())
   level     String
-  message   String   @db.Text
+  message   String
   createdAt DateTime @default(now())
 
   @@map("system_logs")
@@ -424,7 +424,7 @@ model Report {
   id           String      @id @default(cuid())
   tenantId     String?
   createdAt    DateTime    @default(now())
-  data         String      @db.LongText
+  data         String
   name         String
   superAdminId String?
   type         String
@@ -483,7 +483,7 @@ model Backup {
   createdAt   DateTime   @default(now())
   completedAt DateTime?
   createdById String
-  options     String?    @db.LongText
+  options     String?
   filePath    String?
   createdBy   SuperAdmin @relation(fields: [createdById], references: [id], onDelete: Cascade)
 
