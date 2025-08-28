@@ -18,6 +18,7 @@ import { TenantUser } from '@/hooks/useTenantsAPI';
 import { useConfirmModalContext } from '@/components/common/ConfirmModalProvider';
 import { useToast } from '@/hooks/useToast';
 import Button from '@/components/ui/button/Button';
+import { useTranslation } from 'react-i18next';
 
 interface TenantUserManagementProps {
   tenantId: string;
@@ -72,6 +73,7 @@ const TenantUserManagement: React.FC<TenantUserManagementProps> = ({
 }) => {
   const { confirm } = useConfirmModalContext();
   const { toast } = useToast();
+  const { t } = useTranslation('superadmin');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -185,9 +187,9 @@ const TenantUserManagement: React.FC<TenantUserManagementProps> = ({
       {/* Header with Stats */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">User Management</h3>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">{t('userManagement.title')}</h3>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Manage users for this tenant
+            {t('userManagement.subtitle')}
           </p>
         </div>
         <div className="flex items-center space-x-3">
@@ -196,7 +198,7 @@ const TenantUserManagement: React.FC<TenantUserManagementProps> = ({
             className="bg-blue-600 hover:bg-blue-700 text-white"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Add User
+            {t('userManagement.actions.addUser')}
           </Button>
           <Button
             onClick={onExportUsers}
@@ -206,12 +208,12 @@ const TenantUserManagement: React.FC<TenantUserManagementProps> = ({
             {isExporting ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
-                Exporting...
+                {t('userManagement.actions.exporting')}
               </>
             ) : (
               <>
                 <Download className="w-4 h-4 mr-2" />
-                Export
+                {t('userManagement.actions.exportUsers')}
               </>
             )}
           </Button>
@@ -226,7 +228,7 @@ const TenantUserManagement: React.FC<TenantUserManagementProps> = ({
               <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('userManagement.stats.totalUsers')}</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
                 {userStats.total}
               </p>
@@ -240,7 +242,7 @@ const TenantUserManagement: React.FC<TenantUserManagementProps> = ({
               <UserCheck className="w-6 h-6 text-green-600 dark:text-green-400" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Users</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('userManagement.stats.activeUsers')}</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
                 {userStats.active}
               </p>
@@ -254,7 +256,7 @@ const TenantUserManagement: React.FC<TenantUserManagementProps> = ({
               <UserX className="w-6 h-6 text-red-600 dark:text-red-400" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Inactive Users</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('userManagement.stats.inactiveUsers')}</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
                 {userStats.inactive}
               </p>
@@ -272,7 +274,7 @@ const TenantUserManagement: React.FC<TenantUserManagementProps> = ({
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Search users by name, email, or role..."
+                placeholder={t('userManagement.filters.searchPlaceholder')}
                 value={filters.search}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"

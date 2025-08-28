@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserWithRolesByEmail, checkTenantPermission } from '@/lib/permissions';
+import { verifyToken } from '@/lib/jwt';
 
 export interface ModuleAccessConfig {
   moduleKey: string;
@@ -22,9 +23,16 @@ export async function checkModuleAccess(
   config: ModuleAccessConfig
 ): Promise<NextResponse | null> {
   try {
-    // Get user session (you'll need to implement this based on your auth setup)
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    // Get authorization header
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.redirect(new URL('/auth/signin', request.url));
+    }
+
+    const token = authHeader.substring(7);
+    const decoded = await verifyToken(token);
+    
+    if (!decoded || !decoded.id) {
       return NextResponse.redirect(new URL('/auth/signin', request.url));
     }
 
@@ -38,7 +46,7 @@ export async function checkModuleAccess(
     }
 
     // Get user with roles and permissions
-    const user = await getUserWithRolesByEmail(session.user.email, tenant.id);
+    const user = await getUserWithRolesByEmail(decoded.email, tenant.id);
     
     if (!user) {
       return NextResponse.redirect(new URL('/auth/signin', request.url));

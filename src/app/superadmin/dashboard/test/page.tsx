@@ -32,7 +32,7 @@ export default function DashboardTest() {
       <h1 className="text-2xl font-bold">Dashboard Test Page</h1>
       
       <div className="bg-white p-4 rounded-lg shadow">
-        <h2 className="text-lg font-semibold mb-4">Debug Information</h2>
+        <h2 className="text-lg font-semibold mb-4">Information</h2>
         <pre className="bg-gray-100 p-4 rounded text-sm overflow-auto">
           {JSON.stringify(debugInfo, null, 2)}
         </pre>

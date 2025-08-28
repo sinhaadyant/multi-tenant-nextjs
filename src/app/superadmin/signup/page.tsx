@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { AuthLanguageSwitcher } from '@/components/common/AuthLanguageSwitcher';
@@ -25,6 +26,7 @@ const signupSchema = z.object({
 type SignupFormData = z.infer<typeof signupSchema>;
 
 export default function SuperAdminSignup() {
+  const { t } = useTranslation('auth');
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -108,9 +110,9 @@ export default function SuperAdminSignup() {
     }
     
     if (password === confirmPassword) {
-      return { matches: true, message: 'Password matches', color: 'green' };
+      return { matches: true, message: t('signup.passwordMatch.matches'), color: 'green' };
     } else {
-      return { matches: false, message: 'Password does not match', color: 'red' };
+      return { matches: false, message: t('signup.passwordMatch.notMatches'), color: 'red' };
     }
   };
 
@@ -155,17 +157,17 @@ export default function SuperAdminSignup() {
         setInviteData(data.data);
       } else {
         setTokenValid(false);
-        setError(data.message || 'Invalid or expired invite token');
+        setError(data.message || t('signup.errors.tokenRequired'));
       }
     } catch (error) {
       setTokenValid(false);
-      setError('Failed to verify invite token');
+      setError(t('signup.errors.networkError'));
     }
   };
 
   const onSubmit = async (data: SignupFormData) => {
     if (!token) {
-      setError('Invite token is required');
+      setError(t('signup.errors.tokenRequired'));
       return;
     }
 
@@ -187,14 +189,14 @@ export default function SuperAdminSignup() {
       const result = await response.json();
 
       if (result.success) {
-        toast.success('Account created successfully! Please log in.');
+        toast.success(t('signup.success.accountCreated'));
         router.push('/superadmin/login');
       } else {
-        setError(result.message || 'Failed to create account');
-        toast.error(result.message || 'Failed to create account');
+        setError(result.message || t('signup.errors.accountCreationFailed'));
+        toast.error(result.message || t('signup.errors.accountCreationFailed'));
       }
     } catch (err: any) {
-      const errorMessage = 'Network error. Please check your connection and try again.';
+      const errorMessage = t('signup.errors.networkError');
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -208,7 +210,7 @@ export default function SuperAdminSignup() {
         <div className="max-w-md w-full space-y-8">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600 dark:text-gray-400">Verifying invite token...</p>
+            <p className="mt-4 text-gray-600 dark:text-gray-400">{t('signup.verifyingToken')}</p>
           </div>
         </div>
       </div>
@@ -222,17 +224,17 @@ export default function SuperAdminSignup() {
           <div className="text-center">
             <XCircle className="mx-auto h-12 w-12 text-red-500" />
             <h2 className="mt-6 text-3xl font-bold text-gray-900 dark:text-white">
-              Invalid Invite
+              {t('signup.invalidInvite')}
             </h2>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              {error || 'This invite link is invalid or has expired.'}
+              {error || t('signup.invalidInviteMsg')}
             </p>
             <div className="mt-6">
               <button
                 onClick={() => router.push('/superadmin/login')}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
-                Go to Login
+                {t('signup.goToLogin')}
               </button>
             </div>
           </div>
@@ -253,10 +255,10 @@ export default function SuperAdminSignup() {
           <div className="text-center">
             <CheckCircle className="mx-auto h-12 w-12 text-green-500" />
             <h2 className="mt-6 text-3xl font-bold text-gray-900 dark:text-white">
-              Create SuperAdmin Account
+              {t('signup.title')}
             </h2>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Complete your account setup using the invite link
+              {t('signup.subtitle')}
             </p>
           </div>
         </div>
@@ -271,14 +273,14 @@ export default function SuperAdminSignup() {
           {/* Name Field */}
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Full Name
+              {t('signup.fullName')}
             </label>
             <input
               {...register('name')}
               type="text"
               id="name"
               className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              placeholder="Enter your full name"
+              placeholder={t('signup.fullNamePlaceholder')}
             />
             {errors.name && (
               <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name.message}</p>
@@ -288,7 +290,7 @@ export default function SuperAdminSignup() {
           {/* Email Field */}
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Email Address
+              {t('signup.emailAddress')}
             </label>
             <input
               {...register('email')}
@@ -296,17 +298,17 @@ export default function SuperAdminSignup() {
               id="email"
               disabled
               className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400"
-              placeholder="Enter your email"
+              placeholder={t('signup.emailPlaceholder')}
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Email is pre-filled from your invite
+              {t('signup.emailPrefilled')}
             </p>
           </div>
 
           {/* Contact Number Field */}
           <div>
             <label htmlFor="contactNumber" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Contact Number
+              {t('signup.contactNumber')}
             </label>
             <input
               {...register('contactNumber')}
@@ -315,12 +317,12 @@ export default function SuperAdminSignup() {
               pattern="[0-9]*"
               id="contactNumber"
               className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              placeholder="Enter your contact number (numbers only)"
+              placeholder={t('signup.contactNumberPlaceholder')}
               onInput={handleContactNumberInput}
               maxLength={15}
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Enter only numbers (10-15 digits)
+              {t('signup.contactNumberHint')}
             </p>
             {errors.contactNumber && (
               <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.contactNumber.message}</p>
@@ -330,7 +332,7 @@ export default function SuperAdminSignup() {
           {/* Password Field */}
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Password
+              {t('signup.password')}
             </label>
             <div className="mt-1 relative">
               <input
@@ -338,7 +340,7 @@ export default function SuperAdminSignup() {
                 type={showPassword ? 'text' : 'password'}
                 id="password"
                 className="block w-full pr-10 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                placeholder="Create a strong password"
+                placeholder={t('signup.passwordPlaceholder')}
               />
               <button
                 type="button"
@@ -356,19 +358,19 @@ export default function SuperAdminSignup() {
             {/* Password Strength Indicator */}
             {watchedPassword && (
               <div className="space-y-2">
-                <div className="text-sm text-gray-600 dark:text-gray-400">Password strength:</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">{t('signup.passwordStrength')}</div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className={`${watchedPassword.length >= 8 ? 'text-green-600' : 'text-red-600'}`}>
-                    ✓ At least 8 characters
+                    {t('signup.passwordRequirements.minLength')}
                   </div>
                   <div className={`${/[A-Z]/.test(watchedPassword) ? 'text-green-600' : 'text-red-600'}`}>
-                    ✓ One uppercase letter
+                    {t('signup.passwordRequirements.uppercase')}
                   </div>
                   <div className={`${/\d/.test(watchedPassword) ? 'text-green-600' : 'text-red-600'}`}>
-                    ✓ One number
+                    {t('signup.passwordRequirements.number')}
                   </div>
                   <div className={`${/[a-z]/.test(watchedPassword) ? 'text-green-600' : 'text-red-600'}`}>
-                    ✓ One lowercase letter
+                    {t('signup.passwordRequirements.lowercase')}
                   </div>
                 </div>
               </div>
@@ -382,7 +384,7 @@ export default function SuperAdminSignup() {
           {/* Confirm Password Field */}
           <div>
             <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Confirm Password
+              {t('signup.confirmPassword')}
             </label>
             <div className="mt-1 relative">
               <input
@@ -390,7 +392,7 @@ export default function SuperAdminSignup() {
                 type={showConfirmPassword ? 'text' : 'password'}
                 id="confirmPassword"
                 className="block w-full pr-10 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                placeholder="Confirm your password"
+                placeholder={t('signup.confirmPasswordPlaceholder')}
               />
               <button
                 type="button"
@@ -436,10 +438,10 @@ export default function SuperAdminSignup() {
               {isLoading ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Creating Account...
+                  {t('signup.creatingAccount')}
                 </>
               ) : (
-                'Create Account'
+                t('signup.createAccount')
               )}
             </button>
           </div>
@@ -451,7 +453,7 @@ export default function SuperAdminSignup() {
               onClick={() => router.push('/superadmin/login')}
               className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
             >
-              Already have an account? Sign in
+              {t('signup.alreadyHaveAccount')}
             </button>
           </div>
         </form>

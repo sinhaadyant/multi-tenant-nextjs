@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
-import { useTranslation } from 'next-i18next';
+import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard,
   ChevronDown,
@@ -39,10 +39,8 @@ type NavItem = {
   children?: { id: string; label: string; path: string }[];
 };
 
-
-
 // Icon mapping function
-const getIcon = (iconName: string) => {
+const getIcon = (iconName: string): React.ReactNode => {
   const iconMap: { [key: string]: React.ReactNode } = {
     home: <Home className="w-5 h-5" />,
     building: <Building2 className="w-5 h-5" />,
@@ -61,10 +59,23 @@ const getIcon = (iconName: string) => {
   return iconMap[iconName] || <Activity className="w-5 h-5" />;
 };
 
-const SuperAdminSidebar: React.FC = () => {
+const SuperAdminSidebar = (): React.JSX.Element => {
   const { t } = useTranslation('superadmin');
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
+  const [, forceUpdate] = useState({});
+
+  // Listen for language changes
+  useEffect(() => {
+    const handleLanguageChange = () => {
+      forceUpdate({});
+    };
+
+    window.addEventListener('languageChanged', handleLanguageChange);
+    return () => {
+      window.removeEventListener('languageChanged', handleLanguageChange);
+    };
+  }, []);
 
   const superAdminNavElements: NavItem[] = [
     {
@@ -75,43 +86,43 @@ const SuperAdminSidebar: React.FC = () => {
     },
     {
       id: "tenants",
-      label: t('navigation.tenantManagement'),
+      label: t('navigation.tenants'),
       icon: "building",
       children: [
-        { id: "allTenants", label: t('navigation.allTenants'), path: "/superadmin/tenants" },
-        { id: "createTenant", label: t('navigation.createTenant'), path: "/superadmin/tenants/new" }
+        { id: "allTenants", label: t('tenants.title'), path: "/superadmin/tenants" },
+        { id: "createTenant", label: t('tenants.addTenant'), path: "/superadmin/tenants/new" }
       ]
     },
     {
       id: "users",
-      label: t('navigation.userManagement'),
+      label: t('navigation.users'),
       icon: "users",
       path: "/superadmin/users"
     },
     {
       id: "superadmins",
-      label: t('navigation.superadminManagement'),
+      label: t('navigation.superadmins'),
       icon: "user-circle",
       path: "/superadmin/superadmins"
     },
     {
       id: "roles",
-      label: t('navigation.rolesPermissions'),
+      label: t('navigation.roles'),
       icon: "shield",
       children: [
-        { id: "rolesManagement", label: t('navigation.rolesManagement'), path: "/superadmin/roles" },
-        { id: "permissionGroups", label: t('navigation.permissionGroups'), path: "/superadmin/roles?tab=permissions" },
-        { id: "roleAssignment", label: t('navigation.roleAssignment'), path: "/superadmin/roles?tab=assignment" }
+        { id: "rolesManagement", label: t('roles.title'), path: "/superadmin/roles" },
+        { id: "permissionGroups", label: t('roles.permissions'), path: "/superadmin/roles?tab=permissions" },
+        { id: "roleAssignment", label: t('roles.assignment'), path: "/superadmin/roles?tab=assignment" }
       ]
     },
     {
       id: "backup",
-      label: t('navigation.backupImport'),
+      label: t('navigation.backup'),
       icon: "database",
       children: [
-        { id: "backupData", label: t('navigation.backupData'), path: "/superadmin/backup" },
-        { id: "importData", label: t('navigation.importData'), path: "/superadmin/import" },
-        { id: "backupHistory", label: t('navigation.backupHistory'), path: "/superadmin/backup/history" }
+        { id: "backupData", label: t('backup.title'), path: "/superadmin/backup" },
+        { id: "importData", label: t('backup.import'), path: "/superadmin/import" },
+        { id: "backupHistory", label: t('backup.history'), path: "/superadmin/backup/history" }
       ]
     },
     {
@@ -119,8 +130,8 @@ const SuperAdminSidebar: React.FC = () => {
       label: t('navigation.dataManagement'),
       icon: "hard-drive",
       children: [
-        { id: "insertSampleData", label: t('navigation.insertSampleData'), path: "/superadmin/data-management/insert" },
-        { id: "clearData", label: t('navigation.clearData'), path: "/superadmin/data-management/clear" }
+        { id: "insertSampleData", label: t('dataManagement.insertSample'), path: "/superadmin/data-management/insert" },
+        { id: "clearData", label: t('dataManagement.clearData'), path: "/superadmin/data-management/clear" }
       ]
     },
     {
@@ -157,14 +168,69 @@ const SuperAdminSidebar: React.FC = () => {
       ]
     },
     {
+      id: "settings",
+      label: t('navigation.settings'),
+      icon: "cog",
+      path: "/superadmin/settings"
+    },
+    {
       id: "profile",
-      label: t('common.profile'),
+      label: t('navigation.profile'),
       icon: "user-circle",
       path: "/superadmin/profile"
     }
   ];
 
-  const renderMenuItems = (navItems: NavItem[]) => (
+  const [openSubmenu, setOpenSubmenu] = useState<number | null>(null);
+  const [subMenuHeight, setSubMenuHeight] = useState<Record<number, number>>(
+    {}
+  );
+  const subMenuRefs = useRef<Record<number, HTMLDivElement | null>>({});
+
+  const isActive = useCallback((path: string) => path === pathname, [pathname]);
+
+  useEffect(() => {
+    // Check if the current path matches any submenu item
+    let submenuMatched = false;
+    superAdminNavElements.forEach((item, itemIndex) => {
+      if (item.children) {
+        item.children.forEach((subItem) => {
+          if (isActive(subItem.path)) {
+            setOpenSubmenu(itemIndex);
+            submenuMatched = true;
+          }
+        });
+      }
+    });
+
+    // If no submenu item matches, close the open submenu
+    if (!submenuMatched) {
+      setOpenSubmenu(null);
+    }
+  }, [pathname, isActive]);
+
+  useEffect(() => {
+    // Set the height of the submenu items when the submenu is opened
+    if (openSubmenu !== null) {
+      if (subMenuRefs.current[openSubmenu]) {
+        setSubMenuHeight((prevHeights: Record<number, number>) => ({
+          ...prevHeights,
+          [openSubmenu]: subMenuRefs.current[openSubmenu]?.scrollHeight || 0,
+        }));
+      }
+    }
+  }, [openSubmenu]);
+
+  const handleSubmenuToggle = (itemIndex: number) => {
+    setOpenSubmenu((prevOpenSubmenu: number | null) => {
+      if (prevOpenSubmenu === itemIndex) {
+        return null;
+      }
+      return itemIndex;
+    });
+  };
+
+  const renderMenuItems = (navItems: NavItem[]): React.JSX.Element => (
     <ul className="flex flex-col gap-4">
       {navItems.map((item, itemIndex) => (
         <li key={item.id}>
@@ -229,7 +295,7 @@ const SuperAdminSidebar: React.FC = () => {
             )}
             {item.children && (isExpanded || isHovered || isMobileOpen) && (
               <div
-                ref={(el) => {
+                ref={(el: HTMLDivElement | null) => {
                   subMenuRefs.current[itemIndex] = el;
                 }}
                 className="overflow-hidden transition-all duration-300"
@@ -263,55 +329,6 @@ const SuperAdminSidebar: React.FC = () => {
       ))}
     </ul>
   );
-
-  const [openSubmenu, setOpenSubmenu] = useState<number | null>(null);
-  const [subMenuHeight, setSubMenuHeight] = useState<Record<number, number>>(
-    {}
-  );
-  const subMenuRefs = useRef<Record<number, HTMLDivElement | null>>({});
-
-  const isActive = useCallback((path: string) => path === pathname, [pathname]);
-
-  useEffect(() => {
-    // Check if the current path matches any submenu item
-    let submenuMatched = false;
-    superAdminNavElements.forEach((item, itemIndex) => {
-      if (item.children) {
-        item.children.forEach((subItem) => {
-          if (isActive(subItem.path)) {
-            setOpenSubmenu(itemIndex);
-            submenuMatched = true;
-          }
-        });
-      }
-    });
-
-    // If no submenu item matches, close the open submenu
-    if (!submenuMatched) {
-      setOpenSubmenu(null);
-    }
-  }, [pathname, isActive]);
-
-  useEffect(() => {
-    // Set the height of the submenu items when the submenu is opened
-    if (openSubmenu !== null) {
-      if (subMenuRefs.current[openSubmenu]) {
-        setSubMenuHeight((prevHeights) => ({
-          ...prevHeights,
-          [openSubmenu]: subMenuRefs.current[openSubmenu]?.scrollHeight || 0,
-        }));
-      }
-    }
-  }, [openSubmenu]);
-
-  const handleSubmenuToggle = (itemIndex: number) => {
-    setOpenSubmenu((prevOpenSubmenu) => {
-      if (prevOpenSubmenu === itemIndex) {
-        return null;
-      }
-      return itemIndex;
-    });
-  };
 
   return (
     <aside

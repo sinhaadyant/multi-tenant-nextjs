@@ -165,7 +165,7 @@ const response = await fetch('/api/tenant/auth/login', {
    - Verify the loading state is preventing concurrent logout calls
    - Check for proper cleanup in the `clearAuth` function
 
-### Debug Information
+### Information
 
 Enable debug logging by setting `NODE_ENV=development` in your environment. This will provide detailed logs for:
 

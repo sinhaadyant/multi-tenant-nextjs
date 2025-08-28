@@ -10,7 +10,7 @@ import Button from '@/components/ui/button/Button';
 import Input from '@/components/form/input/InputField';
 import { format } from 'date-fns';
 import InviteSuperadminModal from '@/components/superadmin/InviteSuperadminModal';
-import { useTranslation } from 'next-i18next';
+import { useTranslation } from 'react-i18next';
 
 // Memoized stats cards component for better performance
 const StatsCards = memo(({ stats, totalSuperadmins }: { stats: any; totalSuperadmins: number }) => {

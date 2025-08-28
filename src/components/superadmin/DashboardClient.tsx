@@ -1,24 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { 
-  Building2, 
-  Users, 
-  Activity, 
-  TrendingUp, 
-  Shield, 
-  Database,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  DollarSign,
-  Plus,
-  Settings,
-  RefreshCw,
-  Eye,
-  TrendingDown,
-  Bug
-} from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 
 import { DashboardOverviewCards } from './DashboardOverviewCards';
 import { DashboardAnalyticsChart } from './DashboardAnalyticsChart';
@@ -31,11 +14,22 @@ import DateFilterDropdown from './DateFilterDropdown';
 import { useSuperadminDashboard } from '@/hooks/useSuperadminDashboard';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import api, { debugToken } from '@/lib/api';
+import api from '@/lib/api';
+
+interface StatsData {
+  summary?: {
+    totalTenants: number;
+    activeTenants: number;
+    totalUsers: number;
+    activeUsers?: number;
+    tenantGrowth?: number;
+    userGrowth?: number;
+  };
+}
 
 // Real-time stats hook
 const useRealTimeStats = () => {
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
@@ -48,7 +42,7 @@ const useRealTimeStats = () => {
       } else {
         throw new Error(response.data.message || 'Failed to fetch stats');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(err as Error);
     } finally {
       setLoading(false);
@@ -77,7 +71,8 @@ export const DashboardClient: React.FC = () => {
     forceRefresh
   } = useSuperadminDashboard();
 
-  const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useRealTimeStats();
+  const { stats, refetch: refetchStats } = useRealTimeStats();
+  const statsData = stats ? (stats as StatsData) : undefined;
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   // Debug logging
   if (process.env.NODE_ENV === 'development') {
@@ -126,10 +121,10 @@ export const DashboardClient: React.FC = () => {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              SuperAdmin Dashboard
+              System Administration Dashboard
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Manage your multi-tenant application from a central location
+              Centralized management console for multi-tenant platform administration
             </p>
           </div>
         </div>
@@ -155,17 +150,17 @@ export const DashboardClient: React.FC = () => {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              SuperAdmin Dashboard
+              System Administration Dashboard
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Manage your multi-tenant application from a central location
+              Centralized management console for multi-tenant platform administration
             </p>
           </div>
         </div>
         
         <NoDataComponent 
-          title="No Dashboard Data"
-          message="Unable to load dashboard data. Please try again or contact support."
+          title="Dashboard Data Unavailable"
+          message="Unable to retrieve dashboard metrics. Please refresh the page or contact system support if the issue persists."
         />
       </div>
     );
@@ -177,17 +172,15 @@ export const DashboardClient: React.FC = () => {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            SuperAdmin Dashboard
+            System Administration Dashboard
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Manage your multi-tenant application from a central location
+            Centralized management console for multi-tenant platform administration
           </p>
         </div>
         
         <div className="flex items-center gap-3">
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            Last updated: {lastUpdated.toLocaleTimeString()}
-          </div>
+           
           <DateFilterDropdown 
             selectedRange={selectedRange}
             onRangeChange={setSelectedRange}
@@ -197,9 +190,9 @@ export const DashboardClient: React.FC = () => {
               setIsRefreshing(true);
               try {
                 await Promise.all([forceRefresh(), refetchStats()]);
-                toast.success('Dashboard data refreshed successfully!');
-              } catch (error) {
-                toast.error('Failed to refresh dashboard data');
+                toast.success('Dashboard metrics updated successfully!');
+              } catch {
+                toast.error('Failed to update dashboard metrics');
               } finally {
                 setIsRefreshing(false);
               }
@@ -208,20 +201,9 @@ export const DashboardClient: React.FC = () => {
             className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            {isRefreshing ? 'Updating...' : 'Update Metrics'}
           </button>
-          {process.env.NODE_ENV === 'development' && (
-            <button
-              onClick={() => {
-                debugToken();
-                toast.success('Token debug info logged to console');
-              }}
-              className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
-            >
-              <Bug className="w-4 h-4 mr-2" />
-              Debug Token
-            </button>
-          )}
+          
         </div>
       </div>
 
@@ -231,14 +213,8 @@ export const DashboardClient: React.FC = () => {
       </div>
       {/* Overview Cards */}
       <DashboardOverviewCards 
-        summary={{
-          totalTenants: data.summary?.totalTenants || 0,
-          activeTenants: data.summary?.activeTenants || 0,
-          totalUsers: data.summary?.totalUsers || 0,
-          activeUsers: (data.summary as any)?.activeUsers || data.summary?.totalUsers || 0,
-          tenantGrowth: data.summary?.growthMetrics?.tenantGrowth,
-          userGrowth: data.summary?.growthMetrics?.userGrowth
-        }} 
+        data={data}
+        stats={statsData}
         selectedRange={selectedRange} 
         isLoading={isLoading}
       />
@@ -256,10 +232,10 @@ export const DashboardClient: React.FC = () => {
       {/* Recent Tenants and Recent Activity */}
       <div className="grid gap-6 lg:grid-cols-2">
         {data.topTenants && (
-          <RecentTenants tenants={data.topTenants} />
+          <RecentTenants data={data} />
         )}
         {data.recentActivity?.auditLogs && (
-          <RecentActivity auditLogs={data.recentActivity.auditLogs} />
+          <RecentActivity data={data} />
         )}
       </div>
     </div>

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslation } from 'react-i18next';
 import { notFound } from 'next/navigation';
 import ResetPasswordClient from './ResetPasswordClient';
 import axios from 'axios';
@@ -13,6 +14,7 @@ interface TokenValidation {
 }
 
 export default function ResetPasswordPage() {
+  const { t } = useTranslation('auth');
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tokenValidation, setTokenValidation] = useState<TokenValidation | null>(null);
@@ -107,7 +109,7 @@ export default function ResetPasswordPage() {
         <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto space-y-8">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600 dark:text-gray-400">Verifying reset token...</p>
+            <p className="mt-4 text-gray-600 dark:text-gray-400">{t('verifyingResetToken')}</p>
           </div>
         </div>
       </div>
@@ -137,10 +139,10 @@ export default function ResetPasswordPage() {
             </svg>
           </div>
           <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90 sm:text-3xl">
-            Invalid Reset URL
+            {t('invalidResetUrl')}
           </h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            {tokenValidation?.error || 'This reset link is invalid or has expired.'}
+            {tokenValidation?.error || t('invalidResetMsg')}
           </p>
           <div className="mt-6">
             <button

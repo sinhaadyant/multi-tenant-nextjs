@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useTenantLanguage } from '@/hooks/useTenantLanguage';
+import { useSuperAdminLanguage } from '@/hooks/useSuperAdminLanguage';
 import { Globe, ChevronDown } from 'lucide-react';
 
 const languageOptions = [
@@ -14,7 +14,7 @@ const languageOptions = [
 
 export const HeaderLanguageSwitcher: React.FC = () => {
   const { t } = useTranslation('common');
-  const { currentLanguage, changeLanguage, isLoading } = useTenantLanguage();
+  const { currentLanguage, changeLanguage, isLoading } = useSuperAdminLanguage();
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLanguageChange = async (newLanguage: string) => {

@@ -1,0 +1,257 @@
+{
+  "dashboard": {
+    "title": "सुपरएडमिन डैशबोर्ड",
+    "subtitle": "केंद्रीय स्थान से अपने मल्टी-टेनेंट एप्लिकेशन का प्रबंधन करें",
+    "lastUpdated": "अंतिम अपडेट:",
+    "refreshSuccess": "डैशबोर्ड डेटा सफलतापूर्वक रिफ्रेश किया गया!",
+    "noDataTitle": "कोई डैशबोर्ड डेटा नहीं",
+    "noDataMessage": "डैशबोर्ड डेटा लोड नहीं किया जा सका। कृपया पुनः प्रयास करें या सहायता से संपर्क करें।",
+    "loginRequired": "डैशबोर्ड तक पहुंचने के लिए कृपया लॉगिन करें",
+    "stats": {
+      "totalTenants": "कुल टेनेंट्स",
+      "activeTenants": "सक्रिय टेनेंट्स",
+      "totalUsers": "कुल उपयोगकर्ता",
+      "activeUsers": "सक्रिय उपयोगकर्ता",
+      "totalRevenue": "कुल राजस्व",
+      "monthlyRevenue": "मासिक राजस्व",
+      "systemHealth": "सिस्टम स्वास्थ्य",
+      "uptime": "अपटाइम",
+      "supportTickets": "सहायता टिकट",
+      "openTickets": "खुले टिकट",
+      "resolvedTickets": "समाधान किए गए टिकट",
+      "pendingTickets": "लंबित टिकट"
+    },
+    "quickActions": {
+      "title": "त्वरित कार्य",
+      "addTenant": "नया टेनेंट जोड़ें",
+      "manageUsers": "उपयोगकर्ता प्रबंधन",
+      "viewReports": "रिपोर्ट देखें",
+      "systemSettings": "सिस्टम सेटिंग्स",
+      "supportCenter": "सहायता केंद्र"
+    },
+    "recentActivity": {
+      "title": "हाल की गतिविधि",
+      "noActivity": "कोई हाल की गतिविधि नहीं",
+      "tenantCreated": "टेनेंट बनाया गया",
+      "tenantUpdated": "टेनेंट अपडेट किया गया",
+      "userRegistered": "उपयोगकर्ता पंजीकृत",
+      "ticketCreated": "सहायता टिकट बनाया गया",
+      "ticketResolved": "सहायता टिकट समाधान किया गया"
+    },
+    "recentTenants": {
+      "title": "हाल के टेनेंट्स",
+      "viewAll": "सभी टेनेंट्स देखें",
+      "noTenants": "कोई टेनेंट नहीं मिला",
+      "status": {
+        "active": "सक्रिय",
+        "inactive": "निष्क्रिय",
+        "suspended": "निलंबित"
+      }
+    }
+  },
+  "navigation": {
+    "dashboard": "डैशबोर्ड",
+    "tenants": "टेनेंट्स",
+    "users": "उपयोगकर्ता",
+    "superadmins": "सुपरएडमिन्स",
+    "roles": "भूमिकाएं और अनुमतियां",
+    "backup": "बैकअप और आयात",
+    "dataManagement": "डेटा प्रबंधन",
+    "menuManagement": "मेनू प्रबंधन",
+    "reports": "रिपोर्ट्स",
+    "settings": "सेटिंग्स",
+    "support": "सहायता",
+    "audit": "ऑडिट लॉग्स",
+    "profile": "प्रोफाइल",
+    "logout": "साइन आउट"
+  },
+  "tenants": {
+    "title": "सभी टेनेंट्स",
+    "addTenant": "नया टेनेंट जोड़ें",
+    "subtitle": "अपने मल्टी-टेनेंट एप्लिकेशन में सभी टेनेंट्स का प्रबंधन करें",
+    "editTenant": "टेनेंट संपादित करें",
+    "deleteTenant": "टेनेंट हटाएं",
+    "tenantDetails": "टेनेंट विवरण",
+    "tenantSettings": "टेनेंट सेटिंग्स",
+    "noTenants": "कोई टेनेंट नहीं मिला",
+    "searchTenants": "टेनेंट्स खोजें...",
+    "status": {
+      "active": "सक्रिय",
+      "inactive": "निष्क्रिय",
+      "suspended": "निलंबित"
+    },
+    "form": {
+      "name": "टेनेंट का नाम",
+      "slug": "टेनेंट स्लग",
+      "email": "संपर्क ईमेल",
+      "phone": "संपर्क फोन",
+      "address": "पता",
+      "plan": "सदस्यता योजना",
+      "status": "स्थिति",
+      "createdAt": "बनाने की तिथि",
+      "updatedAt": "अंतिम अपडेट"
+    }
+  },
+  "roles": {
+    "title": "भूमिका प्रबंधन",
+    "permissions": "अनुमतियां",
+    "assignment": "भूमिका असाइनमेंट"
+  },
+  "backup": {
+    "title": "बैकअप डेटा",
+    "import": "डेटा आयात करें",
+    "history": "बैकअप इतिहास"
+  },
+  "dataManagement": {
+    "insertSample": "नमूना डेटा डालें",
+    "clearData": "डेटा साफ करें"
+  },
+  "notifications": {
+    "title": "सूचनाएं"
+  },
+  "support": {
+    "title": "सहायता केंद्र",
+    "supportTickets": "सहायता टिकट",
+    "createTicket": "टिकट बनाएं",
+    "subtitle": "सहायता टिकट और सहायता अनुरोधों का प्रबंधन करें",
+    "viewTickets": "सभी टिकट देखें",
+    "noTickets": "कोई टिकट नहीं मिला",
+    "searchTickets": "टिकट खोजें...",
+    "status": {
+      "open": "खुला",
+      "inProgress": "प्रगति में",
+      "resolved": "समाधान किया गया",
+      "closed": "बंद"
+    },
+    "priority": {
+      "low": "कम",
+      "medium": "मध्यम",
+      "high": "उच्च",
+      "urgent": "तत्काल"
+    }
+  },
+  "common": {
+    "loading": "लोड हो रहा है...",
+    "error": "त्रुटि",
+    "success": "सफलता",
+    "cancel": "रद्द करें",
+    "save": "सहेजें",
+    "delete": "हटाएं",
+    "edit": "संपादित करें",
+    "view": "देखें",
+    "add": "जोड़ें",
+    "search": "खोजें",
+    "filter": "फ़िल्टर",
+    "refresh": "रिफ्रेश",
+    "retry": "पुनः प्रयास",
+    "close": "बंद करें",
+    "confirm": "पुष्टि करें",
+    "back": "वापस",
+    "next": "अगला",
+    "previous": "पिछला",
+    "submit": "सबमिट करें",
+    "reset": "रीसेट",
+    "actions": "कार्य",
+    "status": "स्थिति",
+    "createdAt": "बनाने की तिथि",
+    "updatedAt": "अपडेट की तिथि",
+    "name": "नाम",
+    "email": "ईमेल",
+    "phone": "फोन",
+    "description": "विवरण",
+    "notes": "नोट्स",
+    "details": "विवरण",
+    "settings": "सेटिंग्स",
+    "profile": "प्रोफाइल",
+    "logout": "साइन आउट",
+    "signIn": "साइन इन",
+    "signUp": "साइन अप",
+    "forgotPassword": "पासवर्ड भूल गए",
+    "resetPassword": "पासवर्ड रीसेट",
+    "changePassword": "पासवर्ड बदलें",
+    "selectLanguage": "भाषा चुनें"
+  },
+  "users": {
+    "title": "उपयोगकर्ता प्रबंधन",
+    "subtitle": "सभी टेनेंट्स में उपयोगकर्ताओं का प्रबंधन करें",
+    "addUser": "नया उपयोगकर्ता जोड़ें",
+    "editUser": "उपयोगकर्ता संपादित करें",
+    "deleteUser": "उपयोगकर्ता हटाएं",
+    "userDetails": "उपयोगकर्ता विवरण",
+    "noUsers": "कोई उपयोगकर्ता नहीं मिला",
+    "searchUsers": "उपयोगकर्ता खोजें...",
+    "status": {
+      "active": "सक्रिय",
+      "inactive": "निष्क्रिय",
+      "pending": "लंबित"
+    },
+    "form": {
+      "firstName": "पहला नाम",
+      "lastName": "अंतिम नाम",
+      "email": "ईमेल",
+      "phone": "फोन",
+      "role": "भूमिका",
+      "tenant": "टेनेंट",
+      "status": "स्थिति",
+      "createdAt": "बनाने की तिथि",
+      "updatedAt": "अंतिम अपडेट"
+    }
+  },
+  "reports": {
+    "title": "रिपोर्ट्स और विश्लेषण",
+    "subtitle": "विस्तृत रिपोर्ट्स और विश्लेषण देखें",
+    "generateReport": "रिपोर्ट जनरेट करें",
+    "exportReport": "रिपोर्ट निर्यात करें",
+    "noReports": "कोई रिपोर्ट उपलब्ध नहीं",
+    "types": {
+      "tenantReport": "टेनेंट रिपोर्ट",
+      "userReport": "उपयोगकर्ता रिपोर्ट",
+      "revenueReport": "राजस्व रिपोर्ट",
+      "activityReport": "गतिविधि रिपोर्ट"
+    }
+  },
+  "settings": {
+    "title": "सिस्टम सेटिंग्स",
+    "subtitle": "सिस्टम-व्यापी सेटिंग्स कॉन्फ़िगर करें",
+    "general": "सामान्य सेटिंग्स",
+    "security": "सुरक्षा सेटिंग्स",
+    "notifications": "सूचना सेटिंग्स",
+    "backup": "बैकअप सेटिंग्स",
+    "saveSettings": "सेटिंग्स सहेजें",
+    "resetSettings": "डिफ़ॉल्ट पर रीसेट करें"
+  },
+  "audit": {
+    "title": "ऑडिट लॉग्स",
+    "subtitle": "सिस्टम ऑडिट लॉग्स और गतिविधि इतिहास देखें",
+    "exportLogs": "लॉग्स निर्यात करें",
+    "clearLogs": "लॉग्स साफ करें",
+    "noLogs": "कोई ऑडिट लॉग नहीं मिला",
+    "searchLogs": "लॉग्स खोजें...",
+    "types": {
+      "login": "लॉगिन",
+      "logout": "लॉगआउट",
+      "create": "बनाएं",
+      "update": "अपडेट",
+      "delete": "हटाएं",
+      "export": "निर्यात"
+    }
+  },
+  "profile": {
+    "title": "प्रोफाइल सेटिंग्स",
+    "subtitle": "अपने सुपरएडमिन प्रोफाइल का प्रबंधन करें",
+    "personalInfo": "व्यक्तिगत जानकारी",
+    "security": "सुरक्षा",
+    "preferences": "प्राथमिकताएं",
+    "avatar": "प्रोफाइल चित्र",
+    "changeAvatar": "चित्र बदलें",
+    "removeAvatar": "चित्र हटाएं",
+    "form": {
+      "name": "पूरा नाम",
+      "email": "ईमेल पता",
+      "phone": "फोन नंबर",
+      "currentPassword": "वर्तमान पासवर्ड",
+      "newPassword": "नया पासवर्ड",
+      "confirmPassword": "पासवर्ड की पुष्टि करें"
+    }
+  }
+}

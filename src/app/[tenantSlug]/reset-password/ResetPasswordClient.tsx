@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Shield, Eye, EyeOff, Loader2, CheckCircle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -31,6 +31,9 @@ interface ResetPasswordClientProps {
 
 export default function ResetPasswordClient({ token, email }: ResetPasswordClientProps) {
   const router = useRouter();
+  const params = useParams();
+  const tenantSlug = params.tenantSlug as string;
+  
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -39,7 +42,7 @@ export default function ResetPasswordClient({ token, email }: ResetPasswordClien
 
   // Additional validation - redirect if no token or email
   if (!token || !email) {
-    router.push('/superadmin/forgot-password');
+    router.push(`/${tenantSlug}/forgot-password`);
     return null;
   }
 
@@ -59,12 +62,12 @@ export default function ResetPasswordClient({ token, email }: ResetPasswordClien
     setError(null);
 
     try {
-      const response = await resetPassword(token, data.newPassword, data.confirmPassword);
+      const response = await resetPassword(token, data.newPassword, data.confirmPassword, tenantSlug);
 
       if (response.success) {
         setSuccess(true);
         setTimeout(() => {
-          router.push('/superadmin/login?message=password-reset-success');
+          router.push(`/${tenantSlug}/login?message=password-reset-success`);
         }, 2000);
       } else {
         setError(response.message);
@@ -103,7 +106,7 @@ export default function ResetPasswordClient({ token, email }: ResetPasswordClien
     <div className="flex flex-col flex-1 w-full">
       <div className="w-full max-w-md sm:pt-10 mx-auto mb-5">
         <Link
-          href="/superadmin/login"
+          href={`/${tenantSlug}/login`}
           className="inline-flex items-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
         >
           ← Back to login

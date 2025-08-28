@@ -8,9 +8,14 @@ import { z } from 'zod';
 
 // Validation schemas
 const updateRoleSchema = z.object({
-  name: z.string().min(1, 'Role name is required').optional(),
-  description: z.string().optional(),
-  color: z.string().optional(),
+  name: z.string()
+    .min(1, 'Role name is required')
+    .min(2, 'Role name must be at least 2 characters')
+    .max(50, 'Role name must be less than 50 characters')
+    .regex(/^[a-zA-Z0-9\s\-_]+$/, 'Role name can only contain letters, numbers, spaces, hyphens, and underscores')
+    .optional(),
+  description: z.string().max(200, 'Description must be less than 200 characters').optional(),
+  color: z.string().regex(/^#[0-9A-F]{6}$/i, 'Valid color is required').optional(),
   isActive: z.boolean().optional(),
   permissions: z.array(z.object({
     moduleKey: z.string(),
@@ -162,7 +167,9 @@ export const PUT = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
       });
 
       if (nameExists) {
-        return createErrorResponse('Role with this name already exists in this tenant', 400);
+        return createErrorResponse('Role with this name already exists in this tenant', 400, [
+          { field: 'name', message: 'Role name already exists in this tenant' }
+        ]);
       }
     }
 
@@ -223,7 +230,11 @@ export const PUT = withTenantAuth(async (req: AuthenticatedRequest, { params }: 
   } catch (error: any) {
     console.error('Error updating role:', error);
     if (error.name === 'ZodError') {
-      return createErrorResponse('Validation error: ' + error.errors[0].message, 400);
+      const validationErrors = error.errors.map((err: any) => ({
+        field: err.path.join('.'),
+        message: err.message
+      }));
+      return createErrorResponse('Validation failed', 400, validationErrors);
     }
     return createErrorResponse(
       error.message || 'Failed to update role',

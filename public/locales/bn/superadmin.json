@@ -1,0 +1,257 @@
+{
+  "dashboard": {
+    "title": "সুপারঅ্যাডমিন ড্যাশবোর্ড",
+    "subtitle": "কেন্দ্রীয় অবস্থান থেকে আপনার মাল্টি-টেন্যান্ট অ্যাপ্লিকেশন পরিচালনা করুন",
+    "lastUpdated": "সর্বশেষ আপডেট:",
+    "refreshSuccess": "ড্যাশবোর্ড ডেটা সফলভাবে রিফ্রেশ করা হয়েছে!",
+    "noDataTitle": "কোন ড্যাশবোর্ড ডেটা নেই",
+    "noDataMessage": "ড্যাশবোর্ড ডেটা লোড করা যায়নি। অনুগ্রহ করে আবার চেষ্টা করুন বা সহায়তার সাথে যোগাযোগ করুন।",
+    "loginRequired": "ড্যাশবোর্ড অ্যাক্সেস করতে অনুগ্রহ করে লগইন করুন",
+    "stats": {
+      "totalTenants": "মোট টেন্যান্ট",
+      "activeTenants": "সক্রিয় টেন্যান্ট",
+      "totalUsers": "মোট ব্যবহারকারী",
+      "activeUsers": "সক্রিয় ব্যবহারকারী",
+      "totalRevenue": "মোট রাজস্ব",
+      "monthlyRevenue": "মাসিক রাজস্ব",
+      "systemHealth": "সিস্টেম স্বাস্থ্য",
+      "uptime": "আপটাইম",
+      "supportTickets": "সহায়তা টিকিট",
+      "openTickets": "খোলা টিকিট",
+      "resolvedTickets": "সমাধানকৃত টিকিট",
+      "pendingTickets": "অপেক্ষমান টিকিট"
+    },
+    "quickActions": {
+      "title": "দ্রুত কর্ম",
+      "addTenant": "নতুন টেন্যান্ট যোগ করুন",
+      "manageUsers": "ব্যবহারকারী পরিচালনা",
+      "viewReports": "রিপোর্ট দেখুন",
+      "systemSettings": "সিস্টেম সেটিংস",
+      "supportCenter": "সহায়তা কেন্দ্র"
+    },
+    "recentActivity": {
+      "title": "সাম্প্রতিক কার্যক্রম",
+      "noActivity": "কোন সাম্প্রতিক কার্যক্রম নেই",
+      "tenantCreated": "টেন্যান্ট তৈরি করা হয়েছে",
+      "tenantUpdated": "টেন্যান্ট আপডেট করা হয়েছে",
+      "userRegistered": "ব্যবহারকারী নিবন্ধিত",
+      "ticketCreated": "সহায়তা টিকিট তৈরি করা হয়েছে",
+      "ticketResolved": "সহায়তা টিকিট সমাধান করা হয়েছে"
+    },
+    "recentTenants": {
+      "title": "সাম্প্রতিক টেন্যান্ট",
+      "viewAll": "সব টেন্যান্ট দেখুন",
+      "noTenants": "কোন টেন্যান্ট পাওয়া যায়নি",
+      "status": {
+        "active": "সক্রিয়",
+        "inactive": "নিষ্ক্রিয়",
+        "suspended": "স্থগিত"
+      }
+    }
+  },
+  "navigation": {
+    "dashboard": "ড্যাশবোর্ড",
+    "tenants": "টেন্যান্ট",
+    "users": "ব্যবহারকারী",
+    "superadmins": "সুপারঅ্যাডমিন",
+    "roles": "ভূমিকা এবং অনুমতি",
+    "backup": "ব্যাকআপ এবং আমদানি",
+    "dataManagement": "ডেটা পরিচালনা",
+    "menuManagement": "মেনু পরিচালনা",
+    "reports": "রিপোর্ট",
+    "settings": "সেটিংস",
+    "support": "সহায়তা",
+    "audit": "অডিট লগ",
+    "profile": "প্রোফাইল",
+    "logout": "সাইন আউট"
+  },
+  "tenants": {
+    "title": "সব টেন্যান্ট",
+    "addTenant": "নতুন টেন্যান্ট যোগ করুন",
+    "subtitle": "আপনার মাল্টি-টেন্যান্ট অ্যাপ্লিকেশনে সব টেন্যান্ট পরিচালনা করুন",
+    "editTenant": "টেন্যান্ট সম্পাদনা করুন",
+    "deleteTenant": "টেন্যান্ট মুছুন",
+    "tenantDetails": "টেন্যান্ট বিবরণ",
+    "tenantSettings": "টেন্যান্ট সেটিংস",
+    "noTenants": "কোন টেন্যান্ট পাওয়া যায়নি",
+    "searchTenants": "টেন্যান্ট অনুসন্ধান করুন...",
+    "status": {
+      "active": "সক্রিয়",
+      "inactive": "নিষ্ক্রিয়",
+      "suspended": "স্থগিত"
+    },
+    "form": {
+      "name": "টেন্যান্ট নাম",
+      "slug": "টেন্যান্ট স্লাগ",
+      "email": "যোগাযোগ ইমেইল",
+      "phone": "যোগাযোগ ফোন",
+      "address": "ঠিকানা",
+      "plan": "সাবস্ক্রিপশন পরিকল্পনা",
+      "status": "অবস্থা",
+      "createdAt": "তৈরির তারিখ",
+      "updatedAt": "সর্বশেষ আপডেট"
+    }
+  },
+  "roles": {
+    "title": "ভূমিকা পরিচালনা",
+    "permissions": "অনুমতি",
+    "assignment": "ভূমিকা বরাদ্দ"
+  },
+  "backup": {
+    "title": "ব্যাকআপ ডেটা",
+    "import": "ডেটা আমদানি করুন",
+    "history": "ব্যাকআপ ইতিহাস"
+  },
+  "dataManagement": {
+    "insertSample": "নমুনা ডেটা ঢোকান",
+    "clearData": "ডেটা মুছুন"
+  },
+  "notifications": {
+    "title": "বিজ্ঞপ্তি"
+  },
+  "support": {
+    "title": "সহায়তা কেন্দ্র",
+    "supportTickets": "সহায়তা টিকিট",
+    "createTicket": "টিকিট তৈরি করুন",
+    "subtitle": "সহায়তা টিকিট এবং সহায়তা অনুরোধ পরিচালনা করুন",
+    "viewTickets": "সব টিকিট দেখুন",
+    "noTickets": "কোন টিকিট পাওয়া যায়নি",
+    "searchTickets": "টিকিট অনুসন্ধান করুন...",
+    "status": {
+      "open": "খোলা",
+      "inProgress": "অগ্রগতিতে",
+      "resolved": "সমাধানকৃত",
+      "closed": "বন্ধ"
+    },
+    "priority": {
+      "low": "কম",
+      "medium": "মাঝারি",
+      "high": "উচ্চ",
+      "urgent": "জরুরি"
+    }
+  },
+  "common": {
+    "loading": "লোড হচ্ছে...",
+    "error": "ত্রুটি",
+    "success": "সফলতা",
+    "cancel": "বাতিল করুন",
+    "save": "সংরক্ষণ করুন",
+    "delete": "মুছুন",
+    "edit": "সম্পাদনা করুন",
+    "view": "দেখুন",
+    "add": "যোগ করুন",
+    "search": "অনুসন্ধান করুন",
+    "filter": "ফিল্টার",
+    "refresh": "রিফ্রেশ",
+    "retry": "আবার চেষ্টা করুন",
+    "close": "বন্ধ করুন",
+    "confirm": "নিশ্চিত করুন",
+    "back": "পিছনে",
+    "next": "পরবর্তী",
+    "previous": "পূর্ববর্তী",
+    "submit": "জমা দিন",
+    "reset": "রিসেট",
+    "actions": "কর্ম",
+    "status": "অবস্থা",
+    "createdAt": "তৈরির তারিখ",
+    "updatedAt": "আপডেটের তারিখ",
+    "name": "নাম",
+    "email": "ইমেইল",
+    "phone": "ফোন",
+    "description": "বিবরণ",
+    "notes": "নোট",
+    "details": "বিবরণ",
+    "settings": "সেটিংস",
+    "profile": "প্রোফাইল",
+    "logout": "সাইন আউট",
+    "signIn": "সাইন ইন",
+    "signUp": "সাইন আপ",
+    "forgotPassword": "পাসওয়ার্ড ভুলে গেছেন",
+    "resetPassword": "পাসওয়ার্ড রিসেট",
+    "changePassword": "পাসওয়ার্ড পরিবর্তন করুন",
+    "selectLanguage": "ভাষা নির্বাচন করুন"
+  },
+  "users": {
+    "title": "ব্যবহারকারী পরিচালনা",
+    "subtitle": "সব টেন্যান্টে ব্যবহারকারী পরিচালনা করুন",
+    "addUser": "নতুন ব্যবহারকারী যোগ করুন",
+    "editUser": "ব্যবহারকারী সম্পাদনা করুন",
+    "deleteUser": "ব্যবহারকারী মুছুন",
+    "userDetails": "ব্যবহারকারী বিবরণ",
+    "noUsers": "কোন ব্যবহারকারী পাওয়া যায়নি",
+    "searchUsers": "ব্যবহারকারী অনুসন্ধান করুন...",
+    "status": {
+      "active": "সক্রিয়",
+      "inactive": "নিষ্ক্রিয়",
+      "pending": "অপেক্ষমান"
+    },
+    "form": {
+      "firstName": "প্রথম নাম",
+      "lastName": "শেষ নাম",
+      "email": "ইমেইল",
+      "phone": "ফোন",
+      "role": "ভূমিকা",
+      "tenant": "টেন্যান্ট",
+      "status": "অবস্থা",
+      "createdAt": "তৈরির তারিখ",
+      "updatedAt": "সর্বশেষ আপডেট"
+    }
+  },
+  "reports": {
+    "title": "রিপোর্ট এবং বিশ্লেষণ",
+    "subtitle": "বিস্তারিত রিপোর্ট এবং বিশ্লেষণ দেখুন",
+    "generateReport": "রিপোর্ট তৈরি করুন",
+    "exportReport": "রিপোর্ট রপ্তানি করুন",
+    "noReports": "কোন রিপোর্ট উপলব্ধ নেই",
+    "types": {
+      "tenantReport": "টেন্যান্ট রিপোর্ট",
+      "userReport": "ব্যবহারকারী রিপোর্ট",
+      "revenueReport": "রাজস্ব রিপোর্ট",
+      "activityReport": "কার্যক্রম রিপোর্ট"
+    }
+  },
+  "settings": {
+    "title": "সিস্টেম সেটিংস",
+    "subtitle": "সিস্টেম-ব্যাপী সেটিংস কনফিগার করুন",
+    "general": "সাধারণ সেটিংস",
+    "security": "নিরাপত্তা সেটিংস",
+    "notifications": "বিজ্ঞপ্তি সেটিংস",
+    "backup": "ব্যাকআপ সেটিংস",
+    "saveSettings": "সেটিংস সংরক্ষণ করুন",
+    "resetSettings": "ডিফল্টে রিসেট করুন"
+  },
+  "audit": {
+    "title": "অডিট লগ",
+    "subtitle": "সিস্টেম অডিট লগ এবং কার্যক্রম ইতিহাস দেখুন",
+    "exportLogs": "লগ রপ্তানি করুন",
+    "clearLogs": "লগ মুছুন",
+    "noLogs": "কোন অডিট লগ পাওয়া যায়নি",
+    "searchLogs": "লগ অনুসন্ধান করুন...",
+    "types": {
+      "login": "লগইন",
+      "logout": "লগআউট",
+      "create": "তৈরি করুন",
+      "update": "আপডেট",
+      "delete": "মুছুন",
+      "export": "রপ্তানি"
+    }
+  },
+  "profile": {
+    "title": "প্রোফাইল সেটিংস",
+    "subtitle": "আপনার সুপারঅ্যাডমিন প্রোফাইল পরিচালনা করুন",
+    "personalInfo": "ব্যক্তিগত তথ্য",
+    "security": "নিরাপত্তা",
+    "preferences": "পছন্দ",
+    "avatar": "প্রোফাইল ছবি",
+    "changeAvatar": "ছবি পরিবর্তন করুন",
+    "removeAvatar": "ছবি সরান",
+    "form": {
+      "name": "পূর্ণ নাম",
+      "email": "ইমেইল ঠিকানা",
+      "phone": "ফোন নম্বর",
+      "currentPassword": "বর্তমান পাসওয়ার্ড",
+      "newPassword": "নতুন পাসওয়ার্ড",
+      "confirmPassword": "পাসওয়ার্ড নিশ্চিত করুন"
+    }
+  }
+}

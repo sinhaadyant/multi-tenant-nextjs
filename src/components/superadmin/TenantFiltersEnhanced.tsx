@@ -3,6 +3,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Search, Filter, X, Calendar, MapPin, Package, Users } from 'lucide-react';
 import { TenantFilters } from '@/hooks/useTenantsAPI';
+import { useTranslation } from 'react-i18next';
 
 interface TenantFiltersEnhancedProps {
   filters: TenantFilters;
@@ -17,6 +18,7 @@ const TenantFiltersEnhanced: React.FC<TenantFiltersEnhancedProps> = ({
   onClearFilters,
   loading = false
 }) => {
+  const { t } = useTranslation('superadmin');
   const [isExpanded, setIsExpanded] = useState(false);
   const [searchValue, setSearchValue] = useState(filters.search || '');
 
@@ -65,7 +67,7 @@ const TenantFiltersEnhanced: React.FC<TenantFiltersEnhancedProps> = ({
           </div>
           <input
             type="text"
-            placeholder="Search tenants by name, subdomain, or domain..."
+            placeholder={t('tenants.management.filters.searchPlaceholder')}
             value={searchValue}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="block w-full pl-10 pr-10 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 transition-colors"
@@ -85,7 +87,7 @@ const TenantFiltersEnhanced: React.FC<TenantFiltersEnhancedProps> = ({
                  {/* Search Status */}
          {searchValue && (
            <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-             Searching for &quot;{searchValue}&quot;...
+             {t('common.search')} for &quot;{searchValue}&quot;...
            </div>
          )}
       </div>

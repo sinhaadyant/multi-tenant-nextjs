@@ -1,9 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import { useTranslation } from 'react-i18next';
 import Checkbox from "@/components/form/input/Checkbox";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
@@ -18,10 +19,61 @@ import toast from 'react-hot-toast';
 import Link from "next/link";
 
 export default function SignInForm({ superAdmin }: { superAdmin?: boolean }) {
+  const { t } = useTranslation('auth');
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
+  const [, forceUpdate] = useState({});
   const router = useRouter();
   const dispatch = useAppDispatch();
+
+  // Listen for language changes
+  useEffect(() => {
+    const handleLanguageChange = () => {
+      forceUpdate({});
+    };
+
+    window.addEventListener('languageChanged', handleLanguageChange);
+    return () => {
+      window.removeEventListener('languageChanged', handleLanguageChange);
+    };
+  }, []);
+
+  const loginMutation = useMutation<LoginResponse, Error, LoginFormData>({
+    mutationFn: login,
+    onSuccess: (data) => {
+      if (data.success && data.data) {
+        // Handle user data safely
+        if (data.data.user) {
+          dispatch(setLogin(data.data.user));
+        }
+        
+        // Handle token data safely
+        if (data.data.token) {
+          simpleStorage.setAuthToken(data.data.token, isChecked);
+        }
+        
+        // Handle refresh token safely
+        if (data.data.refreshToken) {
+          // Store refresh token in localStorage or secure storage
+          localStorage.setItem('refreshToken', data.data.refreshToken);
+        }
+        
+        // Handle remember me
+        if (isChecked) {
+          localStorage.setItem('rememberMe', 'true');
+        }
+        
+        toast.success('Login successful!');
+        router.push('/superadmin/dashboard');
+      } else {
+        toast.error(data.message || t('login.errors.invalidCredentials'));
+      }
+    },
+    onError: (error) => {
+      console.error('Login error:', error);
+      toast.error(t('login.errors.networkError'));
+    },
+  });
 
   const {
     register,
@@ -29,55 +81,6 @@ export default function SignInForm({ superAdmin }: { superAdmin?: boolean }) {
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-  });
-
-  // Login mutation
-  const loginMutation = useMutation({
-    mutationFn: (data: LoginFormData & { rememberMe?: boolean }): Promise<LoginResponse> => {
-      return login(data);
-    },
-    onSuccess: (response: LoginResponse) => {
-      if (response.success && response.data) {
-        try {
-          // Store auth data using storage utility with "Remember Me" preference
-          simpleStorage.setAuthToken(response.data.token, isChecked);
-          simpleStorage.setAuthUser(response.data.user);
-          
-          // For superadmin, also ensure the cookie is properly set
-          if (response.data.user.role === 'superadmin') {
-            // Set cookie for superadmin token with appropriate expiration
-            const cookieMaxAge = isChecked ? 30 * 24 * 60 * 60 : 7 * 24 * 60 * 60; // 30 days or 7 days
-            document.cookie = `superadmin_token=${response.data.token}; path=/; max-age=${cookieMaxAge}; samesite=lax`;
-          }
-          
-          // Update Redux state
-          dispatch(setLogin({
-            user: response.data.user,
-            token: response.data.token,
-            refreshToken: response.data.refreshToken || '',
-            email: response.data.user.email,
-          }));
-
-          toast.success('Login successful!');
-          
-          // Redirect based on user role
-          if (response.data.user.role === 'superadmin') {
-            router.push('/superadmin/dashboard');
-          } else {
-            router.push('/dashboard');
-          }
-        } catch (error) {
-          if (process.env.NODE_ENV === 'development') {
-            console.error('❌ Error storing auth data:', error);
-          }
-          toast.error('Login successful but failed to save session. Please try again.');
-        }
-      }
-    },
-    onError: (error: any) => {
-      const errorMessage = error.response?.data?.message || 'Login failed';
-      toast.error(errorMessage);
-    },
   });
 
   const onSubmit = (data: LoginFormData) => {
@@ -97,17 +100,17 @@ export default function SignInForm({ superAdmin }: { superAdmin?: boolean }) {
           className="inline-flex items-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
         >
           <ChevronLeftIcon />
-          Back to dashboard
+          {t('login.backToDashboard')}
         </Link>
       </div>
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
         <div>
           <div className="mb-5 sm:mb-8">
             <h1 className="mb-2 font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md">
-              Sign In
+              {t('login.title')}
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Enter your email and password to sign in!
+              {t('login.subtitle')}
             </p>
           </div>
           <div>
@@ -115,11 +118,11 @@ export default function SignInForm({ superAdmin }: { superAdmin?: boolean }) {
               <div className="space-y-6">
                 <div>
                   <Label>
-                    Email <span className="text-error-500">*</span>{" "}
+                    {t('login.emailLabel')} <span className="text-error-500">*</span>{" "}
                   </Label>
                   <Input 
                     {...register('email')}
-                    placeholder="info@gmail.com" 
+                    placeholder={t('login.emailPlaceholder')} 
                     type="email"
                     className={errors.email ? 'border-red-500' : ''}
                   />
@@ -129,80 +132,54 @@ export default function SignInForm({ superAdmin }: { superAdmin?: boolean }) {
                 </div>
                 <div>
                   <Label>
-                    Password <span className="text-error-500">*</span>{" "}
+                    {t('login.passwordLabel')} <span className="text-error-500">*</span>{" "}
                   </Label>
                   <div className="relative">
-                    <Input
+                    <Input 
                       {...register('password')}
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Enter your password"
+                      placeholder={t('login.passwordPlaceholder')} 
+                      type={showPassword ? 'text' : 'password'}
                       className={errors.password ? 'border-red-500' : ''}
                     />
-                    <span
+                    <button
+                      type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute z-30 -translate-y-1/2 cursor-pointer right-4 top-1/2"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
                     >
                       {showPassword ? (
-                        <EyeIcon className="fill-gray-500 dark:fill-gray-400" />
+                        <EyeCloseIcon className="h-5 w-5 text-gray-400" />
                       ) : (
-                        <EyeCloseIcon className="fill-gray-500 dark:fill-gray-400" />
+                        <EyeIcon className="h-5 w-5 text-gray-400" />
                       )}
-                    </span>
+                    </button>
                   </div>
                   {errors.password && (
                     <p className="mt-1 text-sm text-red-500">{errors.password.message}</p>
                   )}
                 </div>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Checkbox checked={isChecked} onChange={setIsChecked} />
-                    <span className="block font-normal text-gray-700 text-theme-sm dark:text-gray-400">
-                      Keep me logged in
-                    </span>
-                  </div>
+                  <Checkbox
+                    id="rememberMe"
+                    checked={isChecked}
+                    onChange={(checked: boolean) => setIsChecked(checked)}
+                    label={t('login.rememberMe')}
+                  />
                   <Link
-                    href="/reset-password"
-                    className="text-sm text-brand-500 hover:text-brand-600 dark:text-brand-400"
+                    href="/superadmin/forgot-password"
+                    className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
                   >
-                    Forgot password?
+                    {t('login.forgotPasswordLink')}
                   </Link>
                 </div>
-                <div>
-                  <Button 
-                    className="w-full" 
-                    size="sm"
-                    disabled={loginMutation.isPending}
-                    onClick={handleSubmit(onSubmit)}
-                  >
-                    {loginMutation.isPending ? (
-                      <div className="flex items-center">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Signing in...
-                      </div>
-                    ) : (
-                      'Sign in'
-                    )}
-                  </Button>
-                </div>
+                <Button
+                  type="submit"
+                  disabled={loginMutation.isPending}
+                  className="w-full"
+                >
+                  {loginMutation.isPending ? t('login.signingInButton') : t('login.signInButton')}
+                </Button>
               </div>
             </form>
-
-            {!superAdmin && <div className="mt-5">
-              <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-400 sm:text-start">
-                Don&apos;t have an account? {""}
-                <Link
-                  href="/signup"
-                  className="text-brand-500 hover:text-brand-600 dark:text-brand-400"
-                >
-                  Sign Up
-                </Link>
-              </p>
-            </div>}
-            {superAdmin && <div className="mt-5">
-              <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-400">
-                Need an invite? Contact your administrator for a SuperAdmin account.
-              </p>
-            </div>}
           </div>
         </div>
       </div>

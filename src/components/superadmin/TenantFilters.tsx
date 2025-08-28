@@ -3,6 +3,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Search, Filter, X, Calendar, MapPin } from 'lucide-react';
 import { TenantFilters } from '@/hooks/useTenantsAPI';
+import { useTranslation } from 'react-i18next';
 
 interface TenantFiltersProps {
   filters: TenantFilters;
@@ -17,6 +18,7 @@ const TenantFiltersComponent: React.FC<TenantFiltersProps> = ({
   onClearFilters,
   loading = false
 }) => {
+  const { t } = useTranslation('superadmin');
   const [isExpanded, setIsExpanded] = useState(false);
   const [localSearchValue, setLocalSearchValue] = useState(filters.search || '');
   const [showClearButton, setShowClearButton] = useState(!!filters.search);
@@ -74,7 +76,7 @@ const TenantFiltersComponent: React.FC<TenantFiltersProps> = ({
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search tenants by name, subdomain, or domain..."
+            placeholder={t('tenants.management.filters.searchPlaceholder')}
             value={localSearchValue}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
@@ -101,10 +103,10 @@ const TenantFiltersComponent: React.FC<TenantFiltersProps> = ({
             disabled={loading}
           >
             <Filter className="w-4 h-4" />
-            <span>Filters</span>
+            <span>{t('tenants.management.filters.filters')}</span>
             {hasActiveFilters && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                Active
+                {t('tenants.management.filters.active')}
               </span>
             )}
           </button>
@@ -115,7 +117,7 @@ const TenantFiltersComponent: React.FC<TenantFiltersProps> = ({
               className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               disabled={loading}
             >
-              Clear all
+              {t('tenants.management.filters.clearAll')}
             </button>
           )}
         </div>
@@ -127,7 +129,7 @@ const TenantFiltersComponent: React.FC<TenantFiltersProps> = ({
               {/* Status Filter */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Status
+                  {t('tenants.management.filters.status')}
                 </label>
                 <select
                   value={filters.status || ''}
@@ -135,16 +137,16 @@ const TenantFiltersComponent: React.FC<TenantFiltersProps> = ({
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                   disabled={loading}
                 >
-                  <option value="">All Status</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
+                  <option value="">{t('tenants.management.filters.allStatus')}</option>
+                  <option value="active">{t('tenants.management.table.status.active')}</option>
+                  <option value="inactive">{t('tenants.management.table.status.suspended')}</option>
                 </select>
               </div>
 
               {/* Region Filter */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Region
+                  {t('tenants.management.filters.region')}
                 </label>
                 <select
                   value={filters.region || ''}
@@ -152,12 +154,12 @@ const TenantFiltersComponent: React.FC<TenantFiltersProps> = ({
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                   disabled={loading}
                 >
-                  <option value="">All Regions</option>
-                  <option value="US East">US East</option>
-                  <option value="US West">US West</option>
-                  <option value="EU West">EU West</option>
-                  <option value="EU Central">EU Central</option>
-                  <option value="Asia Pacific">Asia Pacific</option>
+                  <option value="">{t('tenants.management.filters.allRegions')}</option>
+                  <option value="US East">{t('tenants.management.filters.regions.usEast')}</option>
+                  <option value="US West">{t('tenants.management.filters.regions.usWest')}</option>
+                  <option value="EU West">{t('tenants.management.filters.regions.euWest')}</option>
+                  <option value="EU Central">{t('tenants.management.filters.regions.euCentral')}</option>
+                  <option value="Asia Pacific">{t('tenants.management.filters.regions.asiaPacific')}</option>
                 </select>
               </div>
             </div>
@@ -166,7 +168,7 @@ const TenantFiltersComponent: React.FC<TenantFiltersProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Sort By
+                  {t('tenants.management.filters.sortBy')}
                 </label>
                 <select
                   value={filters.sortBy || 'createdAt'}
@@ -174,16 +176,16 @@ const TenantFiltersComponent: React.FC<TenantFiltersProps> = ({
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                   disabled={loading}
                 >
-                  <option value="createdAt">Created Date</option>
-                  <option value="name">Name</option>
-                  <option value="status">Status</option>
-                  <option value="userCount">User Count</option>
+                  <option value="createdAt">{t('tenants.management.filters.createdDate')}</option>
+                  <option value="name">{t('tenants.management.table.columns.name')}</option>
+                  <option value="status">{t('tenants.management.table.columns.status')}</option>
+                  <option value="userCount">{t('tenants.management.filters.userCount')}</option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Sort Order
+                  {t('tenants.management.filters.sortOrder')}
                 </label>
                 <select
                   value={filters.sortOrder || 'desc'}
@@ -191,8 +193,8 @@ const TenantFiltersComponent: React.FC<TenantFiltersProps> = ({
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                   disabled={loading}
                 >
-                  <option value="desc">Newest First</option>
-                  <option value="asc">Oldest First</option>
+                  <option value="desc">{t('tenants.management.filters.newestFirst')}</option>
+                  <option value="asc">{t('tenants.management.filters.oldestFirst')}</option>
                 </select>
               </div>
             </div>
@@ -202,7 +204,7 @@ const TenantFiltersComponent: React.FC<TenantFiltersProps> = ({
               <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                 {filters.status && (
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                    Status: {filters.status}
+                    {t('tenants.management.filters.status')}: {filters.status}
                     <button
                       onClick={() => handleFilterChange('status', undefined)}
                       className="ml-1 hover:text-green-600 dark:hover:text-green-300"
@@ -213,7 +215,7 @@ const TenantFiltersComponent: React.FC<TenantFiltersProps> = ({
                 )}
                 {filters.region && (
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                    Region: {filters.region}
+                    {t('tenants.management.filters.region')}: {filters.region}
                     <button
                       onClick={() => handleFilterChange('region', undefined)}
                       className="ml-1 hover:text-purple-600 dark:hover:text-purple-300"
@@ -224,7 +226,7 @@ const TenantFiltersComponent: React.FC<TenantFiltersProps> = ({
                 )}
                 {filters.search && (
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                    Search: "{filters.search}"
+                    {t('common.search')}: "{filters.search}"
                     <button
                       onClick={handleClearSearch}
                       className="ml-1 hover:text-yellow-600 dark:hover:text-yellow-300"

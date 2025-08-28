@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslation } from 'react-i18next';
 import Link from 'next/link';
 import { Shield, Eye, EyeOff, Loader2, CheckCircle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -30,6 +31,7 @@ interface ResetPasswordClientProps {
 }
 
 export default function ResetPasswordClient({ token, email }: ResetPasswordClientProps) {
+  const { t } = useTranslation('auth');
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +72,7 @@ export default function ResetPasswordClient({ token, email }: ResetPasswordClien
         setError(response.message);
       }
     } catch (err) {
-      setError('Network error. Please check your connection and try again.');
+      setError(t('resetPassword.errors.networkError'));
     } finally {
       setIsLoading(false);
     }
@@ -85,13 +87,13 @@ export default function ResetPasswordClient({ token, email }: ResetPasswordClien
               <CheckCircle className="h-16 w-16 text-green-500" />
             </div>
             <h2 className="mt-4 text-3xl font-bold text-gray-900 dark:text-white">
-              Password Updated Successfully
+              {t('resetPassword.successTitle')}
             </h2>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Your password has been successfully updated. You can now log in with your new password.
+              {t('resetPassword.successSubtitle')}
             </p>
             <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-              Redirecting to login page...
+              {t('resetPassword.redirectingToLogin')}
             </p>
           </div>
         </div>
@@ -106,7 +108,7 @@ export default function ResetPasswordClient({ token, email }: ResetPasswordClien
           href="/superadmin/login"
           className="inline-flex items-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
         >
-          ← Back to login
+          {t('resetPassword.backToLogin')}
         </Link>
       </div>
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto space-y-8">
@@ -117,13 +119,13 @@ export default function ResetPasswordClient({ token, email }: ResetPasswordClien
           </div>
           
           <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90 sm:text-3xl">
-            Reset Your Password
+            {t('resetPassword.title')}
           </h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Enter your new password to secure your account
+            {t('resetPassword.subtitle')}
           </p>
           <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-            Resetting password for: {email}
+            {t('resetPassword.resettingFor', { email })}
           </p>
         </div>
 
@@ -131,7 +133,7 @@ export default function ResetPasswordClient({ token, email }: ResetPasswordClien
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
           <div>
             <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              New Password
+              {t('resetPassword.newPassword')}
             </label>
             <div className="relative mt-1">
               <input
@@ -141,7 +143,7 @@ export default function ResetPasswordClient({ token, email }: ResetPasswordClien
                 className={`block w-full px-3 py-2 pr-10 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white ${
                   errors.newPassword ? 'border-red-300' : 'border-gray-300'
                 }`}
-                placeholder="Enter your new password"
+                placeholder={t('resetPassword.newPasswordPlaceholder')}
                 disabled={isLoading}
               />
               <button
@@ -165,7 +167,7 @@ export default function ResetPasswordClient({ token, email }: ResetPasswordClien
 
           <div>
             <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Confirm New Password
+              {t('resetPassword.confirmPassword')}
             </label>
             <div className="relative mt-1">
               <input
@@ -175,7 +177,7 @@ export default function ResetPasswordClient({ token, email }: ResetPasswordClien
                 className={`block w-full px-3 py-2 pr-10 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white ${
                   errors.confirmPassword ? 'border-red-300' : 'border-gray-300'
                 }`}
-                placeholder="Confirm your new password"
+                placeholder={t('resetPassword.confirmPasswordPlaceholder')}
                 disabled={isLoading}
               />
               <button
@@ -200,19 +202,19 @@ export default function ResetPasswordClient({ token, email }: ResetPasswordClien
           {/* Password Strength Indicator */}
           {newPassword && (
             <div className="space-y-2">
-              <div className="text-sm text-gray-600 dark:text-gray-400">Password strength:</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">{t('resetPassword.passwordStrength')}</div>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className={`${newPassword.length >= 8 ? 'text-green-600' : 'text-red-600'}`}>
-                  ✓ At least 8 characters
+                  {t('resetPassword.passwordRequirements.minLength')}
                 </div>
                 <div className={`${/[A-Z]/.test(newPassword) ? 'text-green-600' : 'text-red-600'}`}>
-                  ✓ One uppercase letter
+                  {t('resetPassword.passwordRequirements.uppercase')}
                 </div>
                 <div className={`${/\d/.test(newPassword) ? 'text-green-600' : 'text-red-600'}`}>
-                  ✓ One number
+                  {t('resetPassword.passwordRequirements.number')}
                 </div>
                 <div className={`${/[a-z]/.test(newPassword) ? 'text-green-600' : 'text-red-600'}`}>
-                  ✓ One lowercase letter
+                  {t('resetPassword.passwordRequirements.lowercase')}
                 </div>
               </div>
             </div>
@@ -243,10 +245,10 @@ export default function ResetPasswordClient({ token, email }: ResetPasswordClien
             {isLoading ? (
               <>
                 <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5" />
-                Updating Password...
+                {t('resetPassword.updatingPassword')}
               </>
             ) : (
-              'Update Password'
+              t('resetPassword.updatePassword')
             )}
           </button>
         </form>

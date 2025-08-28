@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import i18n, { i18nInitialized } from '@/lib/i18n';
+import i18n from '@/lib/i18n';
 import { Globe, ChevronDown } from 'lucide-react';
 
 const languageOptions = [
@@ -12,78 +12,37 @@ const languageOptions = [
   { code: 'fr', name: 'FR', nativeName: 'Français' },
 ];
 
-export const AuthLanguageSwitcher: React.FC = () => {
+export const AuthLanguageSwitcher = () => {
   const { t } = useTranslation('common');
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [isLoading, setIsLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
+  const [, forceUpdate] = useState({});
 
   useEffect(() => {
-    const initializeLanguage = async () => {
-      try {
-        // Wait for i18n to be initialized
-        if (!i18nInitialized) {
-          await new Promise<void>((resolve) => {
-            const checkInitialized = () => {
-              if (i18nInitialized) {
-                resolve();
-              } else {
-                setTimeout(checkInitialized, 100);
-              }
-            };
-            checkInitialized();
-          });
-        }
-
-        // Get saved language or default to 'en'
-        const savedLanguage = localStorage.getItem('language') || 'en';
-        setCurrentLanguage(savedLanguage);
-        
-        // Apply the language
-        await i18n.changeLanguage(savedLanguage);
-        
-        // Set RTL for Arabic and Urdu
-        if (savedLanguage === 'ar' || savedLanguage === 'ur') {
-          document.documentElement.dir = 'rtl';
-        } else {
-          document.documentElement.dir = 'ltr';
-        }
-        
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error initializing language:', error);
-        setIsLoading(false);
-      }
-    };
-
-    initializeLanguage();
+    // Get saved language or default to 'en'
+    const savedLanguage = localStorage.getItem('language') || 'en';
+    setCurrentLanguage(savedLanguage);
+    
+    // Apply the language
+    i18n.changeLanguage(savedLanguage);
+    
+    // Set RTL for Arabic and Urdu
+    if (savedLanguage === 'ar' || savedLanguage === 'ur') {
+      document.documentElement.dir = 'rtl';
+    } else {
+      document.documentElement.dir = 'ltr';
+    }
+    
+    setIsLoading(false);
   }, []);
 
   const handleLanguageChange = async (newLanguage: string) => {
     try {
-      console.log('AuthLanguageSwitcher: Changing language to:', newLanguage);
-      
-      // Wait for i18n to be initialized
-      if (!i18nInitialized) {
-        console.log('AuthLanguageSwitcher: Waiting for i18n initialization...');
-        await new Promise<void>((resolve) => {
-          const checkInitialized = () => {
-            if (i18nInitialized) {
-              resolve();
-            } else {
-              setTimeout(checkInitialized, 100);
-            }
-          };
-          checkInitialized();
-        });
-      }
-
-      console.log('AuthLanguageSwitcher: i18n initialized, changing language...');
+      setIsLoading(true);
       
       // Update i18next
       await i18n.changeLanguage(newLanguage);
-      
-      console.log('AuthLanguageSwitcher: Language changed to:', i18n.language);
       
       // Update state
       setCurrentLanguage(newLanguage);
@@ -98,9 +57,17 @@ export const AuthLanguageSwitcher: React.FC = () => {
         document.documentElement.dir = 'ltr';
       }
 
+      // Force re-render of all components
+      forceUpdate({});
+      
+      // Trigger a custom event to notify other components
+      window.dispatchEvent(new CustomEvent('languageChanged', { detail: newLanguage }));
+
       setIsOpen(false);
     } catch (error) {
-      console.error('AuthLanguageSwitcher: Error changing language:', error);
+      console.error('Error changing language:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 

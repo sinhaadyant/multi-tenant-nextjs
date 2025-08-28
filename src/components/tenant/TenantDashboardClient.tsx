@@ -92,6 +92,7 @@ const TenantDashboardClient: React.FC = () => {
   }, [isLoggedIn, tenant, router, tenantSlug]);
 
   // Use the tenant dashboard hook with better error handling
+  const dashboardData = useTenantDashboard();
   const {
     stats,
     systemHealth,
@@ -102,7 +103,7 @@ const TenantDashboardClient: React.FC = () => {
     selectedRange,
     setSelectedRange,
     refreshDashboard
-  } = useTenantDashboard();
+  } = dashboardData;
 
   // Real-time stats with better error handling
   const { stats: realTimeStats, loading: statsLoading, error: statsError, refetch: refetchStats } = useTenantRealTimeStats(tenant?.slug || '');
@@ -132,13 +133,13 @@ const TenantDashboardClient: React.FC = () => {
     });
   }
 
-  // Temporary override for testing - force permissions to false
-  const testPermissions = {
-    canViewUsers: false,
-    canViewRoles: false,
-    canViewAudit: false,
-    canViewReports: false,
-    canViewAnalytics: false
+  // Use actual permissions from the hook
+  const actualPermissions = {
+    canViewUsers,
+    canViewRoles,
+    canViewAudit,
+    canViewReports,
+    canViewAnalytics
   };
 
   // Handle dashboard errors
@@ -228,9 +229,7 @@ const TenantDashboardClient: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-3">
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            Last updated: {lastUpdated.toLocaleTimeString()}
-          </div>
+ 
           {selectedRange && setSelectedRange && (
             <DateFilterDropdown 
               selectedRange={selectedRange}
@@ -245,38 +244,7 @@ const TenantDashboardClient: React.FC = () => {
             <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
             {isRefreshing ? 'Refreshing...' : 'Refresh'}
           </button>
-          {process.env.NODE_ENV === 'development' && (
-            <>
-              <button
-                onClick={() => {
-                  debugToken();
-                  toast.success('Token debug info logged to console');
-                }}
-                className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
-              >
-                <Bug className="w-4 h-4 mr-2" />
-                Debug Token
-              </button>
-              <button
-                onClick={() => {
-                  // Clear all tokens and redirect to login
-                  localStorage.clear();
-                  sessionStorage.clear();
-                  document.cookie = 'superadmin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-                  document.cookie = 'refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-                  document.cookie = 'tenant_auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-                  toast.success('Tokens cleared. Redirecting to login...');
-                  setTimeout(() => {
-                    router.push(`/${tenant?.slug}/login`);
-                  }, 1000);
-                }}
-                className="inline-flex items-center px-3 py-2 text-sm font-medium text-red-700 bg-white border border-red-300 rounded-lg hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 dark:bg-gray-800 dark:text-red-300 dark:border-red-600 dark:hover:bg-red-900/20"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Clear Tokens
-              </button>
-            </>
-          )}
+          
         </div>
       </div>
 
@@ -302,27 +270,25 @@ const TenantDashboardClient: React.FC = () => {
         </div>
       )}
 
-      {/* Overview Cards - Only show if user has any relevant permissions */}
-      {(testPermissions.canViewUsers || testPermissions.canViewRoles || testPermissions.canViewAudit || testPermissions.canViewReports) && (
-        <TenantDashboardOverviewCards 
-          summary={{
-            totalUsers: displayStats?.summary?.totalUsers || 0,
-            activeUsers: displayStats?.summary?.activeUsers || 0,
-            totalRoles: displayStats?.summary?.totalRoles || 0,
-            totalAuditEvents: displayStats?.summary?.totalAuditEvents || 0,
-            userGrowth: displayStats?.summary?.userGrowth || 0,
-            auditGrowth: displayStats?.summary?.auditGrowth || 0
-          }} 
-          selectedRange={selectedRange || '7d'} 
-          isLoading={isLoading}
-          permissions={{
-            canViewUsers: testPermissions.canViewUsers,
-            canViewRoles: testPermissions.canViewRoles,
-            canViewAudit: testPermissions.canViewAudit,
-            canViewReports: testPermissions.canViewReports
-          }}
-        />
-      )}
+      {/* Overview Cards - Show based on actual permissions */}
+      <TenantDashboardOverviewCards 
+        summary={{
+          totalUsers: displayStats?.summary?.totalUsers || 0,
+          activeUsers: displayStats?.summary?.activeUsers || 0,
+          totalRoles: displayStats?.summary?.totalRoles || 0,
+          totalAuditEvents: displayStats?.summary?.totalAuditEvents || 0,
+          userGrowth: displayStats?.summary?.userGrowth || 0,
+          auditGrowth: displayStats?.summary?.auditGrowth || 0
+        }} 
+        selectedRange={selectedRange || '7d'} 
+        isLoading={isLoading}
+        permissions={{
+          canViewUsers: actualPermissions.canViewUsers,
+          canViewRoles: actualPermissions.canViewRoles,
+          canViewAudit: actualPermissions.canViewAudit,
+          canViewReports: actualPermissions.canViewReports
+        }}
+      />
 
       {/* Show error message if there's an error but still show the dashboard */}
       {isError && (

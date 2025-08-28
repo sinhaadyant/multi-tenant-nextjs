@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Tenant } from '@/hooks/useTenantsAPI';
 import { format } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 
 interface TenantTableProps {
   tenants: Tenant[];
@@ -38,27 +39,29 @@ interface TenantTableProps {
 
 // Memoized Status Badge Component
 const StatusBadge = memo(({ status }: { status: string }) => {
+  const { t } = useTranslation('superadmin');
+  
   const getStatusConfig = (status: string) => {
     switch (status) {
       case 'active':
         return {
           className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-          label: 'Active'
+          label: t('tenants.management.table.status.active')
         };
       case 'pending':
         return {
           className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-          label: 'Pending'
+          label: t('tenants.management.table.status.pending')
         };
       case 'suspended':
         return {
           className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-          label: 'Suspended'
+          label: t('tenants.management.table.status.suspended')
         };
       default:
         return {
           className: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
-          label: 'Unknown'
+          label: t('tenants.management.table.status.unknown')
         };
     }
   };
@@ -111,6 +114,7 @@ const TenantRow = memo(({
   onSort: (field: string) => void;
 }) => {
   const [isPending, startTransition] = useTransition();
+  const { t } = useTranslation('superadmin');
 
   const handleSort = useCallback((field: string) => {
     startTransition(() => {
@@ -170,7 +174,7 @@ const TenantRow = memo(({
               onClick={() => handleAction('view')}
               className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-700 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
               disabled={isPending}
-              title="View Tenant"
+              title={t('tenants.management.actions.viewTenant')}
             >
               <Eye className="w-4 h-4" />
             </button>
@@ -178,7 +182,7 @@ const TenantRow = memo(({
               onClick={() => handleAction('edit')}
               className="flex items-center justify-center w-8 h-8 rounded-md bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 dark:bg-green-900/20 dark:hover:bg-green-900/30 dark:text-green-400 dark:hover:text-green-300 transition-colors"
               disabled={isPending}
-              title="Edit Tenant"
+              title={t('tenants.management.actions.editTenant')}
             >
               <Edit className="w-4 h-4" />
             </button>
@@ -190,7 +194,7 @@ const TenantRow = memo(({
                   : 'bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 dark:bg-green-900/20 dark:hover:bg-green-900/30 dark:text-green-400 dark:hover:text-green-300'
               }`}
               disabled={isPending}
-              title={tenant.status === 'active' ? 'Suspend Tenant' : 'Activate Tenant'}
+              title={tenant.status === 'active' ? t('tenants.management.actions.suspendTenant') : t('tenants.management.actions.activateTenant')}
             >
               {tenant.status === 'active' ? (
                 <PowerOff className="w-4 h-4" />
@@ -202,7 +206,7 @@ const TenantRow = memo(({
               onClick={() => handleAction('delete')}
               className="flex items-center justify-center w-8 h-8 rounded-md bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 dark:bg-red-900/20 dark:hover:bg-red-900/30 dark:text-red-400 dark:hover:text-red-300 transition-colors"
               disabled={isPending}
-              title="Delete Tenant"
+              title={t('tenants.management.actions.deleteTenant')}
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -215,15 +219,15 @@ const TenantRow = memo(({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
                 <Globe className="w-4 h-4 mr-2" />
-                <span>Domain: {tenant.domain}</span>
+                <span>{t('tenants.management.table.details.domain')}: {tenant.domain}</span>
               </div>
               <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
                 <MapPin className="w-4 h-4 mr-2" />
-                <span>Region: {tenant.region}</span>
+                <span>{t('tenants.management.table.details.region')}: {tenant.region}</span>
               </div>
               <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
                 <Calendar className="w-4 h-4 mr-2" />
-                <span>Last Active: {format(new Date(tenant.updatedAt), 'MMM dd, yyyy HH:mm')}</span>
+                <span>{t('tenants.management.table.details.lastActive')}: {format(new Date(tenant.updatedAt), 'MMM dd, yyyy HH:mm')}</span>
               </div>
             </div>
           </td>
@@ -254,6 +258,7 @@ const TenantTable: React.FC<TenantTableProps> = memo(({
 }) => {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const { t } = useTranslation('superadmin');
 
   // Memoized sort handler with transition
   const handleSort = useCallback((field: string) => {
@@ -294,7 +299,13 @@ const TenantTable: React.FC<TenantTableProps> = memo(({
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
-                {['Name', 'Status', 'Users', 'Created', 'Actions'].map((header) => (
+                {[
+                  t('tenants.management.table.columns.name'),
+                  t('tenants.management.table.columns.status'),
+                  t('tenants.management.table.columns.users'),
+                  t('tenants.management.table.columns.created'),
+                  t('tenants.management.table.columns.actions')
+                ].map((header) => (
                   <th key={header} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
                   </th>
@@ -325,11 +336,11 @@ const TenantTable: React.FC<TenantTableProps> = memo(({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Tenants
+              {t('tenants.management.table.title')}
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Showing {paginationInfo.start} to {paginationInfo.end} of {totalRecords} tenants
-              {isPending && <span className="ml-2 text-blue-500">Updating...</span>}
+              {t('tenants.management.table.pagination.showing')} {paginationInfo.start} {t('tenants.management.table.pagination.to')} {paginationInfo.end} {t('tenants.management.table.pagination.of')} {totalRecords} {t('tenants.management.table.pagination.tenants')}
+              {isPending && <span className="ml-2 text-blue-500">{t('tenants.management.table.pagination.updating')}</span>}
             </p>
           </div>
         </div>
@@ -341,11 +352,11 @@ const TenantTable: React.FC<TenantTableProps> = memo(({
           <thead className="bg-gray-50 dark:bg-gray-700">
             <tr>
               {[
-                { key: 'name', label: 'Name' },
-                 { key: 'status', label: 'Status' },
-                { key: 'userCount', label: 'Users' },
-                { key: 'createdAt', label: 'Created' },
-                { key: 'actions', label: 'Actions' }
+                { key: 'name', label: t('tenants.management.table.columns.name') },
+                 { key: 'status', label: t('tenants.management.table.columns.status') },
+                { key: 'userCount', label: t('tenants.management.table.columns.users') },
+                { key: 'createdAt', label: t('tenants.management.table.columns.created') },
+                { key: 'actions', label: t('tenants.management.table.columns.actions') }
               ].map(({ key, label }) => (
                 <th 
                   key={key}
@@ -384,7 +395,7 @@ const TenantTable: React.FC<TenantTableProps> = memo(({
       <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-700 dark:text-gray-300">Show:</span>
+            <span className="text-sm text-gray-700 dark:text-gray-300">{t('tenants.management.table.pagination.show')}:</span>
             <select
               value={pageSize}
               onChange={(e) => handlePageSizeChange(Number(e.target.value))}
@@ -394,7 +405,7 @@ const TenantTable: React.FC<TenantTableProps> = memo(({
                 <option key={size} value={size}>{size}</option>
               ))}
             </select>
-            <span className="text-sm text-gray-700 dark:text-gray-300">entries</span>
+            <span className="text-sm text-gray-700 dark:text-gray-300">{t('tenants.management.table.pagination.entries')}</span>
           </div>
           
           <div className="flex items-center space-x-2">
@@ -403,17 +414,17 @@ const TenantTable: React.FC<TenantTableProps> = memo(({
               disabled={currentPage === 1 || isPending}
               className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Previous
+              {t('tenants.management.table.pagination.previous')}
             </button>
             <span className="text-sm text-gray-700 dark:text-gray-300">
-              Page {currentPage} of {totalPages}
+              {t('tenants.management.table.pagination.page')} {currentPage} {t('tenants.management.table.pagination.of')} {totalPages}
             </span>
             <button
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages || isPending}
               className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Next
+              {t('tenants.management.table.pagination.next')}
             </button>
           </div>
         </div>

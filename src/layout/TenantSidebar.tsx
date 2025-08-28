@@ -229,31 +229,20 @@ const TenantSidebar: React.FC = () => {
     const navItems: NavItem[] = visibleModules.map((module: any) => {
       const moduleKey = module.moduleKey;
       
-      // Map module keys to correct route paths (excluding module-management)
+      // Map module keys to correct route paths (cleaned up to avoid conflicts)
       const routeMapping: { [key: string]: string } = {
         'dashboard': `/${tenantSlug}/dashboard`,
         'user-management': `/${tenantSlug}/users`,
-        'users': `/${tenantSlug}/users`,
-        'roles-permissions': `/${tenantSlug}/roles`,
-        'roles': `/${tenantSlug}/roles`,
-        'audit-logs': `/${tenantSlug}/audit`,
-        'audit': `/${tenantSlug}/audit`,
-        'notifications': `/${tenantSlug}/notifications`,
-        'support': `/${tenantSlug}/support`,
-        'support-tickets': `/${tenantSlug}/support`,
-        'reports-analytics': `/${tenantSlug}/reports`,
-        'reports': `/${tenantSlug}/reports`,
+        'role-management': `/${tenantSlug}/roles`,
+        'analytics': `/${tenantSlug}/analytics`,
         'profile': `/${tenantSlug}/profile`,
-        'tenant-management': `/${tenantSlug}/tenants`,
-        'tenants': `/${tenantSlug}/tenants`,
-        'menu-management': `/${tenantSlug}/menu`,
-        'menu': `/${tenantSlug}/menu`,
-        'backup-import': `/${tenantSlug}/backup`,
-        'backup': `/${tenantSlug}/backup`,
-        'data-management': `/${tenantSlug}/data-management`,
-        'import': `/${tenantSlug}/import`,
-        'content-management': `/${tenantSlug}/content-management`,
-        'analytics': `/${tenantSlug}/analytics`
+        'support': `/${tenantSlug}/support`,
+        'audit-logs': `/${tenantSlug}/audit`,
+        'notifications': `/${tenantSlug}/notifications`,
+        'content-management': `/${tenantSlug}/content`,
+        // 'data-management': `/${tenantSlug}/data`,
+        'settings': `/${tenantSlug}/settings`,
+        'utilities': `/${tenantSlug}/utilities`
       };
 
       const navItem: NavItem = {
@@ -279,8 +268,8 @@ const TenantSidebar: React.FC = () => {
           });
       }
 
-      // Special handling for modules that need custom children
-      if (moduleKey === 'support' || moduleKey === 'support-tickets') {
+      // Special handling for support module
+      if (moduleKey === 'support') {
         navItem.children = [
           { 
             id: "allTickets", 
@@ -290,34 +279,28 @@ const TenantSidebar: React.FC = () => {
         ];
       }
 
-      // Special handling for backup/import module
-      if (moduleKey === 'backup-import' || moduleKey === 'backup') {
-        navItem.children = [
-          { 
-            id: "backup", 
-            label: "Backup Data", 
-            path: `/${tenantSlug}/backup`
-          },
-          { 
-            id: "import", 
-            label: "Import Data", 
-            path: `/${tenantSlug}/import`
-          }
-        ];
-      }
-
       // Special handling for data management module
       if (moduleKey === 'data-management') {
         navItem.children = [
           { 
+            id: "backup", 
+            label: "Backup Data", 
+            path: `/${tenantSlug}/data`
+          },
+          { 
+            id: "import", 
+            label: "Import Data", 
+            path: `/${tenantSlug}/data`
+          },
+          { 
             id: "insertData", 
             label: "Insert Sample Data", 
-            path: `/${tenantSlug}/data-management`
+            path: `/${tenantSlug}/data`
           },
           { 
             id: "clearData", 
             label: "Clear Data", 
-            path: `/${tenantSlug}/data-management`
+            path: `/${tenantSlug}/data`
           }
         ];
       }

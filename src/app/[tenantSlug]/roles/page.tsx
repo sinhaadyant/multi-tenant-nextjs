@@ -251,7 +251,7 @@ const TenantRolesPage = () => {
             <div className="flex items-center gap-2 mb-2">
               <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
               <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                Debug Information
+                Information
               </h4>
             </div>
             <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">

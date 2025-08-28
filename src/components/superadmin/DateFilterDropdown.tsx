@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { ChevronDown, Calendar } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface DateFilterDropdownProps {
   selectedRange: string;
@@ -12,14 +13,15 @@ const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({
   onRangeChange,
   isLoading = false
 }) => {
+  const { t } = useTranslation('superadmin');
   const [isOpen, setIsOpen] = useState(false);
 
   const filterOptions = [
-    { value: '7d', label: 'Last 7 Days' },
-    { value: '30d', label: '1 Month' },
-    { value: '60d', label: '60 Days' },
-    { value: '90d', label: '90 Days' },
-    { value: 'all', label: 'All Time' }
+    { value: '7d', label: t('dateFilter.last7Days') },
+    { value: '30d', label: t('dateFilter.last30Days') },
+    { value: '60d', label: t('dateFilter.last60Days') },
+    { value: '90d', label: t('dateFilter.last90Days') },
+    { value: 'all', label: t('dateFilter.allTime') }
   ];
 
   const selectedOption = filterOptions.find(option => option.value === selectedRange);
@@ -38,7 +40,7 @@ const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({
       >
         <div className="flex items-center">
           <Calendar className="w-4 h-4 mr-2 text-gray-400" />
-          <span>{selectedOption?.label || 'Select Range'}</span>
+          <span>{selectedOption?.label || t('dateFilter.selectRange')}</span>
         </div>
         <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>

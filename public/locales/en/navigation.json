@@ -31,15 +31,16 @@
     "users": "Users",
     "roles": "Roles",
     "modules": "Modules",
-    "analytics": "Analytics",
     "reports": "Reports",
-    "settings": "Settings",
     "profile": "Profile",
     "support": "Support",
     "notifications": "Notifications",
     "audit": "Audit",
     "backup": "Backup",
     "dataManagement": "Data Management",
-    "import": "Import"
+    "import": "Import",
+    "menuManagement": "Menu Management",
+    "tenantManagement": "Tenant Management",
+    "debugPermissions": "Debug Permissions"
   }
 }

@@ -1,21 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { verifyToken } from '@/lib/jwt';
 
 const prisma = new PrismaClient();
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
+    // Get authorization header
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get tenant from user
-    const user = await prisma.user.findFirst({
-      where: { email: session.user.email },
+    const token = authHeader.substring(7);
+    const decoded = await verifyToken(token);
+    
+    if (!decoded || !decoded.id) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    // Get user by ID
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
       include: { tenant: true },
     });
 
@@ -39,10 +45,17 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
+    // Get authorization header
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const token = authHeader.substring(7);
+    const decoded = await verifyToken(token);
+    
+    if (!decoded || !decoded.id) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
     const body = await request.json();
@@ -58,8 +71,8 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Get user and tenant
-    const user = await prisma.user.findFirst({
-      where: { email: session.user.email },
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
       include: { tenant: true },
     });
 

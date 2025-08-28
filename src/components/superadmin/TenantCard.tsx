@@ -16,6 +16,7 @@ import {
   PowerOff
 } from 'lucide-react';
 import { Tenant } from '@/hooks/useTenantsAPI';
+import { useTranslation } from 'react-i18next';
 
 interface TenantCardProps {
   tenant: Tenant;
@@ -40,31 +41,33 @@ const TenantCard: React.FC<TenantCardProps> = ({
   onReactivate,
   searchTerm = ''
 }) => {
+  const { t } = useTranslation('superadmin');
+  
   const getStatusConfig = (status: string) => {
     switch (status) {
       case 'active':
         return {
           icon: <CheckCircle className="w-4 h-4" />,
           className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-          label: 'Active'
+          label: t('tenants.management.table.status.active')
         };
       case 'pending':
         return {
           icon: <Clock className="w-4 h-4" />,
           className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-          label: 'Pending'
+          label: t('tenants.management.table.status.pending')
         };
       case 'suspended':
         return {
           icon: <XCircle className="w-4 h-4" />,
           className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
-          label: 'Suspended'
+          label: t('tenants.management.table.status.suspended')
         };
       default:
         return {
           icon: <MoreHorizontal className="w-4 h-4" />,
           className: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300',
-          label: 'Unknown'
+          label: t('tenants.management.table.status.unknown')
         };
     }
   };
@@ -163,7 +166,7 @@ const TenantCard: React.FC<TenantCardProps> = ({
                 {tenant.userCount}
               </p>
               <p className="text-xs text-gray-600 dark:text-gray-400">
-                Total Users
+                {t('tenants.management.stats.totalUsers')}
               </p>
             </div>
           </div>
@@ -174,7 +177,7 @@ const TenantCard: React.FC<TenantCardProps> = ({
                 {tenant.plan}
               </p>
               <p className="text-xs text-gray-600 dark:text-gray-400">
-                Plan
+                {t('tenants.form.plan')}
               </p>
             </div>
           </div>
@@ -184,7 +187,7 @@ const TenantCard: React.FC<TenantCardProps> = ({
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
             <Calendar className="w-4 h-4" />
-            <span>Created {formatDate(tenant.createdAt)}</span>
+            <span>{t('tenants.form.createdAt')} {formatDate(tenant.createdAt)}</span>
           </div>
           <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
             <Building2 className="w-4 h-4" />
@@ -196,7 +199,7 @@ const TenantCard: React.FC<TenantCardProps> = ({
         {tenant.features.length > 0 && (
           <div>
             <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Features
+              {t('common.features')}
             </p>
             <div className="flex flex-wrap gap-1">
               {tenant.features.slice(0, 3).map((feature) => (
@@ -233,14 +236,14 @@ const TenantCard: React.FC<TenantCardProps> = ({
               className="flex items-center gap-1 px-3 py-2 text-sm font-medium bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-700 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 dark:text-blue-400 dark:hover:text-blue-300 rounded-md transition-colors"
             >
               <Eye className="w-4 h-4" />
-              View
+              {t('common.view')}
             </button>
             <button
               onClick={() => onImpersonate?.(tenant)}
               className="flex items-center gap-1 px-3 py-2 text-sm font-medium bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 dark:bg-green-900/20 dark:hover:bg-green-900/30 dark:text-green-400 dark:hover:text-green-300 rounded-md transition-colors"
             >
               <ExternalLink className="w-4 h-4" />
-              Impersonate
+              {t('common.impersonate')}
             </button>
           </div>
           <div className="flex items-center gap-1">

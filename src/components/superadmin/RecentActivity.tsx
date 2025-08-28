@@ -3,9 +3,7 @@ import {
   Building2, 
   Users, 
   Shield, 
-  Database,
   AlertTriangle,
-  CheckCircle,
   Clock,
   Activity,
   UserPlus,
@@ -13,6 +11,7 @@ import {
   Settings,
   Key
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface AuditLog {
   id: string;
@@ -32,8 +31,24 @@ interface AuditLog {
   } | null;
 }
 
+interface AuditLog {
+  id: string;
+  action: string;
+  createdAt: string;
+  tenant?: { name: string; slug: string } | null;
+  user?: { email: string; name: string } | null;
+  superAdmin?: { email: string; name: string } | null;
+}
+
+interface DashboardData {
+  recentActivity?: {
+    auditLogs: AuditLog[];
+  };
+  auditLogs?: AuditLog[];
+}
+
 interface RecentActivityProps {
-  auditLogs: AuditLog[];
+  data?: DashboardData;
 }
 
 const getActionIcon = (action: string) => {
@@ -79,7 +94,7 @@ const formatTimeAgo = (dateString: string) => {
   });
 };
 
-const formatActionText = (action: string, tenant?: any, user?: any, superAdmin?: any) => {
+const formatActionText = (action: string, tenant?: { name: string; slug: string } | null, user?: { email: string; name: string } | null, superAdmin?: { email: string; name: string } | null) => {
   // Clean up action text
   let text = action
     .replace(/_/g, ' ')
@@ -108,26 +123,25 @@ const formatActionText = (action: string, tenant?: any, user?: any, superAdmin?:
   return text;
 };
 
-export const RecentActivity: React.FC<RecentActivityProps> = ({ auditLogs }) => {
+export const RecentActivity: React.FC<RecentActivityProps> = ({ data }) => {
+  const { t } = useTranslation('superadmin');
+  
+  // Extract audit logs from data
+  const auditLogs = data?.recentActivity?.auditLogs || data?.auditLogs || [];
+
   // Add null checks to prevent errors
-  if (!auditLogs) {
+  if (!auditLogs || auditLogs.length === 0) {
     return (
       <div className="p-6 bg-white rounded-lg shadow-sm border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Recent Activity
+            {t('dashboard.recentActivity.title')}
           </h3>
         </div>
-        <div className="space-y-3">
-          {[1, 2, 3, 4].map((index) => (
-            <div key={index} className="flex items-start space-x-3 p-3 rounded-lg animate-pulse">
-              <div className="w-8 h-8 bg-gray-200 rounded-full dark:bg-gray-700"></div>
-              <div className="flex-1">
-                <div className="h-4 bg-gray-200 rounded w-3/4 dark:bg-gray-700"></div>
-                <div className="h-3 bg-gray-200 rounded w-1/2 mt-2 dark:bg-gray-700"></div>
-              </div>
-            </div>
-          ))}
+        <div className="text-center py-8">
+          <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-500 dark:text-gray-400">{t('dashboard.recentActivity.noActivity')}</p>
+          <p className="text-xs text-gray-400 mt-1">{t('dashboard.recentActivity.noActivityDesc')}</p>
         </div>
       </div>
     );
@@ -137,7 +151,7 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({ auditLogs }) => 
     <div className="p-6 bg-white rounded-lg shadow-sm border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-          Recent Activity
+          {t('dashboard.recentActivity.title')}
         </h3>
         <div className="flex items-center space-x-2">
           <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -150,34 +164,27 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({ auditLogs }) => 
       </div>
       
       <div className="space-y-3">
-        {auditLogs.length === 0 ? (
-          <div className="text-center py-8">
-            <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500 dark:text-gray-400">No recent activity</p>
-          </div>
-        ) : (
-          auditLogs.slice(0, 8).map((log) => (
-            <div key={log.id} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-              <div className={`p-2 rounded-full ${getActionColor(log.action)}`}>
-                {getActionIcon(log.action)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white leading-tight">
-                  {formatActionText(log.action, log.tenant, log.user, log.superAdmin)}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {formatTimeAgo(log.createdAt)}
-                </p>
-              </div>
+        {auditLogs.slice(0, 8).map((log: AuditLog) => (
+          <div key={log.id} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+            <div className={`p-2 rounded-full ${getActionColor(log.action)}`}>
+              {getActionIcon(log.action)}
             </div>
-          ))
-        )}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 dark:text-white leading-tight">
+                {formatActionText(log.action, log.tenant, log.user, log.superAdmin)}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {formatTimeAgo(log.createdAt)}
+              </p>
+            </div>
+          </div>
+        ))}
       </div>
       
       {auditLogs.length > 8 && (
         <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
           <button className="w-full text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
-            View {auditLogs.length - 8} more activities
+            View All Activities
           </button>
         </div>
       )}

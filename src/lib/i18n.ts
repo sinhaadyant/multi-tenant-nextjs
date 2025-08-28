@@ -11,7 +11,14 @@ import enPlans from '../../public/locales/en/plans.json';
 import enSettings from '../../public/locales/en/settings.json';
 import enSuperadmin from '../../public/locales/en/superadmin.json';
 
-// For now, we'll use English translations for all languages to ensure basic functionality
+// Import Hindi translation files
+import hiAuth from '../../public/locales/hi/auth.json';
+import hiSuperadmin from '../../public/locales/hi/superadmin.json';
+
+// Import Bengali translation files
+import bnAuth from '../../public/locales/bn/auth.json';
+
+// For now, we'll use English translations for other languages to ensure basic functionality
 // In a production environment, you would import actual translations for each language
 
 const resources = {
@@ -26,12 +33,12 @@ const resources = {
   },
   hi: {
     common: enCommon,
-    auth: enAuth,
+    auth: hiAuth,
     errors: enErrors,
     users: enUsers,
     plans: enPlans,
     settings: enSettings,
-    superadmin: enSuperadmin,
+    superadmin: hiSuperadmin,
   },
   ur: {
     common: enCommon,
@@ -53,7 +60,7 @@ const resources = {
   },
   bn: {
     common: enCommon,
-    auth: enAuth,
+    auth: bnAuth,
     errors: enErrors,
     users: enUsers,
     plans: enPlans,

@@ -110,8 +110,16 @@ const CreateRoleModal: React.FC<CreateRoleModalProps> = ({
       });
       setErrors([]);
       setTouched({});
-    } catch (error) {
-      // Error is handled by the parent component
+    } catch (error: any) {
+      // Handle API errors
+      if (error?.response?.data?.errors) {
+        const apiErrors = error.response.data.errors.map((err: any) => err.message);
+        setErrors(apiErrors);
+      } else if (error?.message) {
+        setErrors([error.message]);
+      } else {
+        setErrors(['An unexpected error occurred. Please try again.']);
+      }
     }
   };
 
@@ -184,7 +192,7 @@ const CreateRoleModal: React.FC<CreateRoleModalProps> = ({
                     value={formData.name}
                     onChange={(e) => handleInputChange('name', e.target.value)}
                     placeholder="Enter role name"
-                    className={touched.name && !formData.name ? 'border-red-500' : ''}
+                    className={`${touched.name && !formData.name ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                     required
                   />
                   {touched.name && !formData.name && (
@@ -297,6 +305,7 @@ const CreateRoleModal: React.FC<CreateRoleModalProps> = ({
                   variant="outline"
                   onClick={handleClose}
                   disabled={loading}
+                  className="px-4 py-2"
                 >
                   Cancel
                 </Button>
@@ -304,7 +313,7 @@ const CreateRoleModal: React.FC<CreateRoleModalProps> = ({
                   type="submit"
                   variant="primary"
                   disabled={loading}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
                 >
                   {loading ? (
                     <>

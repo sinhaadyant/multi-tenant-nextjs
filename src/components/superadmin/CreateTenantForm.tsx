@@ -8,6 +8,7 @@ import { useMutation } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import { Eye, EyeOff, Check, X, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
+import { useTranslation } from 'react-i18next';
 
 import { createTenantSchema, CreateTenantData } from '@/lib/validations/superadmin';
 import { useCheckEmail, useCreateTenant } from '@/hooks/useTenantsAPI';
@@ -62,6 +63,7 @@ const industryTypes = [
 ] as const;
 
 const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCancel }: CreateTenantFormProps) {
+  const { t } = useTranslation('superadmin');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [subdomainChecking, setSubdomainChecking] = useState(false);
@@ -958,7 +960,7 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
             onClick={onCancel}
             className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600"
           >
-            Cancel
+            {t('createTenant.actions.cancel')}
           </button>
           <button
             type="submit"
@@ -976,7 +978,7 @@ const CreateTenantForm = React.memo(function CreateTenantForm({ onSuccess, onCan
             {(isSubmitting || createTenantMutation.isPending) && (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             )}
-            {isSubmitting || createTenantMutation.isPending ? 'Creating...' : 'Create Tenant'}
+            {isSubmitting || createTenantMutation.isPending ? t('createTenant.actions.creating') : t('createTenant.actions.create')}
           </button>
           
           {/* Validation Status */}

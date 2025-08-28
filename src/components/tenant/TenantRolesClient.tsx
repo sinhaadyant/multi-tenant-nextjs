@@ -165,8 +165,11 @@ const TenantRolesClient: React.FC = () => {
     try {
       await createRoleMutation.mutateAsync(roleData);
       setModalType(null);
+      // Show success message
+      console.log('Role created successfully');
     } catch (error: any) {
-      // Error is handled by the mutation
+      // Re-throw error to be handled by the modal
+      throw error;
     }
   };
 
@@ -336,7 +339,7 @@ const TenantRolesClient: React.FC = () => {
           {permissions?.canCreate && (
             <Button
               onClick={() => setModalType('create')}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
             >
               <Plus className="w-4 h-4" />
               Create Role
@@ -625,9 +628,9 @@ const TenantRolesClient: React.FC = () => {
               {permissions?.canCreate && !searchTerm && statusFilter === 'all' && roleTypeFilter === 'all' && (
                 <Button
                   onClick={() => setModalType('create')}
-                  variant="primary"
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
                 >
-                  <Plus className="w-4 h-4 mr-2" />
+                  <Plus className="w-4 h-4" />
                   Create First Role
                 </Button>
               )}

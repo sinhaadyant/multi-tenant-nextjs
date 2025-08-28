@@ -35,17 +35,7 @@ export async function POST(req: NextRequest) {
 
     // Find and validate the reset token
     const resetTokenRecord = await prisma.passwordResetToken.findUnique({
-      where: { token },
-      include: {
-        superAdmin: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            isActive: true,
-          }
-        }
-      }
+      where: { token }
     });
 
     if (!resetTokenRecord) {

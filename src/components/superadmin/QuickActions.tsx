@@ -14,8 +14,8 @@ export const QuickActions: React.FC = () => {
   
   const actions = [
     {
-      title: t('quickActions.createTenant'),
-      description: t('quickActions.createTenantDesc'),
+      title: t('dashboard.quickActions.addTenant'),
+      description: t('dashboard.quickActions.addTenantDesc'),
       icon: <Plus className="w-5 h-5" />,
       href: '/superadmin/tenants/new',
       color: 'bg-blue-500 hover:bg-blue-600',
@@ -23,8 +23,8 @@ export const QuickActions: React.FC = () => {
       iconBg: 'bg-blue-100 dark:bg-blue-900/30'
     },
     {
-      title: t('quickActions.manageUsers'),
-      description: t('quickActions.manageUsersDesc'),
+      title: t('dashboard.quickActions.manageUsers'),
+      description: t('dashboard.quickActions.manageUsersDesc'),
       icon: <Users className="w-5 h-5" />,
       href: '/superadmin/users',
       color: 'bg-green-500 hover:bg-green-600',
@@ -32,19 +32,19 @@ export const QuickActions: React.FC = () => {
       iconBg: 'bg-green-100 dark:bg-green-900/30'
     },
     {
-      title: t('quickActions.auditLogs'),
-      description: t('quickActions.auditLogsDesc'),
+      title: t('dashboard.quickActions.viewReports'),
+      description: t('dashboard.quickActions.viewReportsDesc'),
       icon: <ClipboardList className="w-5 h-5" />,
-      href: '/superadmin/audit',
+      href: '/superadmin/reports',
       color: 'bg-purple-500 hover:bg-purple-600',
       iconColor: 'text-purple-600 dark:text-purple-400',
       iconBg: 'bg-purple-100 dark:bg-purple-900/30'
     },
     {
-      title: t('quickActions.tenantManagement'),
-      description: t('quickActions.tenantManagementDesc'),
+      title: t('dashboard.quickActions.systemSettings'),
+      description: t('dashboard.quickActions.systemSettingsDesc'),
       icon: <Building2 className="w-5 h-5" />,
-      href: '/superadmin/tenants',
+      href: '/superadmin/settings',
       color: 'bg-orange-500 hover:bg-orange-600',
       iconColor: 'text-orange-600 dark:text-orange-400',
       iconBg: 'bg-orange-100 dark:bg-orange-900/30'
@@ -56,10 +56,10 @@ export const QuickActions: React.FC = () => {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {t('quickActions.title')}
+            {t('dashboard.quickActions.title')}
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Common administrative tasks
+            {t('dashboard.quickActions.subtitle')}
           </p>
         </div>
       </div>
@@ -99,26 +99,26 @@ export const QuickActions: React.FC = () => {
       {/* Additional quick links */}
       <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
         <div className="flex flex-wrap items-center gap-3 text-sm">
-          <span className="text-gray-500 dark:text-gray-400">Quick links:</span>
+          <span className="text-gray-500 dark:text-gray-400">{t('dashboard.quickActions.quickLinks')}</span>
           <Link 
             href="/superadmin/roles"
             className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
           >
-            Roles & Permissions
+            {t('dashboard.quickActions.rolesPermissions')}
           </Link>
           <span className="text-gray-400">•</span>
           <Link 
             href="/superadmin/reports"
             className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
           >
-            Reports
+            {t('dashboard.quickActions.reports')}
           </Link>
           <span className="text-gray-400">•</span>
           <Link 
             href="/superadmin/settings"
             className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
           >
-            Settings
+            {t('dashboard.quickActions.settings')}
           </Link>
         </div>
       </div>

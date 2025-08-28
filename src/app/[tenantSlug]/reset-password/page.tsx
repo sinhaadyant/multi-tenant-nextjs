@@ -36,7 +36,7 @@ export default function ResetPasswordPage() {
     try {
       console.log('🔍 Validating token with axios:', token.substring(0, 10) + '...');
       
-      const response = await axios.get(`/api/superadmin/auth/verify-reset-token`, {
+      const response = await axios.get(`/api/tenant/auth/verify-reset-token`, {
         params: { token },
         timeout: 10000 // 10 second timeout
       });
@@ -144,7 +144,7 @@ export default function ResetPasswordPage() {
           </p>
           <div className="mt-6">
             <button
-              onClick={() => router.push('/superadmin/forgot-password')}
+              onClick={() => router.push('/forgot-password')}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               Request New Reset Link

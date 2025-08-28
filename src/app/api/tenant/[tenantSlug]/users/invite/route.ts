@@ -101,14 +101,31 @@ export const POST = asyncHandler(async (req: NextRequest, { params }: { params: 
     }
 
     // Check if user has permission to invite users
+    // Allow if user has any role with user creation permissions
     const hasInvitePermission = requestingUser.userRoles.some(userRole => 
       userRole.role.permissions.some(permission => 
-        permission.moduleKey === 'users' && permission.canCreate
+        (permission.moduleKey === 'users' || permission.moduleKey === 'user-management') && 
+        permission.canCreate
       )
     );
 
-    if (!hasInvitePermission) {
-      return createErrorResponse('You do not have permission to invite users', 403);
+    // If no specific permission found, check if user is an admin or has any management role
+    const hasAdminRole = requestingUser.userRoles.some(userRole => 
+      userRole.role.name.toLowerCase().includes('admin') || 
+      userRole.role.name.toLowerCase().includes('manager') ||
+      userRole.role.name.toLowerCase().includes('administrator')
+    );
+
+    // Allow invitation if user has create permission OR is an admin/manager
+    if (!hasInvitePermission && !hasAdminRole) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('❌ Permission check failed for user:', requestingUser.email);
+        console.log('User roles:', requestingUser.userRoles.map(ur => ur.role.name));
+        console.log('User permissions:', requestingUser.userRoles.flatMap(ur => 
+          ur.role.permissions.map(p => `${p.moduleKey}:${p.canCreate}`)
+        ));
+      }
+      return createErrorResponse('You do not have permission to invite users. Please contact your administrator.', 403);
     }
 
     // Normalize email

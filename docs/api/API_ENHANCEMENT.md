@@ -339,7 +339,7 @@ export function handleApiError(error: any) {
 ### 4. Error Logging
 - **Structured Logging**: Consistent log format
 - **Error Tracking**: Integration with error tracking services
-- **Debug Information**: Development-friendly error details
+- **Information**: Development-friendly error details
 
 ## Data Validation
 

@@ -6,9 +6,13 @@ import { z } from 'zod';
 
 // Validation schemas
 const createRoleSchema = z.object({
-  name: z.string().min(1, 'Role name is required'),
-  description: z.string().optional(),
-  color: z.string().optional(),
+  name: z.string()
+    .min(1, 'Role name is required')
+    .min(2, 'Role name must be at least 2 characters')
+    .max(50, 'Role name must be less than 50 characters')
+    .regex(/^[a-zA-Z0-9\s\-_]+$/, 'Role name can only contain letters, numbers, spaces, hyphens, and underscores'),
+  description: z.string().max(200, 'Description must be less than 200 characters').optional(),
+  color: z.string().regex(/^#[0-9A-F]{6}$/i, 'Valid color is required').optional(),
   permissions: z.array(z.object({
     moduleKey: z.string(),
     canCreate: z.boolean().default(false),
@@ -16,7 +20,7 @@ const createRoleSchema = z.object({
     canUpdate: z.boolean().default(false),
     canDelete: z.boolean().default(false),
     canViewAll: z.boolean().default(false)
-  })).optional()
+  })).min(1, 'At least one permission is required')
 });
 
 const updateRoleSchema = z.object({
@@ -198,16 +202,19 @@ export const POST = withTenantAuth(async (req: AuthenticatedRequest, { params }:
     const body = await req.json();
     const validatedData = createRoleSchema.parse(body);
 
-    // Check if role name already exists (considering the unique constraint on name + isGlobal)
+    // Check if role name already exists within this specific tenant only
     const existingRole = await prisma.role.findFirst({
       where: {
         name: validatedData.name,
-        isGlobal: false // Check for any non-global role with this name
+        tenantId: tenantId, // Check only within this tenant
+        isGlobal: false
       }
     });
 
     if (existingRole) {
-      return createErrorResponse(`Role with name "${validatedData.name}" already exists. Please choose a different name.`, 400);
+      return createErrorResponse(`Role with name "${validatedData.name}" already exists in this tenant. Please choose a different name.`, 400, [
+        { field: 'name', message: 'Role name already exists in this tenant' }
+      ]);
     }
 
     // Create role
@@ -272,11 +279,17 @@ export const POST = withTenantAuth(async (req: AuthenticatedRequest, { params }:
     
     // Handle specific database constraint errors
     if (error.code === 'P2002' && error.meta?.target?.includes('roles_name_isGlobal_key')) {
-      return createErrorResponse(`Role with name "${validatedData.name}" already exists. Please choose a different name.`, 400);
+      return createErrorResponse(`Role with name "${validatedData.name}" already exists in this tenant. Please choose a different name.`, 400, [
+        { field: 'name', message: 'Role name already exists in this tenant' }
+      ]);
     }
     
     if (error.name === 'ZodError') {
-      return createErrorResponse('Validation error: ' + error.errors[0].message, 400);
+      const validationErrors = error.errors.map((err: any) => ({
+        field: err.path.join('.'),
+        message: err.message
+      }));
+      return createErrorResponse('Validation failed', 400, validationErrors);
     }
     
     return createErrorResponse(

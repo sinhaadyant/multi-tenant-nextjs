@@ -159,7 +159,7 @@ await queryClient.refetchQueries({ queryKey: ['superadmin-support-ticket', ticke
 - **Frontend Compatibility**: All data structures match component expectations
 - **Type Safety**: TypeScript types match actual API responses
 
-## Debug Information
+## Information
 
 ### **During Development**
 The following debug logs will appear in the browser console:

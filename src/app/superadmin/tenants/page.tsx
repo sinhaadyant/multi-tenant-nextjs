@@ -10,47 +10,52 @@ import TenantFilters from '@/components/superadmin/TenantFilters';
 import { useConfirmModalContext } from '@/components/common/ConfirmModalProvider';
 import Button from '@/components/ui/button/Button';
 import TenantSkeleton from '@/components/superadmin/TenantSkeleton';
+import { useTranslation } from 'react-i18next';
 
 import { CountCard } from '@/components/ui/CountCard';
 import { CountCardsGridSkeleton } from '@/components/ui/CountCardSkeleton';
 import { CheckCircle, XCircle, Building2, Users } from 'lucide-react';
 
 // Memoized stats cards component for better performance
-const StatsCards = memo(({ stats, totalUsers }: { stats: any; totalUsers: number }) => (
-  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-    <CountCard
-      title="Active Tenants"
-      value={stats.active}
-      icon={CheckCircle}
-      bgColor="bg-green-100 dark:bg-green-900"
-      iconColor="text-green-600 dark:text-green-400"
-    />
-    
-    <CountCard
-      title="Suspended Tenants"
-      value={stats.inactive}
-      icon={XCircle}
-      bgColor="bg-red-100 dark:bg-red-900"
-      iconColor="text-red-600 dark:text-red-400"
-    />
-    
-    <CountCard
-      title="Total Tenants"
-      value={stats.total}
-      icon={Building2}
-      bgColor="bg-blue-100 dark:bg-blue-900"
-      iconColor="text-blue-600 dark:text-blue-400"
-    />
-    
-    <CountCard
-      title="Total Users"
-      value={totalUsers}
-      icon={Users}
-      bgColor="bg-purple-100 dark:bg-purple-900"
-      iconColor="text-purple-600 dark:text-purple-400"
-    />
-  </div>
-));
+const StatsCards = memo(({ stats, totalUsers }: { stats: any; totalUsers: number }) => {
+  const { t } = useTranslation('superadmin');
+  
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <CountCard
+        title={t('tenants.management.stats.activeTenants')}
+        value={stats.active}
+        icon={CheckCircle}
+        bgColor="bg-green-100 dark:bg-green-900"
+        iconColor="text-green-600 dark:text-green-400"
+      />
+      
+      <CountCard
+        title={t('tenants.management.stats.suspendedTenants')}
+        value={stats.inactive}
+        icon={XCircle}
+        bgColor="bg-red-100 dark:bg-red-900"
+        iconColor="text-red-600 dark:text-red-400"
+      />
+      
+      <CountCard
+        title={t('tenants.management.stats.totalTenants')}
+        value={stats.total}
+        icon={Building2}
+        bgColor="bg-blue-100 dark:bg-blue-900"
+        iconColor="text-blue-600 dark:text-blue-400"
+      />
+      
+      <CountCard
+        title={t('tenants.management.stats.totalUsers')}
+        value={totalUsers}
+        icon={Users}
+        bgColor="bg-purple-100 dark:bg-purple-900"
+        iconColor="text-purple-600 dark:text-purple-400"
+      />
+    </div>
+  );
+});
 
 StatsCards.displayName = 'StatsCards';
 
@@ -59,6 +64,7 @@ const TenantsPage: React.FC = () => {
   const searchParams = useSearchParams();
   const { confirm } = useConfirmModalContext();
   const [isPending, startTransition] = useTransition();
+  const { t } = useTranslation('superadmin');
   
   // State management with optimized initialization
   const [filters, setFilters] = useState<TenantFiltersType>(() => ({
@@ -198,10 +204,10 @@ const TenantsPage: React.FC = () => {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Tenant Management
+            {t('tenants.management.title')}
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Manage all tenants in the system
+            {t('tenants.management.subtitle')}
           </p>
         </div>
         <div className="flex gap-3">
@@ -212,7 +218,7 @@ const TenantsPage: React.FC = () => {
             size="sm"
           >
             <RefreshCw className={`w-4 h-4 mr-2 inline ${isLoading || isPending ? 'animate-spin' : ''}`} />
-            Refresh
+            {t('tenants.management.actions.refresh')}
           </Button>
           <Button
             onClick={handleExportData}
@@ -221,7 +227,7 @@ const TenantsPage: React.FC = () => {
             size="sm"
           >
             <Download className={`w-4 h-4 mr-2 inline ${exportTenantsMutation.isPending ? 'animate-spin' : ''}`} />
-            {exportTenantsMutation.isPending ? 'Exporting...' : 'Export'}
+            {exportTenantsMutation.isPending ? t('tenants.management.actions.exporting') : t('tenants.management.actions.export')}
           </Button>
           <Button
             onClick={handleCreateTenant}
@@ -230,7 +236,7 @@ const TenantsPage: React.FC = () => {
             disabled={isPending}
           >
             <Plus className="w-4 h-4 mr-2 inline" />
-            Create Tenant
+            {t('tenants.management.actions.createTenant')}
           </Button>
         </div>
       </div>

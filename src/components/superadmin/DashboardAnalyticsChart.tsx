@@ -1,6 +1,7 @@
 import React from 'react';
 import dynamic from 'next/dynamic';
-import { ChevronDown, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 // Dynamically import Chart to avoid SSR issues
 const Chart = dynamic(() => import('react-apexcharts'), { 
@@ -70,14 +71,16 @@ const limitDataPoints = (data: Array<{ date: string; count: number }>, maxPoints
   return data.filter((_, index) => index % step === 0);
 };
 
-export const DashboardAnalyticsChart: React.FC<DashboardAnalyticsChartProps> = React.memo(({ chartData }) => {
-  // Add null checks to prevent errors
+const DashboardAnalyticsChartComponent: React.FC<DashboardAnalyticsChartProps> = ({ chartData }) => {
+  const { t } = useTranslation('superadmin');
+  
+    // Add null checks to prevent errors
   if (!chartData) {
     return (
       <div className="p-6 bg-white rounded-lg shadow-sm border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Analytics Dashboard
+            {t('charts.title')}
           </h3>
         </div>
         <div className="space-y-4">
@@ -316,35 +319,101 @@ export const DashboardAnalyticsChart: React.FC<DashboardAnalyticsChartProps> = R
     }
   };
 
-  // Role Distribution Pie Chart
+  // Role Distribution - Improved with better visualization
+  const roleDistributionData = (chartData.roleDistribution || []).slice(0, 5); // Limit to top 5 roles
   const roleDistributionOptions = {
     chart: {
-      type: 'pie' as const,
+      type: 'donut' as const,
       toolbar: {
         show: false
+      },
+      animations: {
+        enabled: true,
+        easing: 'easeinout',
+        speed: 800,
+        animateGradually: {
+          enabled: true,
+          delay: 150
+        },
+        dynamicAnimation: {
+          enabled: true,
+          speed: 350
+        }
       }
     },
-    series: (chartData.roleDistribution || []).map(item => item.count),
-    labels: (chartData.roleDistribution || []).map(item => item.role),
-    colors: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'],
+    series: roleDistributionData.map(item => item.count),
+    labels: roleDistributionData.map(item => {
+      // Clean up role names for better display
+      const roleName = item.role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      return roleName.length > 15 ? roleName.substring(0, 15) + '...' : roleName;
+    }),
+    colors: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#F97316', '#EC4899'],
     legend: {
       position: 'bottom' as const,
+      fontSize: '12px',
+      fontFamily: 'Inter, sans-serif',
       labels: {
         colors: '#6B7280'
+      },
+      markers: {
+        size: 12
+      },
+      itemMargin: {
+        horizontal: 10,
+        vertical: 5
+      }
+    },
+    plotOptions: {
+      pie: {
+        donut: {
+          size: '65%',
+          labels: {
+            show: true,
+            name: {
+              show: true,
+              fontSize: '14px',
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 600,
+              color: '#374151'
+            },
+            value: {
+              show: true,
+              fontSize: '16px',
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 700,
+              color: '#111827',
+              formatter: function (val: any) {
+                return val;
+              }
+            },
+            total: {
+              show: true,
+              label: 'Total Users',
+              fontSize: '14px',
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 600,
+              color: '#374151',
+              formatter: function (w: any) {
+                return w.globals.seriesTotals.reduce((a: number, b: number) => a + b, 0);
+              }
+            }
+          }
+        }
       }
     },
     theme: {
       mode: 'light' as const
     },
     dataLabels: {
-      enabled: true,
-      formatter: function(val: any, opts: any) {
-        return opts.w.globals.seriesTotals[opts.seriesIndex] > 0 ? val.toFixed(1) + '%' : '';
-      },
-      style: {
-        colors: ['#ffffff'],
-        fontSize: '12px',
-        fontWeight: 'bold'
+      enabled: false // Disable data labels for cleaner look
+    },
+    tooltip: {
+      y: {
+        formatter: function(val: number, opts: any) {
+          const total = opts.w.globals.seriesTotals.reduce((a: number, b: number) => a + b, 0);
+          const percentage = total > 0 ? ((val / total) * 100).toFixed(1) : '0';
+          return `${val} users (${percentage}%)`;
+        }
       }
     }
   };
@@ -390,15 +459,15 @@ export const DashboardAnalyticsChart: React.FC<DashboardAnalyticsChartProps> = R
       <div className="p-6 bg-white rounded-lg shadow-sm border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            User Signups Over Time
+            {t('charts.userSignups.title')}
           </h3>
           <div className="flex items-center space-x-2">
             <span className="text-sm text-gray-500 dark:text-gray-400">
-              {userSignupsData.length} data points
+              {userSignupsData.length} {t('charts.userSignups.dataPoints')}
             </span>
             {!hasUserSignups && (
               <span className="text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900 px-2 py-1 rounded">
-                No data
+                {t('charts.userSignups.noDataLabel')}
               </span>
             )}
           </div>
@@ -426,15 +495,15 @@ export const DashboardAnalyticsChart: React.FC<DashboardAnalyticsChartProps> = R
       <div className="p-6 bg-white rounded-lg shadow-sm border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Tenant Activity
+            {t('charts.tenantActivity.title')}
           </h3>
           <div className="flex items-center space-x-2">
             <span className="text-sm text-gray-500 dark:text-gray-400">
-              {tenantActivityData.length} data points
+              {tenantActivityData.length} {t('charts.tenantActivity.dataPoints')}
             </span>
             {!hasTenantActivity && (
               <span className="text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900 px-2 py-1 rounded">
-                No data
+                {t('charts.tenantActivity.noDataLabel')}
               </span>
             )}
           </div>
@@ -462,23 +531,34 @@ export const DashboardAnalyticsChart: React.FC<DashboardAnalyticsChartProps> = R
       <div className="p-6 bg-white rounded-lg shadow-sm border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Role Distribution
+            {t('charts.roleDistribution.title')}
           </h3>
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {roleDistributionData.length} {t('charts.roleDistribution.roles')}
+            </span>
+            {roleDistributionData.length > 5 && (
+              <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">
+                {t('charts.roleDistribution.top5Shown')}
+              </span>
+            )}
+          </div>
         </div>
         {hasRoleDistribution ? (
           typeof window !== 'undefined' && (
             <Chart
               options={roleDistributionOptions}
               series={roleDistributionOptions.series}
-              type="pie"
-              height={250}
+              type="donut"
+              height={300}
             />
           )
         ) : (
-          <div className="flex items-center justify-center h-[250px] text-gray-500">
+          <div className="flex items-center justify-center h-[300px] text-gray-500">
             <div className="text-center">
               <div className="text-4xl mb-2">👥</div>
-              <p>No role distribution data available</p>
+              <p className="text-sm">{t('charts.roleDistribution.noData')}</p>
+              <p className="text-xs text-gray-400 mt-1">{t('charts.roleDistribution.noDataDesc')}</p>
             </div>
           </div>
         )}
@@ -488,8 +568,13 @@ export const DashboardAnalyticsChart: React.FC<DashboardAnalyticsChartProps> = R
       <div className="p-6 bg-white rounded-lg shadow-sm border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Tenant Plan Distribution
+            {t('charts.planDistribution.title')}
           </h3>
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {chartData.tenantPlanDistribution?.length || 0} {t('charts.planDistribution.plans')}
+            </span>
+          </div>
         </div>
         {hasPlanDistribution ? (
           typeof window !== 'undefined' && (
@@ -504,11 +589,13 @@ export const DashboardAnalyticsChart: React.FC<DashboardAnalyticsChartProps> = R
           <div className="flex items-center justify-center h-[250px] text-gray-500">
             <div className="text-center">
               <div className="text-4xl mb-2">📋</div>
-              <p>No plan distribution data available</p>
+              <p>{t('charts.planDistribution.noData')}</p>
             </div>
           </div>
         )}
       </div>
     </div>
   );
-}); 
+};
+
+export const DashboardAnalyticsChart = React.memo(DashboardAnalyticsChartComponent); 

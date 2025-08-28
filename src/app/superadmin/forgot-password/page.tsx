@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslation } from 'react-i18next';
 import { Mail, Loader2, CheckCircle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,6 +19,7 @@ const forgotPasswordSchema = z.object({
 type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 
 export default function ForgotPassword() {
+  const { t } = useTranslation('auth');
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +56,7 @@ export default function ForgotPassword() {
         setError(response.message);
       }
     } catch (err) {
-      setError('Network error. Please check your connection and try again.');
+      setError(t('forgotPassword.errors.networkError'));
     } finally {
       setIsLoading(false);
     }
@@ -69,14 +71,14 @@ export default function ForgotPassword() {
               <CheckCircle className="h-16 w-16 text-green-500" />
             </div>
             <h2 className="mt-4 text-3xl font-bold text-gray-900 dark:text-white">
-              Check Your Email
+              {t('forgotPassword.checkEmailTitle')}
             </h2>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              We've sent password reset instructions to <br />
+              {t('forgotPassword.checkEmailSubtitle')} <br />
               <span className="font-medium">{getValues('email')}</span>
             </p>
             <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-              Redirecting to reset password page for demo purposes...
+              {t('forgotPassword.redirectingDemo')}
             </p>
           </div>
         </div>
@@ -96,7 +98,7 @@ export default function ForgotPassword() {
           href="/superadmin/login"
           className="inline-flex items-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
         >
-          ← Back to login
+          {t('forgotPassword.backToLogin')}
         </Link>
       </div>
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto space-y-8">
@@ -108,10 +110,10 @@ export default function ForgotPassword() {
           </div>
           
           <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90 sm:text-3xl">
-            Forgot Password?
+            {t('forgotPassword.title')}
           </h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Enter your email address and we'll send you instructions to reset your password
+            {t('forgotPassword.subtitle')}
           </p>
         </div>
 
@@ -119,7 +121,7 @@ export default function ForgotPassword() {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Email Address
+              {t('forgotPassword.emailLabel')}
             </label>
             <input
               {...register('email')}
@@ -128,7 +130,7 @@ export default function ForgotPassword() {
               className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white ${
                 errors.email ? 'border-red-300' : 'border-gray-300'
               }`}
-              placeholder="Enter your email address"
+              placeholder={t('forgotPassword.emailPlaceholder')}
               disabled={isLoading}
             />
             {errors.email && (
@@ -163,10 +165,10 @@ export default function ForgotPassword() {
             {isLoading ? (
               <>
                 <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5" />
-                Sending Instructions...
+                {t('forgotPassword.sendingInstructions')}
               </>
             ) : (
-              'Send Reset Instructions'
+              t('forgotPassword.sendInstructions')
             )}
           </button>
         </form>

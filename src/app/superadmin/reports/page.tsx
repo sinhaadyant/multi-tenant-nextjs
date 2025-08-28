@@ -26,7 +26,7 @@ import { GenerateReportModal } from '@/components/superadmin/GenerateReportModal
 import { ReportDetailsModal } from '@/components/superadmin/ReportDetailsModal';
 import { ReportsFilters as ReportsFiltersComponent } from '@/components/superadmin/ReportsFilters';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
-import { useTranslation } from 'next-i18next';
+import { useTranslation } from 'react-i18next';
 
 export default function ReportsPage() {
   const { t } = useTranslation('superadmin');
